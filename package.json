@@ -1,0 +1,22 @@
+{
+  "name": "physics-foundry",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "start": "node server.js",
+    "build": "node build.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "esbuild": "^0.28.1",
+    "three": "^0.161.0"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.9.0"
+  }
+}

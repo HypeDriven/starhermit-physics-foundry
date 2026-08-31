@@ -1,0 +1,98 @@
+[
+  {
+    "name": "ui-select",
+    "seconds": 1,
+    "prompt": "Short bright UI confirmation click: a quick metallic tap with a soft high blip, clean and dry, no reverb tail.",
+    "event": "ui-select"
+  },
+  {
+    "name": "ui-back",
+    "seconds": 1,
+    "prompt": "Short soft UI back sound: a muted descending wooden tick, like a small toggle switch flicked down.",
+    "event": "ui-back"
+  },
+  {
+    "name": "ui-error",
+    "seconds": 1,
+    "prompt": "Short dull error buzz: two low muted thuds on a plastic panel, flat and disapproving, no high frequencies.",
+    "event": "ui-error"
+  },
+  {
+    "name": "spawn",
+    "seconds": 1,
+    "prompt": "Object materializing pop: a quick wooden knock with an airy snap, like a block snapping into place on a workbench.",
+    "event": "spawn"
+  },
+  {
+    "name": "joint",
+    "seconds": 1,
+    "prompt": "Small mechanical pin locking: two quick metal snaps like a hinge pin clicking into a socket.",
+    "event": "joint"
+  },
+  {
+    "name": "delete",
+    "seconds": 1,
+    "prompt": "Soft crumpling whoosh: tearing cardboard with a short puff of air, muffled and quick.",
+    "event": "delete"
+  },
+  {
+    "name": "undo",
+    "seconds": 1,
+    "prompt": "Quick reverse whoosh: a tape-rewind slide ending in a single soft tick.",
+    "event": "undo"
+  },
+  {
+    "name": "run-start",
+    "seconds": 2,
+    "prompt": "Machinery spin-up: a rising mechanical whirr of gears engaging, ending with a solid clunk.",
+    "event": "run-start"
+  },
+  {
+    "name": "impact",
+    "seconds": 1,
+    "prompt": "Heavy physics impact: a solid steel weight hitting a wooden plank, deep thud with a short metallic ring.",
+    "event": "impact"
+  },
+  {
+    "name": "shatter",
+    "seconds": 2,
+    "prompt": "Glass pane shattering into many small shards scattering on a hard concrete floor.",
+    "event": "shatter"
+  },
+  {
+    "name": "goal",
+    "seconds": 1,
+    "prompt": "Cheerful success chime: two bright glockenspiel notes rising, like a small service bell rung twice.",
+    "event": "goal"
+  },
+  {
+    "name": "win",
+    "seconds": 3,
+    "prompt": "Short triumphant fanfare: bright brass and bells rising through four celebratory notes, warm and satisfying.",
+    "event": "win"
+  },
+  {
+    "name": "lose",
+    "seconds": 3,
+    "prompt": "Sad descending trombone phrase: three soft low muted notes falling in pitch, gentle and comical.",
+    "event": "lose"
+  },
+  {
+    "name": "tick",
+    "seconds": 1,
+    "prompt": "Single high clock tick: one small precise metallic click, very short and dry.",
+    "event": "tick"
+  },
+  {
+    "name": "pause",
+    "seconds": 1,
+    "prompt": "Soft pause sound: a muted latch clicking shut with a gentle downward thunk.",
+    "event": "pause"
+  },
+  {
+    "name": "achievement",
+    "seconds": 2,
+    "prompt": "Sparkling magical chime arpeggio: three bright crystalline bell notes ascending with a shimmer.",
+    "event": "achievement"
+  }
+]
