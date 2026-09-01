@@ -20834,6 +20834,50 @@ function noise(bus, { dur = 0.15, vol = 0.2, filterFreq = 2e3, q = 1, delay = 0 
   src.start(t0);
   src.stop(t0 + dur + 0.05);
 }
+var SAMPLE_BY_EVENT = {
+  "ui-select": "ui-select",
+  "ui-back": "ui-back",
+  "ui-error": "ui-error",
+  spawn: "spawn",
+  joint: "joint",
+  delete: "delete",
+  undo: "undo",
+  "run-start": "run-start",
+  impact: "impact",
+  shatter: "shatter",
+  goal: "goal",
+  win: "win",
+  lose: "lose",
+  tick: "tick",
+  pause: "pause",
+  achievement: "achievement"
+};
+var sampleCache = /* @__PURE__ */ new Map();
+function loadSample(name) {
+  let entry = sampleCache.get(name);
+  if (entry !== void 0) return entry;
+  entry = fetch("sfx/" + name + ".opus").then((r) => {
+    if (!r.ok) throw new Error("sfx http " + r.status);
+    return r.arrayBuffer();
+  }).then((ab) => ctx.decodeAudioData(ab)).then((buf) => {
+    sampleCache.set(name, buf);
+    return buf;
+  }).catch(() => {
+    sampleCache.set(name, null);
+    return null;
+  });
+  sampleCache.set(name, entry);
+  return entry;
+}
+function playSample(name) {
+  const entry = loadSample(name);
+  if (!entry || typeof entry.then === "function") return false;
+  const src = ctx.createBufferSource();
+  src.buffer = entry;
+  src.connect(buses.effects.gain);
+  src.start();
+  return true;
+}
 var MATERIAL_TONE = {
   steel: { freq: 220, type: "square", noiseFreq: 3500 },
   wood: { freq: 330, type: "triangle", noiseFreq: 1200 },
@@ -20893,6 +20937,13 @@ function play(name, opts = {}) {
   if (!ctx || !unlocked || muted) return;
   const fn = players[name];
   if (!fn) return;
+  const sampleName = SAMPLE_BY_EVENT[name];
+  if (sampleName) {
+    try {
+      if (playSample(sampleName)) return;
+    } catch {
+    }
+  }
   try {
     fn(opts);
   } catch {
@@ -21009,7 +21060,9 @@ async function getServerTime() {
   const r = await request("/api/v1/time");
   const t1 = Date.now();
   if (r.error) return { error: r.error, now: t1, offset: 0 };
-  const adjusted = r.now + (t1 - t0) / 2;
+  const serverMs = Number(r.now ?? r.serverTime ?? r.epochMs);
+  if (!Number.isFinite(serverMs)) return { error: "time-shape", now: t1, offset: 0 };
+  const adjusted = serverMs + (t1 - t0) / 2;
   return { now: adjusted, offset: adjusted - t1 };
 }
 function getDaily() {

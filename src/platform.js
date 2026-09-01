@@ -43,7 +43,10 @@ export async function getServerTime() {
   const r = await request("/api/v1/time");
   const t1 = Date.now();
   if (r.error) return { error: r.error, now: t1, offset: 0 };
-  const adjusted = r.now + (t1 - t0) / 2;
+  // Hosts expose the epoch under different keys (`now`, `serverTime`, `epochMs`).
+  const serverMs = Number(r.now ?? r.serverTime ?? r.epochMs);
+  if (!Number.isFinite(serverMs)) return { error: "time-shape", now: t1, offset: 0 };
+  const adjusted = serverMs + (t1 - t0) / 2;
   return { now: adjusted, offset: adjusted - t1 };
 }
 
