@@ -256,7 +256,9 @@ export function createServer() {
         if (!rateOk(ip)) return send(res, 429, { error: "rate-limited" });
 
         if (req.method === "GET" && pathname === "/api/v1/time") {
-          return send(res, 200, { now: Date.now() });
+          // The `api` marker tells the client the full route set exists;
+          // minimal hosts serve only this route, without the marker.
+          return send(res, 200, { now: Date.now(), api: "physics-foundry/1" });
         }
         if (req.method === "GET" && pathname === "/api/v1/daily") {
           const date = utcToday();

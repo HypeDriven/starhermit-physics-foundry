@@ -21021,7 +21021,10 @@ __export(platform_exports, {
   unlockAchievement: () => unlockAchievement
 });
 var TIMEOUT_MS = 5e3;
+var API_MARKER = "physics-foundry/1";
 var offline = false;
+var fullApi = false;
+var probePromise = null;
 async function request(path, opts = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -21055,26 +21058,43 @@ function post(payload) {
 function isOffline() {
   return offline;
 }
-async function getServerTime() {
-  const t0 = Date.now();
-  const r = await request("/api/v1/time");
-  const t1 = Date.now();
-  if (r.error) return { error: r.error, now: t1, offset: 0 };
-  const serverMs = Number(r.now ?? r.serverTime ?? r.epochMs);
-  if (!Number.isFinite(serverMs)) return { error: "time-shape", now: t1, offset: 0 };
-  const adjusted = serverMs + (t1 - t0) / 2;
-  return { now: adjusted, offset: adjusted - t1 };
+function probe() {
+  if (!probePromise) {
+    probePromise = (async () => {
+      const t0 = Date.now();
+      const r = await request("/api/v1/time");
+      const t1 = Date.now();
+      if (r.error) return { error: r.error, now: t1, offset: 0 };
+      const serverMs = Number(r.now ?? r.serverTime ?? r.epochMs);
+      if (!Number.isFinite(serverMs)) return { error: "time-shape", now: t1, offset: 0 };
+      fullApi = r.api === API_MARKER;
+      const adjusted = serverMs + (t1 - t0) / 2;
+      return { now: adjusted, offset: adjusted - t1 };
+    })();
+  }
+  return probePromise;
 }
-function getDaily() {
+function getServerTime() {
+  return probe();
+}
+async function getDaily() {
+  await probe();
+  if (!fullApi) return { error: "offline" };
   return request("/api/v1/daily");
 }
-function submitScore(payload) {
+async function submitScore(payload) {
+  await probe();
+  if (!fullApi) return { error: "offline" };
   return request("/api/v1/leaderboard/submit", post(payload));
 }
-function unlockAchievement(key, playerId) {
+async function unlockAchievement(key, playerId) {
+  await probe();
+  if (!fullApi) return { error: "offline" };
   return request("/api/v1/achievements", post({ key, playerId }));
 }
-function getLeaderboard(board = "global", opts = {}) {
+async function getLeaderboard(board = "global", opts = {}) {
+  await probe();
+  if (!fullApi) return { error: "offline" };
   let url = "/api/v1/leaderboard?board=" + encodeURIComponent(board);
   if (opts.date) url += "&date=" + encodeURIComponent(opts.date);
   return request(url);
