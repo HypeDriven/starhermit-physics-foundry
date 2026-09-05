@@ -753,7 +753,7 @@ export function init(deps) {
         value: settings.playerName || "",
       });
       const submitBtn = el("button", {
-        class: "pf-btn pf-btn-primary", text: "Verify & share replay",
+        class: "pf-btn pf-btn-secondary", text: "Verify & share replay",
         onclick: async () => {
           const name = nameInput.value.trim();
           if (name.length < 3) { flashError("Name must be at least 3 characters"); return; }
