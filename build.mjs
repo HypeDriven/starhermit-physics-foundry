@@ -20,6 +20,7 @@ await esbuild.build({
 
 copyFileSync(resolve(root, "src", "style.css"), resolve(outdir, "style.css"));
 copyFileSync(resolve(root, "starhermit.txt"), resolve(outdir, "starhermit.txt"));
+copyFileSync(resolve(root, "favicon.svg"), resolve(outdir, "favicon.svg"));
 
 const html = `<!DOCTYPE html>
 <html lang="en">
@@ -27,6 +28,7 @@ const html = `<!DOCTYPE html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
+<link rel="icon" href="./favicon.svg" type="image/svg+xml" />
 <title>Physics Foundry</title>
 <link rel="stylesheet" href="./style.css" />
 <script type="module" src="./bootstrap.js"></script>

@@ -1,12 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
-import { createServer } from "../server.js";
 import { verifyReplay, SCHEMA_VERSION } from "../src/rules.js";
 import { CONTENT_VERSION, getLevel } from "../src/content.js";
 
-let server, base, dataDirBackup;
+// Point the server's persistence at a throwaway directory before it is
+// evaluated, so submitting scores here never writes into the repo's data/.
+const tmpDataDir = await mkdtemp(path.join(os.tmpdir(), "pf-server-test-"));
+process.env.PF_DATA_DIR = tmpDataDir;
+const { createServer } = await import("../server.js");
+
+let server, base;
 
 test.before(async () => {
   server = createServer();
@@ -18,6 +26,7 @@ test.before(async () => {
 test.after(async () => {
   server.close();
   await once(server, "close");
+  await rm(tmpDataDir, { recursive: true, force: true });
 });
 
 const get = async (p) => fetch(base + p);

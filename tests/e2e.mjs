@@ -174,6 +174,47 @@ async function runPass(browser, label, viewport, hasTouch) {
         await page.waitForSelector(".pf-screen-title:not([hidden])");
       });
 
+      await step("Escape closes title settings; help returns to its opener; restart from pause", async () => {
+        // settings opened from the title (no play session) closes with Escape
+        await page.click(".pf-title-grid .pf-card:has-text('Profile & settings')");
+        await page.waitForSelector(".pf-overlay[aria-label='Settings']");
+        await page.keyboard.press("Escape");
+        await page.waitForSelector(".pf-overlay", { state: "detached" });
+
+        await page.click(".pf-screen-title .pf-btn-big"); // Play
+        await page.waitForSelector(".pf-screen-play:not([hidden])");
+        await waitPhase(page, "build");
+
+        // help from the play HUD pauses the chamber and returns to it
+        await page.click(".pf-screen-play .pf-rail-left .pf-btn:has-text('Help')");
+        await page.waitForSelector(".pf-screen-help:not([hidden])");
+        const paused = await page.textContent("#pf-phase");
+        if (!paused.includes("(paused)")) throw new Error("help did not pause the chamber: " + paused);
+        await page.keyboard.press("Escape");
+        await page.waitForSelector(".pf-screen-play:not([hidden])");
+        const resumed = await page.textContent("#pf-phase");
+        if (resumed.includes("(paused)")) throw new Error("chamber still paused after help: " + resumed);
+
+        // help from the pause panel returns to the pause panel
+        await page.keyboard.press("Escape");
+        await page.waitForSelector(".pf-overlay[aria-label='Paused']");
+        await page.click(".pf-overlay .pf-btn:has-text('Help')");
+        await page.waitForSelector(".pf-screen-help:not([hidden])");
+        await page.click(".pf-screen-help .pf-btn:has-text('Back')");
+        await page.waitForSelector(".pf-overlay[aria-label='Paused']");
+
+        // restart from the pause panel returns a fresh build phase
+        await page.click(".pf-overlay .pf-btn:has-text('Restart chamber')");
+        await page.waitForSelector(".pf-overlay", { state: "detached" });
+        await page.waitForSelector(".pf-screen-play:not([hidden])");
+        await waitPhase(page, "build");
+
+        await page.click(".pf-screen-play .pf-rail-left .pf-btn:has-text('Pause')");
+        await page.waitForSelector(".pf-overlay[aria-label='Paused']");
+        await page.click(".pf-overlay .pf-btn:has-text('Leave chamber')");
+        await page.waitForSelector(".pf-screen-title:not([hidden])");
+      });
+
       await step("learn lesson 1: banner, keyboard spawn, run, results", async () => {
         await page.click(".pf-title-grid .pf-card:has-text('All modes')");
         await page.waitForSelector(".pf-screen-modes:not([hidden])");

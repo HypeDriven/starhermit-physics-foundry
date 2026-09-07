@@ -22227,7 +22227,10 @@ function init(deps) {
     const s = screens[name];
     if (s) {
       const h = s.querySelector("h2, h3, button");
-      if (h) h.focus({ preventScroll: true });
+      if (h) {
+        if (h.tagName === "H2" || h.tagName === "H3") h.tabIndex = -1;
+        h.focus({ preventScroll: true });
+      }
     }
   }
   function makeScreen(name) {
@@ -22290,10 +22293,7 @@ function init(deps) {
         ])
       ]),
       el("div", { class: "pf-title-foot" }, [
-        el("button", { class: "pf-btn pf-btn-secondary", text: "How to play", onclick: () => {
-          renderHelp();
-          showScreen("help");
-        } }),
+        el("button", { class: "pf-btn pf-btn-secondary", text: "How to play", onclick: () => openHelp("title") }),
         el("button", { class: "pf-btn pf-btn-secondary", text: "Leaderboards", onclick: () => {
           renderScores();
           showScreen("scores");
@@ -22442,10 +22442,7 @@ function init(deps) {
       hudPhase,
       hudError,
       el("button", { class: "pf-btn pf-btn-secondary", text: "Pause (Esc)", onclick: () => pauseGame() }),
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Help", onclick: () => {
-        renderHelp();
-        showScreen("help");
-      } })
+      el("button", { class: "pf-btn pf-btn-secondary", text: "Help", onclick: () => openHelp("play") })
     ]),
     canvasWrap,
     el("aside", { class: "pf-rail pf-rail-right" }, [lessonBanner, tray])
@@ -22685,16 +22682,49 @@ function init(deps) {
   canvas.addEventListener("pointercancel", () => {
     jointAnchor = null;
   });
-  document.addEventListener("keydown", (ev) => {
-    if (screens.play.hidden) {
-      if (ev.key === "Escape" && !pauseOverlay && !settingsOverlay && !screens.play.hidden) return;
-      return;
+  function trapTab(overlay, ev) {
+    const items = [...overlay.querySelectorAll("button, input, select, textarea, a[href]")].filter((n) => !n.disabled && n.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    const outside = !overlay.contains(active);
+    if (ev.shiftKey && (outside || active === first)) {
+      ev.preventDefault();
+      last.focus();
+    } else if (!ev.shiftKey && (outside || active === last)) {
+      ev.preventDefault();
+      first.focus();
     }
-    if (pauseOverlay || settingsOverlay) {
+  }
+  document.addEventListener("keydown", (ev) => {
+    const overlay = settingsOverlay || pauseOverlay;
+    if (overlay) {
       if (ev.key === "Escape") {
         ev.preventDefault();
-        closeOverlays();
-        if (session && session.paused) resumeGame();
+        if (overlay === settingsOverlay) {
+          closeOverlays();
+          if (session && session.paused) openPause();
+        } else {
+          resumeGame();
+        }
+      } else if (ev.key === "Tab") {
+        trapTab(overlay, ev);
+      }
+      return;
+    }
+    if (screens.play.hidden) {
+      if (ev.key === "Escape") {
+        if (!screens.help.hidden) {
+          ev.preventDefault();
+          audio.play("ui-back");
+          backFromHelp();
+        } else if (!screens.modes.hidden || !screens.progression.hidden || !screens.scores.hidden) {
+          ev.preventDefault();
+          audio.play("ui-back");
+          renderTitle();
+          showScreen("title");
+        }
       }
       return;
     }
@@ -22914,7 +22944,7 @@ function init(deps) {
         value: settings.playerName || ""
       });
       const submitBtn = el("button", {
-        class: "pf-btn pf-btn-primary",
+        class: "pf-btn pf-btn-secondary",
         text: "Verify & share replay",
         onclick: async () => {
           const name = nameInput.value.trim();
@@ -23033,7 +23063,9 @@ function init(deps) {
     startLevel(level, "daily", { daily: { date } });
   }
   function restartCurrent() {
-    startLevel(currentLevel, currentMode, currentCtx);
+    const ctx2 = { ...currentCtx };
+    if (ctx2.daily && progress.dailyAttempts[ctx2.daily.date]) ctx2.practice = true;
+    startLevel(currentLevel, currentMode, ctx2);
   }
   function startLevel(level, mode, ctx2) {
     teardownPlay();
@@ -23122,6 +23154,7 @@ function init(deps) {
     session.setPaused(true);
     audio.play("pause");
     if (renderer) renderer.setPaused(true);
+    refreshHud();
     openPause();
   }
   function resumeGame() {
@@ -23152,12 +23185,16 @@ function init(deps) {
         el("h2", { text: "Paused" }),
         el("button", { class: "pf-btn pf-btn-primary pf-btn-big", text: "Resume", onclick: resumeGame }),
         el("button", { class: "pf-btn", text: "Settings", onclick: openSettings }),
-        el("button", { class: "pf-btn", text: "Help", onclick: () => {
-          renderHelp();
-          showScreen("help");
-          closeOverlays();
-          if (session) resumeGame();
-        } }),
+        el("button", { class: "pf-btn", text: "Help", onclick: () => openHelp("pause") }),
+        el("button", {
+          class: "pf-btn",
+          text: "Restart chamber",
+          onclick: () => {
+            audio.play("ui-select");
+            closeOverlays();
+            restartCurrent();
+          }
+        }),
         el("button", {
           class: "pf-btn pf-btn-secondary",
           text: "Leave chamber",
@@ -23372,12 +23409,37 @@ function init(deps) {
     );
   }
   let helpReturn = "title";
+  let helpPaused = false;
+  function openHelp(from) {
+    helpReturn = session && (from === "play" || from === "pause") ? from : "title";
+    if (helpReturn === "play" && !session.paused) {
+      helpPaused = true;
+      session.setPaused(true);
+      if (renderer) renderer.setPaused(true);
+      refreshHud();
+    }
+    closeOverlays();
+    renderHelp();
+    showScreen("help");
+  }
   function backFromHelp() {
-    if (helpReturn === "play" && session) showScreen("play");
-    else {
+    if (helpReturn === "pause" && session) {
+      showScreen("play");
+      openPause();
+    } else if (helpReturn === "play" && session) {
+      showScreen("play");
+      if (helpPaused) {
+        helpPaused = false;
+        session.setPaused(false);
+        if (renderer) renderer.setPaused(false);
+      }
+      refreshHud();
+    } else {
       renderTitle();
       showScreen("title");
     }
+    helpReturn = "title";
+    helpPaused = false;
   }
   const scoresScreen = makeScreen("scores");
   async function renderScores() {

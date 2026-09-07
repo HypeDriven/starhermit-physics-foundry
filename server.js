@@ -12,7 +12,11 @@ import { CONTENT_VERSION, ACHIEVEMENTS, dailyLevel, getLevel } from "./src/conte
 const dailySeedLevel = dailySeed;
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(ROOT, "data");
+// Runtime state lives outside version control; PF_DATA_DIR lets a host (or the
+// test suite) redirect it so a run never mutates the checked-out tree.
+const DATA_DIR = process.env.PF_DATA_DIR
+  ? path.resolve(process.env.PF_DATA_DIR)
+  : path.join(ROOT, "data");
 const LB_FILE = path.join(DATA_DIR, "leaderboards.json");
 const ACH_FILE = path.join(DATA_DIR, "achievements.json");
 

@@ -140,7 +140,12 @@ export function init(deps) {
     const s = screens[name];
     if (s) {
       const h = s.querySelector("h2, h3, button");
-      if (h) h.focus({ preventScroll: true });
+      // headings are not focusable by default; make them programmatically
+      // focusable so screen changes move focus (and screen-reader position)
+      if (h) {
+        if (h.tagName === "H2" || h.tagName === "H3") h.tabIndex = -1;
+        h.focus({ preventScroll: true });
+      }
     }
   }
 
@@ -191,7 +196,7 @@ export function init(deps) {
         ]),
       ]),
       el("div", { class: "pf-title-foot" }, [
-        el("button", { class: "pf-btn pf-btn-secondary", text: "How to play", onclick: () => { renderHelp(); showScreen("help"); } }),
+        el("button", { class: "pf-btn pf-btn-secondary", text: "How to play", onclick: () => openHelp("title") }),
         el("button", { class: "pf-btn pf-btn-secondary", text: "Leaderboards", onclick: () => { renderScores(); showScreen("scores"); } }),
       ])
     );
@@ -318,7 +323,7 @@ export function init(deps) {
     el("aside", { class: "pf-rail pf-rail-left" }, [
       hudObjective, hudProgress, hudBudget, hudTime, hudPhase, hudError,
       el("button", { class: "pf-btn pf-btn-secondary", text: "Pause (Esc)", onclick: () => pauseGame() }),
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Help", onclick: () => { renderHelp(); showScreen("help"); } }),
+      el("button", { class: "pf-btn pf-btn-secondary", text: "Help", onclick: () => openHelp("play") }),
     ]),
     canvasWrap,
     el("aside", { class: "pf-rail pf-rail-right" }, [lessonBanner, tray])
@@ -546,13 +551,45 @@ export function init(deps) {
   canvas.addEventListener("pointercancel", () => { jointAnchor = null; });
 
   // ------------------------------------------------------------ keyboard
+  // Keep Tab focus inside an open modal dialog.
+  function trapTab(overlay, ev) {
+    const items = [...overlay.querySelectorAll("button, input, select, textarea, a[href]")]
+      .filter((n) => !n.disabled && n.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const active = document.activeElement;
+    const outside = !overlay.contains(active);
+    if (ev.shiftKey && (outside || active === first)) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && (outside || active === last)) { ev.preventDefault(); first.focus(); }
+  }
+
   document.addEventListener("keydown", (ev) => {
-    if (screens.play.hidden) {
-      if (ev.key === "Escape" && !pauseOverlay && !settingsOverlay && !screens.play.hidden) return;
+    // Overlays are modal and can be open over any screen (settings is also
+    // reachable from the title), so they are handled before the play checks.
+    const overlay = settingsOverlay || pauseOverlay;
+    if (overlay) {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        if (overlay === settingsOverlay) {
+          closeOverlays();
+          if (session && session.paused) openPause();
+        } else {
+          resumeGame();
+        }
+      } else if (ev.key === "Tab") {
+        trapTab(overlay, ev);
+      }
       return;
     }
-    if (pauseOverlay || settingsOverlay) {
-      if (ev.key === "Escape") { ev.preventDefault(); closeOverlays(); if (session && session.paused) resumeGame(); }
+    if (screens.play.hidden) {
+      // Escape backs out of the secondary screens.
+      if (ev.key === "Escape") {
+        if (!screens.help.hidden) { ev.preventDefault(); audio.play("ui-back"); backFromHelp(); }
+        else if (!screens.modes.hidden || !screens.progression.hidden || !screens.scores.hidden) {
+          ev.preventDefault(); audio.play("ui-back"); renderTitle(); showScreen("title");
+        }
+      }
       return;
     }
     const k = ev.key.toLowerCase();
@@ -862,7 +899,11 @@ export function init(deps) {
   }
 
   function restartCurrent() {
-    startLevel(currentLevel, currentMode, currentCtx);
+    // The daily allows one ranked attempt; any retry after it is scored
+    // locally but never submitted.
+    const ctx = { ...currentCtx };
+    if (ctx.daily && progress.dailyAttempts[ctx.daily.date]) ctx.practice = true;
+    startLevel(currentLevel, currentMode, ctx);
   }
 
   function startLevel(level, mode, ctx) {
@@ -957,6 +998,7 @@ export function init(deps) {
     session.setPaused(true);
     audio.play("pause");
     if (renderer) renderer.setPaused(true);
+    refreshHud();
     openPause();
   }
 
@@ -986,7 +1028,11 @@ export function init(deps) {
         el("h2", { text: "Paused" }),
         el("button", { class: "pf-btn pf-btn-primary pf-btn-big", text: "Resume", onclick: resumeGame }),
         el("button", { class: "pf-btn", text: "Settings", onclick: openSettings }),
-        el("button", { class: "pf-btn", text: "Help", onclick: () => { renderHelp(); showScreen("help"); closeOverlays(); if (session) resumeGame(); } }),
+        el("button", { class: "pf-btn", text: "Help", onclick: () => openHelp("pause") }),
+        el("button", {
+          class: "pf-btn", text: "Restart chamber",
+          onclick: () => { audio.play("ui-select"); closeOverlays(); restartCurrent(); },
+        }),
         el("button", {
           class: "pf-btn pf-btn-secondary", text: "Leave chamber",
           onclick: () => { teardownPlay(); renderTitle(); showScreen("title"); },
@@ -1164,10 +1210,43 @@ export function init(deps) {
     );
   }
 
+  // Help is reachable from the title, from the play HUD, and from the pause
+  // panel; each entry point must be returned to. Opening it mid-run pauses the
+  // simulation so the clock cannot expire while the player reads.
   let helpReturn = "title";
+  let helpPaused = false;
+
+  function openHelp(from) {
+    helpReturn = session && (from === "play" || from === "pause") ? from : "title";
+    if (helpReturn === "play" && !session.paused) {
+      helpPaused = true;
+      session.setPaused(true);
+      if (renderer) renderer.setPaused(true);
+      refreshHud();
+    }
+    closeOverlays();
+    renderHelp();
+    showScreen("help");
+  }
+
   function backFromHelp() {
-    if (helpReturn === "play" && session) showScreen("play");
-    else { renderTitle(); showScreen("title"); }
+    if (helpReturn === "pause" && session) {
+      showScreen("play");
+      openPause();
+    } else if (helpReturn === "play" && session) {
+      showScreen("play");
+      if (helpPaused) {
+        helpPaused = false;
+        session.setPaused(false);
+        if (renderer) renderer.setPaused(false);
+      }
+      refreshHud();
+    } else {
+      renderTitle();
+      showScreen("title");
+    }
+    helpReturn = "title";
+    helpPaused = false;
   }
 
   // ------------------------------------------------------------ score chase / leaderboards
