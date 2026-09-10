@@ -93,6 +93,28 @@ the test suite points it at a `mkdtemp` directory and removes it afterwards, and
 - `npm run test:e2e` → `E2E PASS — both viewport passes clean`, including a new
   step covering title-settings Escape, help→play, help→pause, and pause restart.
 
+## Resolved: shipped distribution was missing cover art and authored SFX
+
+The upload bundle in `dist/` (committed build output) contained only the JS/CSS
+shell. The platform manifest declares `cover=coverart.png`, and the audio layer
+fetches `sfx/<event>.opus` relative to the page, so the distributed build had no
+cover image and silently fell back to synthesized audio for every event.
+
+- `build.mjs` now also copies `coverart.png` and the whole `sfx/` directory into
+  `dist/`; `npm run build` was re-run.
+- `src/ui.js`: audio previously unlocked only on a canvas pick or keypress, so
+  pure menu/touch flows stayed silent even with clips present. A global
+  `pointerdown` listener now calls `audio.unlock()` on the first gesture
+  anywhere, matching the audio module's "unlocks on first user gesture" contract.
+
+**Verified**
+
+- Headless Chrome smoke test against a static server rooted at `dist/`: page
+  boots with no page errors; a real tap on the title Play button fetches
+  `sfx/ui-select.opus` with HTTP 200.
+- `npm test` → 33/33 pass; `npm run test:e2e` → `E2E PASS — both viewport
+  passes clean`.
+
 ## Open
 
 - Localization: `/home/albert/games/agents.md` → `agents/localization.md` requires

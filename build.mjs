@@ -1,5 +1,5 @@
 // Build: bundle the client (src + vendored three.js) into dist/ with esbuild.
-import { mkdirSync, copyFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, copyFileSync, cpSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
@@ -21,6 +21,8 @@ await esbuild.build({
 copyFileSync(resolve(root, "src", "style.css"), resolve(outdir, "style.css"));
 copyFileSync(resolve(root, "starhermit.txt"), resolve(outdir, "starhermit.txt"));
 copyFileSync(resolve(root, "favicon.svg"), resolve(outdir, "favicon.svg"));
+copyFileSync(resolve(root, "coverart.png"), resolve(outdir, "coverart.png"));
+cpSync(resolve(root, "sfx"), resolve(outdir, "sfx"), { recursive: true });
 
 const html = `<!DOCTYPE html>
 <html lang="en">

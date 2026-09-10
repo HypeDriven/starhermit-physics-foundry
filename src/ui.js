@@ -564,6 +564,10 @@ export function init(deps) {
     else if (!ev.shiftKey && (outside || active === last)) { ev.preventDefault(); first.focus(); }
   }
 
+  // Any real pointer gesture anywhere (menus included) unlocks audio, so UI
+  // taps sound immediately without waiting for a canvas pick.
+  document.addEventListener("pointerdown", () => audio.unlock());
+
   document.addEventListener("keydown", (ev) => {
     // Overlays are modal and can be open over any screen (settings is also
     // reachable from the title), so they are handled before the play checks.

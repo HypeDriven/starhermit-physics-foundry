@@ -22697,6 +22697,7 @@ function init(deps) {
       first.focus();
     }
   }
+  document.addEventListener("pointerdown", () => audio.unlock());
   document.addEventListener("keydown", (ev) => {
     const overlay = settingsOverlay || pauseOverlay;
     if (overlay) {
