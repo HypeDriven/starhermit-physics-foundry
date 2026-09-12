@@ -311,15 +311,23 @@ body.pf-lh .pf-rail-right { order: 0; }
   .pf-tray-row .pf-btn { flex: 1 1 auto; }
 }
 
-/* landscape mobile: narrow status rail */
+/* landscape mobile: status rail left, playfield centre, tray in its own
+   scrolling right column — the board keeps the full height, never a slit */
 @media (max-width: 900px) and (orientation: landscape) {
+  .pf-app { height: 100dvh; max-height: 100dvh; }
+  .pf-top { padding: 0.25rem 0.8rem; }
   .pf-screen-play {
-    grid-template-columns: 180px 1fr;
-    grid-template-rows: 1fr auto;
+    grid-template-columns: minmax(140px, 170px) minmax(0, 1fr) minmax(150px, 190px);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0.4rem; padding: 0.4rem; min-height: 0;
   }
-  .pf-rail-left { grid-row: 1 / 3; flex-direction: column; }
-  .pf-rail-right { grid-column: 2; }
-  .pf-canvas-wrap { min-height: 0; }
+  .pf-rail-left { grid-column: 1; grid-row: 1; flex-direction: column; min-height: 0; overflow-y: auto; font-size: 0.85rem; padding: 0.5rem; }
+  .pf-canvas-wrap { grid-column: 2; grid-row: 1; min-height: 120px; height: 100%; }
+  .pf-rail-right { grid-column: 3; grid-row: 1; min-height: 0; overflow-y: auto; padding: 0.5rem; }
+  .pf-tray { gap: 0.4rem; }
+  .pf-tray-row { gap: 0.3rem; }
+  .pf-tray-row .pf-btn { flex: 1 1 100%; min-height: 40px; padding: 0.35rem 0.5rem; font-size: 0.85rem; }
+  .pf-lesson { padding: 0.4rem; font-size: 0.85rem; }
 }
 
 /* larger text option */
