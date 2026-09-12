@@ -28,7 +28,7 @@ function defaultSettings() {
     music: 0.5, effects: 0.8, ambience: 0.4, voice: 0.5, muted: false,
     quality: "high", reducedMotion: false, highContrast: false, largeText: false,
     leftHanded: false, cameraDefault: "frame", jointMode: "toggle", haptics: false,
-    consentAnalytics: false, playerName: "",
+    consentAnalytics: false,
   };
 }
 
@@ -96,6 +96,9 @@ function webglAvailable() {
 // ---------------------------------------------------------------- mount
 
 function mount() {
+  // Read + scrub the host launch token before anything else (no-op locally).
+  platform.handshake();
+
   const settings = storage.loadSettings();
 
   // honor OS-level preferences on first run

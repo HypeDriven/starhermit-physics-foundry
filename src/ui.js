@@ -51,9 +51,53 @@ export function init(deps) {
 
   function saveSettings() {
     storage.saveSettings(settings);
+    platform.cloudSave(currentDoc());
+    updateNetStatus();
     analytics("settings-change", { consent: settings.consentAnalytics });
   }
-  function saveProgress() { storage.saveProgress(progress); }
+  function saveProgress() {
+    storage.saveProgress(progress);
+    platform.cloudSave(currentDoc());
+    updateNetStatus();
+  }
+
+  // Cloud mirror snapshot (settings + progress); the platform module debounces.
+  function currentDoc() {
+    return JSON.parse(JSON.stringify({ settings, progress }));
+  }
+
+  // Net / identity / sync status shown in the header status slot.
+  function updateNetStatus() {
+    const net = document.getElementById("pf-net");
+    if (!net) return;
+    const bits = [];
+    if (platform.isHosted()) bits.push(platform.getNickname() || "Player");
+    bits.push(platform.isOffline() ? "offline" : "online");
+    if (platform.isHosted()) bits.push(platform.getSyncStatus());
+    net.textContent = bits.join(" · ");
+  }
+
+  // Remote-preferred cloud restore: the cloud doc mirrors settings+progress;
+  // localStorage remains the offline cache.
+  function applyRemoteDoc(doc) {
+    if (!doc || typeof doc !== "object") return;
+    if (doc.settings && typeof doc.settings === "object") Object.assign(settings, doc.settings);
+    if (doc.progress && typeof doc.progress === "object") Object.assign(progress, doc.progress);
+    saveSettings();
+    saveProgress();
+    audio.setBusVolume("music", settings.music);
+    audio.setBusVolume("effects", settings.effects);
+    audio.setBusVolume("ambience", settings.ambience);
+    audio.setBusVolume("voice", settings.voice);
+    audio.setMuted(settings.muted);
+    applyA11yClasses();
+    if (renderer) {
+      renderer.setQuality(settings.quality);
+      renderer.setReducedMotion(settings.reducedMotion);
+      if (renderer.setFraming) renderer.setFraming(settings.cameraDefault === "tight" ? 0.02 : 0.1);
+    }
+    if (!screens.title.hidden) renderTitle();
+  }
 
   // ------------------------------------------------------------ root DOM
   const root = document.getElementById("pf-shell") || document.body;
@@ -761,7 +805,7 @@ export function init(deps) {
     const a = ACHIEVEMENTS[key];
     toast("Achievement unlocked: " + (a ? a.name : key), "ok");
     audio.play("achievement");
-    // idempotent server-side too; failure is fine offline
+    // the dev backend also keeps idempotent unlocks; hosted they stay local
     platform.unlockAchievement(key, progress.playerId).then(() => {});
   }
 
@@ -788,44 +832,41 @@ export function init(deps) {
       && !currentCtx.practice;
     const submitWrap = el("div", { class: "pf-submit" });
     if (ranked && (currentMode === "journey" || currentMode === "daily")) {
-      const nameInput = el("input", {
-        class: "pf-input", type: "text", minlength: "3", maxlength: "24",
-        placeholder: "Name for leaderboard", "aria-label": "Leaderboard name",
-        value: settings.playerName || "",
-      });
-      const submitBtn = el("button", {
-        class: "pf-btn pf-btn-secondary", text: "Verify & share replay",
-        onclick: async () => {
-          const name = nameInput.value.trim();
-          if (name.length < 3) { flashError("Name must be at least 3 characters"); return; }
-          submitBtn.disabled = true;
-          settings.playerName = name;
-          saveSettings();
-          const replay = session.getReplay();
-          const payload = {
-            board: currentMode === "daily" ? "daily" : "global",
-            name,
-            contentVersion: CONTENT_VERSION,
-            rulesetVersion: SCHEMA_VERSION,
-            commands: replay.commands,
-            stateHashes: replay.stateHashes,
-            seed: session.state.seed,
-            durationMs: r.durationMs,
-            assists: 0,
-          };
-          if (currentMode === "daily") payload.date = currentCtx.daily.date;
-          else payload.levelId = currentLevel.id;
-          const res = await platform.submitScore(payload);
-          if (res.error) {
-            flashError("Submit failed: " + res.error);
-            submitBtn.disabled = false;
-          } else {
-            toast("Rank " + res.rank + " with " + res.score + " points", "ok");
-            submitBtn.textContent = "Submitted — rank " + res.rank;
-          }
-        },
-      });
-      submitWrap.append(nameInput, submitBtn);
+      if (platform.isHosted()) {
+        // Platform leaderboards are script-owned: clients cannot submit, and
+        // identity comes from the account profile rather than a typed name.
+        submitWrap.append(el("p", { class: "pf-note", text: "Ranked run recorded locally. Platform leaderboards are verified server-side and read-only for clients." }));
+      } else {
+        const submitBtn = el("button", {
+          class: "pf-btn pf-btn-secondary", text: "Verify & share replay",
+          onclick: async () => {
+            submitBtn.disabled = true;
+            const replay = session.getReplay();
+            const payload = {
+              board: currentMode === "daily" ? "daily" : "global",
+              name: "foundry-" + String(progress.playerId).slice(0, 8),
+              contentVersion: CONTENT_VERSION,
+              rulesetVersion: SCHEMA_VERSION,
+              commands: replay.commands,
+              stateHashes: replay.stateHashes,
+              seed: session.state.seed,
+              durationMs: r.durationMs,
+              assists: 0,
+            };
+            if (currentMode === "daily") payload.date = currentCtx.daily.date;
+            else payload.levelId = currentLevel.id;
+            const res = await platform.submitScore(payload);
+            if (res.error) {
+              flashError("Submit failed: " + res.error);
+              submitBtn.disabled = false;
+            } else {
+              toast("Rank " + res.rank + " with " + res.score + " points", "ok");
+              submitBtn.textContent = "Submitted — rank " + res.rank;
+            }
+          },
+        });
+        submitWrap.append(submitBtn);
+      }
     } else {
       submitWrap.append(el("p", { class: "pf-note", text: "Unranked session — no leaderboard submission." }));
     }
@@ -1048,6 +1089,16 @@ export function init(deps) {
   }
 
   // ------------------------------------------------------------ settings
+  // Profile line for the settings panel: platform account when hosted, local
+  // guest otherwise. Identity always comes from the account profile.
+  function profileNote() {
+    if (platform.isHosted()) {
+      return "Playing as " + (platform.getNickname() || "…")
+        + " — progress syncs to your account (" + platform.getSyncStatus() + ").";
+    }
+    return "Local guest profile — progress stays in this browser.";
+  }
+
   function openSettings() {
     closeOverlays();
     const s = settings;
@@ -1105,6 +1156,8 @@ export function init(deps) {
     settingsOverlay = el("div", { class: "pf-overlay", role: "dialog", "aria-modal": "true", "aria-label": "Settings" }, [
       el("div", { class: "pf-panel pf-settings" }, [
         el("h2", { text: "Settings" }),
+        el("h3", { text: "Profile" }),
+        el("p", { class: "pf-note", text: profileNote() }),
         el("h3", { text: "Audio" }),
         slider("Music", "music"), slider("Effects", "effects"), slider("Ambience", "ambience"), slider("Voice", "voice"),
         toggle("Mute all", "muted", (v) => audio.setMuted(v)),
@@ -1256,6 +1309,21 @@ export function init(deps) {
   // ------------------------------------------------------------ score chase / leaderboards
   const scoresScreen = makeScreen("scores");
 
+  // Local daily attempts (the offline cache) when no board is reachable.
+  function renderLocalDaily(wrap) {
+    const days = Object.keys(progress.dailyAttempts || {}).sort().reverse().slice(0, 10);
+    if (!days.length) {
+      wrap.append(el("p", { class: "pf-note", text: "No local daily runs yet." }));
+      return;
+    }
+    wrap.append(el("table", { class: "pf-score-table" }, [
+      el("tr", {}, [el("th", { text: "Day" }), el("th", { text: "Score" })]),
+      ...days.map((d) => el("tr", {}, [
+        el("td", { text: d }), el("td", { text: String((progress.dailyAttempts[d] || {}).score ?? 0) }),
+      ])),
+    ]));
+  }
+
   async function renderScores() {
     scoresScreen.innerHTML = "";
     scoresScreen.append(el("h2", { text: "Leaderboards" }));
@@ -1263,22 +1331,27 @@ export function init(deps) {
     scoresScreen.append(boards,
       el("button", { class: "pf-btn pf-btn-secondary", text: "Back", onclick: () => { audio.play("ui-back"); renderTitle(); showScreen("title"); } }));
     for (const board of ["global", "daily"]) {
-      const wrap = el("section", { class: "pf-board" }, [el("h3", { text: board === "global" ? "Global (Journey)" : "Daily" })]);
+      const head = el("h3", { text: board === "global" ? "Global (Journey)" : "Daily" });
+      const wrap = el("section", { class: "pf-board" }, [head]);
       boards.append(wrap);
       const res = await platform.getLeaderboard(board);
       if (res.error) {
+        if (board === "daily") { renderLocalDaily(wrap); continue; }
         wrap.append(el("p", { class: "pf-note", text: res.error === "offline" ? "Offline — board unavailable. Play and submit when connected." : "Board error: " + res.error }));
         continue;
       }
+      // the platform exposes a single read-only board; per-day views stay local
+      if (res.hosted && board === "daily") { renderLocalDaily(wrap); continue; }
+      if (res.hosted) head.textContent = "StarHermit leaderboard";
       if (!res.entries || !res.entries.length) {
         wrap.append(el("p", { class: "pf-note", text: "No entries yet. Be the first." }));
         continue;
       }
       const t = el("table", { class: "pf-score-table" }, [
         el("tr", {}, [el("th", { text: "#" }), el("th", { text: "Name" }), el("th", { text: "Score" }), el("th", { text: "Goal" })]),
-        ...res.entries.slice(0, 20).map((e, i) => el("tr", {}, [
+        ...res.entries.map((e, i) => el("tr", {}, [
           el("td", { text: String(i + 1) }), el("td", { text: e.name }),
-          el("td", { text: String(e.score) }), el("td", { text: String(e.components?.goal ?? 0) }),
+          el("td", { text: String(e.score) }), el("td", { text: String(e.goal) }),
         ])),
       ]);
       wrap.append(t);
@@ -1298,11 +1371,14 @@ export function init(deps) {
   }
   setInterval(() => { if (!titleScreen.hidden) updateDailyCountdown(); }, 30000);
 
-  // server time for the daily boundary (local fallback already in place)
+  // Platform identity, cloud restore, server time and daily info; every call
+  // degrades gracefully when there is no launch token (local play).
+  updateNetStatus();
+  platform.fetchProfile().then(updateNetStatus);
+  platform.cloudLoad().then((doc) => { if (doc) applyRemoteDoc(doc); updateNetStatus(); });
   platform.getServerTime().then((r) => {
-    if (!r.error) timeOffset = r.offset;
-    const net = document.getElementById("pf-net");
-    if (net) net.textContent = r.error ? "offline" : "online";
+    if (!r.error) timeOffset = r.offset || 0;
+    updateNetStatus();
   });
   platform.getDaily().then((d) => { if (!d.error) dailyInfo = d; });
 

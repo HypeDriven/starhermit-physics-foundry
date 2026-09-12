@@ -185,8 +185,8 @@ No module may mutate rules state except through a validated command. Rendering c
 
 ### Packaging and launch
 - Ship a browser distribution with `starhermit.txt` at its root, `name=Physics Foundry`, and `launch=index.html`. Keep source files, secrets, design documents, and source maps outside the uploaded distribution.
-- Read the game scope from the short-lived launch token rather than hard-coding a slug. Use same-origin `/api` and `/ws` routes when hosted. Refresh account tokens through the host shell; never persist access or launch tokens in local storage.
-- Synchronize countdowns and daily boundaries with `GET /api/v1/time` using round-trip-adjusted offset. Treat rate limits and structured `{"error":"..."}` responses as recoverable UI states.
+- Read the game scope from the short-lived launch token delivered in the URL fragment (`#game_token=<jwt>`) rather than hard-coding a slug; re-mint it every 45 min via `POST /api/v1/games/{scope}/launch-token`. Use same-origin `/api` routes when hosted; never persist access or launch tokens in local storage.
+- Synchronize countdowns and daily boundaries with round-trip-adjusted time from the development backend (`GET /api/v1/time`); hosted play derives the UTC day from the device clock. Treat rate limits and structured `{"error":"..."}` responses as recoverable UI states.
 
 ### Identity, profile, presence, and preferences
 - Support guest practice locally, then offer account sign-in for durable progress. Use the profile display name and avatar only where identity is useful, honor profile privacy, and send throttled presence heartbeats while actively playing.
@@ -200,7 +200,7 @@ No module may mutate rules state except through a validated command. Rendering c
 
 ### Achievements and leaderboards
 - Declare a small static achievement set: first completion, mechanic mastery, a sustained streak, a difficult content milestone, and an accessibility-neutral long-term goal. Keys are stable, lowercase identifiers; unlocks are idempotent.
-- Provide global and friends-filtered boards for the primary metric plus a fair daily/weekly board. Include ruleset, content version, seed, assists, and duration with every submission; reject impossible or stale-version scores.
+- Provide global and friends-filtered boards for the primary metric plus a fair daily/weekly board. Include ruleset, content version, seed, assists, and duration with every submission; reject impossible or stale-version scores. On-platform, leaderboards are script-owned and read-only for clients; the replay-validated submission endpoint runs only on the development backend, and personal bests stay local plus cloud-mirrored.
 - For globally competitive boards, validate score claims through a lightweight authoritative script using replayable input logs and deterministic seeds. If validation is unavailable, label the board casual and apply plausibility/rate checks.
 
 ### Sessions and transport

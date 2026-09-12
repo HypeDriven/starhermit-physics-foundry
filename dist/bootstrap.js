@@ -21013,23 +21013,110 @@ function startMusic() {
 // src/platform.js
 var platform_exports = {};
 __export(platform_exports, {
+  base64ToBytes: () => base64ToBytes,
+  bytesToBase64: () => bytesToBase64,
+  cloudLoad: () => cloudLoad,
+  cloudSave: () => cloudSave,
+  fetchProfile: () => fetchProfile,
   getDaily: () => getDaily,
+  getGameScope: () => getGameScope,
   getLeaderboard: () => getLeaderboard,
+  getNickname: () => getNickname,
   getServerTime: () => getServerTime,
+  getSyncStatus: () => getSyncStatus,
+  handshake: () => handshake,
+  isHosted: () => isHosted,
   isOffline: () => isOffline,
   submitScore: () => submitScore,
-  unlockAchievement: () => unlockAchievement
+  unlockAchievement: () => unlockAchievement,
+  unzipFirstEntry: () => unzipFirstEntry,
+  zipStore: () => zipStore
 });
+init_rules();
 var TIMEOUT_MS = 5e3;
-var API_MARKER = "physics-foundry/1";
+var REFRESH_MS = 45 * 60 * 1e3;
+var REFRESH_RETRY_MS = 60 * 1e3;
+var launchToken = "";
+var fromFragment = false;
+var userSub = "";
+var gameScope = "";
+var nickname = "";
 var offline = false;
-var fullApi = false;
-var probePromise = null;
+var syncState = "offline";
+var refreshTimer = 0;
+var saveTimer = 0;
+var pendingDoc = null;
+var nickCache = /* @__PURE__ */ new Map();
+function isOffline() {
+  return offline;
+}
+function isHosted() {
+  return fromFragment;
+}
+function getGameScope() {
+  return gameScope;
+}
+function getNickname() {
+  return nickname;
+}
+function getSyncStatus() {
+  return syncState;
+}
+function decodeJwtPayload(t) {
+  try {
+    const seg = String(t).split(".")[1];
+    if (!seg) return null;
+    const b64 = seg.replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(b64 + "=".repeat((4 - b64.length % 4) % 4)));
+  } catch {
+    return null;
+  }
+}
+function acceptToken(t, fragment2) {
+  launchToken = t || "";
+  fromFragment = !!(fragment2 && launchToken);
+  const claims = decodeJwtPayload(launchToken);
+  userSub = claims && typeof claims.sub === "string" ? claims.sub : "";
+  gameScope = claims && typeof claims.game_scope === "string" ? claims.game_scope : "";
+  if (userSub && !nickname) nickname = "Player " + userSub.slice(0, 8);
+  scheduleRefresh();
+}
+function handshake() {
+  try {
+    const u = new URL(window.location.href);
+    if (u.hash.length > 1) {
+      const frag = new URLSearchParams(u.hash.slice(1));
+      const t2 = frag.get("game_token");
+      if (t2) {
+        acceptToken(t2, true);
+        window.history.replaceState({}, "", u.pathname + u.search);
+        return;
+      }
+    }
+    const host = u.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1" && host !== "[::1]") return;
+    const t = u.searchParams.get("game_token") || u.searchParams.get("token") || u.searchParams.get("launch");
+    if (t) {
+      acceptToken(t, false);
+      window.history.replaceState({}, "", u.pathname + u.search);
+    }
+  } catch {
+  }
+}
+function authHeaders(extra) {
+  const h = { ...extra || {} };
+  if (launchToken) h.Authorization = "Bearer " + launchToken;
+  return h;
+}
 async function request(path, opts = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(path, { ...opts, signal: ctrl.signal });
+    const res = await fetch(path, {
+      ...opts,
+      headers: authHeaders({ "content-type": "application/json", ...opts.headers || {} }),
+      signal: ctrl.signal
+    });
     if (res.status === 429) return { error: "rate-limited" };
     let data = null;
     try {
@@ -21049,55 +21136,256 @@ async function request(path, opts = {}) {
   }
 }
 function post(payload) {
-  return {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload)
-  };
+  return { method: "POST", body: JSON.stringify(payload) };
 }
-function isOffline() {
-  return offline;
+function scheduleRefresh(ms) {
+  clearTimeout(refreshTimer);
+  refreshTimer = 0;
+  if (!isHosted() || !gameScope || !launchToken) return;
+  refreshTimer = setTimeout(refreshToken, ms || REFRESH_MS);
 }
-function probe() {
-  if (!probePromise) {
-    probePromise = (async () => {
-      const t0 = Date.now();
-      const r = await request("/api/v1/time");
-      const t1 = Date.now();
-      if (r.error) return { error: r.error, now: t1, offset: 0 };
+async function refreshToken() {
+  const r = await request("/api/v1/games/" + encodeURIComponent(gameScope) + "/launch-token", post({}));
+  const t = r && (r.token || r.launchToken);
+  if (typeof t === "string" && t) launchToken = t;
+  scheduleRefresh(t ? REFRESH_MS : REFRESH_RETRY_MS);
+}
+var CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 4294967295;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 255] ^ c >>> 8;
+  return (c ^ 4294967295) >>> 0;
+}
+function zipStore(name, dataBytes) {
+  const enc = new TextEncoder();
+  const nameB = enc.encode(name);
+  const crc = crc32(dataBytes);
+  const out = [];
+  const u16 = (v) => out.push(v & 255, v >> 8 & 255);
+  const u32 = (v) => out.push(v & 255, v >> 8 & 255, v >> 16 & 255, v >>> 24 & 255);
+  u32(67324752);
+  u16(20);
+  u16(0);
+  u16(0);
+  u16(0);
+  u16(0);
+  u32(crc);
+  u32(dataBytes.length);
+  u32(dataBytes.length);
+  u16(nameB.length);
+  u16(0);
+  const local = out.length;
+  const head = new Uint8Array(out);
+  const cd = [];
+  const c16 = (v) => cd.push(v & 255, v >> 8 & 255);
+  const c32 = (v) => cd.push(v & 255, v >> 8 & 255, v >> 16 & 255, v >>> 24 & 255);
+  c32(33639248);
+  c16(20);
+  c16(20);
+  c16(0);
+  c16(0);
+  c16(0);
+  c16(0);
+  c32(crc);
+  c32(dataBytes.length);
+  c32(dataBytes.length);
+  c16(nameB.length);
+  c16(0);
+  c16(0);
+  c16(0);
+  c16(0);
+  c32(0);
+  c32(0);
+  const cdHead = new Uint8Array(cd);
+  const cdOff = head.length + nameB.length + dataBytes.length;
+  const parts = [head, nameB, dataBytes, cdHead, nameB];
+  const eocd = [];
+  const e32 = (v) => eocd.push(v & 255, v >> 8 & 255, v >> 16 & 255, v >>> 24 & 255);
+  const e16 = (v) => eocd.push(v & 255, v >> 8 & 255);
+  e32(101010256);
+  e16(0);
+  e16(0);
+  e16(1);
+  e16(1);
+  e32(cdHead.length + nameB.length);
+  e32(cdOff);
+  e16(0);
+  parts.push(new Uint8Array(eocd));
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const buf = new Uint8Array(total);
+  let o = 0;
+  for (const p of parts) {
+    buf.set(p, o);
+    o += p.length;
+  }
+  return buf;
+}
+function unzipFirstEntry(zipBytes) {
+  const dv = new DataView(zipBytes.buffer, zipBytes.byteOffset, zipBytes.byteLength);
+  let off = 0;
+  while (off + 30 <= zipBytes.length && dv.getUint32(off, true) === 67324752) {
+    const method = dv.getUint16(off + 8, true);
+    const size = dv.getUint32(off + 18, true);
+    const nameLen = dv.getUint16(off + 26, true);
+    const extraLen = dv.getUint16(off + 28, true);
+    const dataOff = off + 30 + nameLen + extraLen;
+    if (method !== 0) throw new Error("unsupported zip entry");
+    return zipBytes.slice(dataOff, dataOff + size);
+  }
+  throw new Error("bad zip");
+}
+function bytesToBase64(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 32768)
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+  return btoa(s);
+}
+function base64ToBytes(b64) {
+  const s = atob(b64);
+  const b = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+  return b;
+}
+async function cloudLoad() {
+  if (!isHosted() || !gameScope) return null;
+  try {
+    const res = await fetch("/api/v1/me/cloud-saves/" + encodeURIComponent(gameScope), { headers: authHeaders() });
+    if (!res.ok) {
+      syncState = res.status === 404 ? "synced" : "offline";
+      return null;
+    }
+    const doc = JSON.parse(new TextDecoder().decode(unzipFirstEntry(new Uint8Array(await res.arrayBuffer()))));
+    syncState = "synced";
+    return doc;
+  } catch {
+    syncState = "offline";
+    return null;
+  }
+}
+function cloudSave(doc) {
+  if (!isHosted() || !gameScope || !doc) return;
+  pendingDoc = doc;
+  syncState = "saving";
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushCloudSave, 2e3);
+}
+async function flushCloudSave() {
+  clearTimeout(saveTimer);
+  saveTimer = 0;
+  const doc = pendingDoc;
+  pendingDoc = null;
+  if (!doc || !isHosted() || !gameScope) return;
+  try {
+    const zip = zipStore("save.json", new TextEncoder().encode(JSON.stringify(doc)));
+    const res = await fetch("/api/v1/me/cloud-saves/" + encodeURIComponent(gameScope), {
+      method: "PUT",
+      headers: authHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({ dataBase64: bytesToBase64(zip) })
+    });
+    syncState = res.ok ? "synced" : "offline";
+  } catch {
+    syncState = "offline";
+  }
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => {
+    if (saveTimer) flushCloudSave();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && saveTimer) flushCloudSave();
+  });
+}
+async function fetchProfile() {
+  if (!isHosted() || !userSub) return false;
+  const r = await request("/api/v1/users/" + encodeURIComponent(userSub) + "/profile");
+  if (r && !r.error) {
+    const n = typeof r.nickname === "string" ? r.nickname.trim() : "";
+    nickname = n || "Player " + String(r.id || userSub).slice(0, 8);
+    nickCache.set(userSub, nickname);
+    return true;
+  }
+  if (!nickname) nickname = "Player " + userSub.slice(0, 8);
+  return false;
+}
+async function resolveNickname(userId) {
+  const id = String(userId || "");
+  if (!id) return "";
+  if (nickCache.has(id)) return nickCache.get(id);
+  let name = "Player " + id.slice(0, 8);
+  const r = await request("/api/v1/users/" + encodeURIComponent(id) + "/profile");
+  if (r && !r.error) {
+    const n = typeof r.nickname === "string" ? r.nickname.trim() : "";
+    if (n) name = n;
+  }
+  nickCache.set(id, name);
+  return name;
+}
+async function getServerTime() {
+  if (!isHosted()) {
+    const t0 = Date.now();
+    const r = await request("/api/v1/time");
+    const t1 = Date.now();
+    if (!r.error) {
       const serverMs = Number(r.now ?? r.serverTime ?? r.epochMs);
       if (!Number.isFinite(serverMs)) return { error: "time-shape", now: t1, offset: 0 };
-      fullApi = r.api === API_MARKER;
       const adjusted = serverMs + (t1 - t0) / 2;
       return { now: adjusted, offset: adjusted - t1 };
-    })();
+    }
+    return { error: r.error, now: t1, offset: 0 };
   }
-  return probePromise;
-}
-function getServerTime() {
-  return probe();
+  return { now: Date.now(), offset: 0 };
 }
 async function getDaily() {
-  await probe();
-  if (!fullApi) return { error: "offline" };
-  return request("/api/v1/daily");
+  if (!isHosted()) {
+    const r = await request("/api/v1/daily");
+    if (!r.error) return r;
+  }
+  const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  return { date, seed: dailySeed(date), local: true };
+}
+async function getLeaderboard(board = "global", opts = {}) {
+  if (isHosted()) {
+    const g = await request("/api/v1/games/" + encodeURIComponent(gameScope));
+    const leaderboardId = g && !g.error ? g.leaderboardId : null;
+    if (!leaderboardId) return { error: g && g.error || "no-board" };
+    const e = await request("/api/v1/leaderboards/" + encodeURIComponent(leaderboardId) + "/entries?pageSize=20");
+    if (!e || e.error || !Array.isArray(e.entries)) return { error: e && e.error || "board-error" };
+    return {
+      hosted: true,
+      entries: await Promise.all(e.entries.slice(0, 20).map(async (en) => ({
+        name: await resolveNickname(en.userId != null ? en.userId : en.user),
+        score: en.score | 0,
+        goal: en.components && en.components.goal != null ? en.components.goal : 0
+      })))
+    };
+  }
+  let url = "/api/v1/leaderboard?board=" + encodeURIComponent(board);
+  if (opts.date) url += "&date=" + encodeURIComponent(opts.date);
+  const r = await request(url);
+  if (r.error) return r;
+  return {
+    entries: (r.entries || []).slice(0, 20).map((en) => ({
+      name: en.name,
+      score: en.score,
+      goal: en.components && en.components.goal != null ? en.components.goal : 0
+    }))
+  };
 }
 async function submitScore(payload) {
-  await probe();
-  if (!fullApi) return { error: "offline" };
+  if (isHosted()) return { error: "read-only" };
   return request("/api/v1/leaderboard/submit", post(payload));
 }
 async function unlockAchievement(key, playerId) {
-  await probe();
-  if (!fullApi) return { error: "offline" };
+  if (isHosted()) return { ok: true };
   return request("/api/v1/achievements", post({ key, playerId }));
-}
-async function getLeaderboard(board = "global", opts = {}) {
-  await probe();
-  if (!fullApi) return { error: "offline" };
-  let url = "/api/v1/leaderboard?board=" + encodeURIComponent(board);
-  if (opts.date) url += "&date=" + encodeURIComponent(opts.date);
-  return request(url);
 }
 
 // src/ui.js
@@ -22142,10 +22430,45 @@ function init(deps) {
   const progress = storage2.loadProgress();
   function saveSettings() {
     storage2.saveSettings(settings);
+    platform.cloudSave(currentDoc());
+    updateNetStatus();
     analytics2("settings-change", { consent: settings.consentAnalytics });
   }
   function saveProgress() {
     storage2.saveProgress(progress);
+    platform.cloudSave(currentDoc());
+    updateNetStatus();
+  }
+  function currentDoc() {
+    return JSON.parse(JSON.stringify({ settings, progress }));
+  }
+  function updateNetStatus() {
+    const net = document.getElementById("pf-net");
+    if (!net) return;
+    const bits = [];
+    if (platform.isHosted()) bits.push(platform.getNickname() || "Player");
+    bits.push(platform.isOffline() ? "offline" : "online");
+    if (platform.isHosted()) bits.push(platform.getSyncStatus());
+    net.textContent = bits.join(" \xB7 ");
+  }
+  function applyRemoteDoc(doc) {
+    if (!doc || typeof doc !== "object") return;
+    if (doc.settings && typeof doc.settings === "object") Object.assign(settings, doc.settings);
+    if (doc.progress && typeof doc.progress === "object") Object.assign(progress, doc.progress);
+    saveSettings();
+    saveProgress();
+    audio.setBusVolume("music", settings.music);
+    audio.setBusVolume("effects", settings.effects);
+    audio.setBusVolume("ambience", settings.ambience);
+    audio.setBusVolume("voice", settings.voice);
+    audio.setMuted(settings.muted);
+    applyA11yClasses();
+    if (renderer) {
+      renderer.setQuality(settings.quality);
+      renderer.setReducedMotion(settings.reducedMotion);
+      if (renderer.setFraming) renderer.setFraming(settings.cameraDefault === "tight" ? 0.02 : 0.1);
+    }
+    if (!screens.title.hidden) renderTitle();
   }
   const root = document.getElementById("pf-shell") || document.body;
   root.innerHTML = "";
@@ -22935,52 +23258,40 @@ function init(deps) {
     const ranked = (currentMode === "journey" || currentMode === "daily" || currentMode === "challenge") && !currentCtx.practice;
     const submitWrap = el("div", { class: "pf-submit" });
     if (ranked && (currentMode === "journey" || currentMode === "daily")) {
-      const nameInput = el("input", {
-        class: "pf-input",
-        type: "text",
-        minlength: "3",
-        maxlength: "24",
-        placeholder: "Name for leaderboard",
-        "aria-label": "Leaderboard name",
-        value: settings.playerName || ""
-      });
-      const submitBtn = el("button", {
-        class: "pf-btn pf-btn-secondary",
-        text: "Verify & share replay",
-        onclick: async () => {
-          const name = nameInput.value.trim();
-          if (name.length < 3) {
-            flashError("Name must be at least 3 characters");
-            return;
+      if (platform.isHosted()) {
+        submitWrap.append(el("p", { class: "pf-note", text: "Ranked run recorded locally. Platform leaderboards are verified server-side and read-only for clients." }));
+      } else {
+        const submitBtn = el("button", {
+          class: "pf-btn pf-btn-secondary",
+          text: "Verify & share replay",
+          onclick: async () => {
+            submitBtn.disabled = true;
+            const replay = session.getReplay();
+            const payload = {
+              board: currentMode === "daily" ? "daily" : "global",
+              name: "foundry-" + String(progress.playerId).slice(0, 8),
+              contentVersion: CONTENT_VERSION,
+              rulesetVersion: SCHEMA_VERSION,
+              commands: replay.commands,
+              stateHashes: replay.stateHashes,
+              seed: session.state.seed,
+              durationMs: r.durationMs,
+              assists: 0
+            };
+            if (currentMode === "daily") payload.date = currentCtx.daily.date;
+            else payload.levelId = currentLevel.id;
+            const res = await platform.submitScore(payload);
+            if (res.error) {
+              flashError("Submit failed: " + res.error);
+              submitBtn.disabled = false;
+            } else {
+              toast("Rank " + res.rank + " with " + res.score + " points", "ok");
+              submitBtn.textContent = "Submitted \u2014 rank " + res.rank;
+            }
           }
-          submitBtn.disabled = true;
-          settings.playerName = name;
-          saveSettings();
-          const replay = session.getReplay();
-          const payload = {
-            board: currentMode === "daily" ? "daily" : "global",
-            name,
-            contentVersion: CONTENT_VERSION,
-            rulesetVersion: SCHEMA_VERSION,
-            commands: replay.commands,
-            stateHashes: replay.stateHashes,
-            seed: session.state.seed,
-            durationMs: r.durationMs,
-            assists: 0
-          };
-          if (currentMode === "daily") payload.date = currentCtx.daily.date;
-          else payload.levelId = currentLevel.id;
-          const res = await platform.submitScore(payload);
-          if (res.error) {
-            flashError("Submit failed: " + res.error);
-            submitBtn.disabled = false;
-          } else {
-            toast("Rank " + res.rank + " with " + res.score + " points", "ok");
-            submitBtn.textContent = "Submitted \u2014 rank " + res.rank;
-          }
-        }
-      });
-      submitWrap.append(nameInput, submitBtn);
+        });
+        submitWrap.append(submitBtn);
+      }
     } else {
       submitWrap.append(el("p", { class: "pf-note", text: "Unranked session \u2014 no leaderboard submission." }));
     }
@@ -23210,6 +23521,12 @@ function init(deps) {
     root.append(pauseOverlay);
     pauseOverlay.querySelector("button").focus();
   }
+  function profileNote() {
+    if (platform.isHosted()) {
+      return "Playing as " + (platform.getNickname() || "\u2026") + " \u2014 progress syncs to your account (" + platform.getSyncStatus() + ").";
+    }
+    return "Local guest profile \u2014 progress stays in this browser.";
+  }
   function openSettings() {
     closeOverlays();
     const s = settings;
@@ -23277,6 +23594,8 @@ function init(deps) {
     settingsOverlay = el("div", { class: "pf-overlay", role: "dialog", "aria-modal": "true", "aria-label": "Settings" }, [
       el("div", { class: "pf-panel pf-settings" }, [
         el("h2", { text: "Settings" }),
+        el("h3", { text: "Profile" }),
+        el("p", { class: "pf-note", text: profileNote() }),
         el("h3", { text: "Audio" }),
         slider("Music", "music"),
         slider("Effects", "effects"),
@@ -23443,6 +23762,20 @@ function init(deps) {
     helpPaused = false;
   }
   const scoresScreen = makeScreen("scores");
+  function renderLocalDaily(wrap) {
+    const days = Object.keys(progress.dailyAttempts || {}).sort().reverse().slice(0, 10);
+    if (!days.length) {
+      wrap.append(el("p", { class: "pf-note", text: "No local daily runs yet." }));
+      return;
+    }
+    wrap.append(el("table", { class: "pf-score-table" }, [
+      el("tr", {}, [el("th", { text: "Day" }), el("th", { text: "Score" })]),
+      ...days.map((d) => el("tr", {}, [
+        el("td", { text: d }),
+        el("td", { text: String((progress.dailyAttempts[d] || {}).score ?? 0) })
+      ]))
+    ]));
+  }
   async function renderScores() {
     scoresScreen.innerHTML = "";
     scoresScreen.append(el("h2", { text: "Leaderboards" }));
@@ -23456,24 +23789,34 @@ function init(deps) {
       } })
     );
     for (const board of ["global", "daily"]) {
-      const wrap = el("section", { class: "pf-board" }, [el("h3", { text: board === "global" ? "Global (Journey)" : "Daily" })]);
+      const head = el("h3", { text: board === "global" ? "Global (Journey)" : "Daily" });
+      const wrap = el("section", { class: "pf-board" }, [head]);
       boards.append(wrap);
       const res = await platform.getLeaderboard(board);
       if (res.error) {
+        if (board === "daily") {
+          renderLocalDaily(wrap);
+          continue;
+        }
         wrap.append(el("p", { class: "pf-note", text: res.error === "offline" ? "Offline \u2014 board unavailable. Play and submit when connected." : "Board error: " + res.error }));
         continue;
       }
+      if (res.hosted && board === "daily") {
+        renderLocalDaily(wrap);
+        continue;
+      }
+      if (res.hosted) head.textContent = "StarHermit leaderboard";
       if (!res.entries || !res.entries.length) {
         wrap.append(el("p", { class: "pf-note", text: "No entries yet. Be the first." }));
         continue;
       }
       const t = el("table", { class: "pf-score-table" }, [
         el("tr", {}, [el("th", { text: "#" }), el("th", { text: "Name" }), el("th", { text: "Score" }), el("th", { text: "Goal" })]),
-        ...res.entries.slice(0, 20).map((e, i) => el("tr", {}, [
+        ...res.entries.map((e, i) => el("tr", {}, [
           el("td", { text: String(i + 1) }),
           el("td", { text: e.name }),
           el("td", { text: String(e.score) }),
-          el("td", { text: String(e.components?.goal ?? 0) })
+          el("td", { text: String(e.goal) })
         ]))
       ]);
       wrap.append(t);
@@ -23492,10 +23835,15 @@ function init(deps) {
   setInterval(() => {
     if (!titleScreen.hidden) updateDailyCountdown();
   }, 3e4);
+  updateNetStatus();
+  platform.fetchProfile().then(updateNetStatus);
+  platform.cloudLoad().then((doc) => {
+    if (doc) applyRemoteDoc(doc);
+    updateNetStatus();
+  });
   platform.getServerTime().then((r) => {
-    if (!r.error) timeOffset = r.offset;
-    const net = document.getElementById("pf-net");
-    if (net) net.textContent = r.error ? "offline" : "online";
+    if (!r.error) timeOffset = r.offset || 0;
+    updateNetStatus();
   });
   platform.getDaily().then((d) => {
     if (!d.error) dailyInfo = d;
@@ -23537,8 +23885,7 @@ function defaultSettings() {
     cameraDefault: "frame",
     jointMode: "toggle",
     haptics: false,
-    consentAnalytics: false,
-    playerName: ""
+    consentAnalytics: false
   };
 }
 function defaultProgress() {
@@ -23597,6 +23944,7 @@ function webglAvailable() {
   }
 }
 function mount() {
+  handshake();
   const settings = storage.loadSettings();
   if (!localStorage.getItem(SETTINGS_KEY)) {
     if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) settings.reducedMotion = true;
