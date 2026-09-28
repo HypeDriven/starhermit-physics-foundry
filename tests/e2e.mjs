@@ -8,6 +8,10 @@
  *   (spawn via keyboard, run, results) -> progression persisted.
  * Then a fresh mobile context (390x844, touch) repeats: title -> Play -> Run
  * -> results -> pause button -> resume.
+ * Both passes finish with the Graphics panel: Auto (detected Low on the
+ * software GPU) -> Low -> High, a Bloom override, live apply + summary,
+ * reload persistence, preset-clears-overrides, and an Ultra chamber run.
+ * Console errors AND warnings fail the run.
  *
  * Server: an embedded minimal static server on an ephemeral port. The repo's
  * server.js is the declared StarHermit authoritative script (starhermit.txt:
@@ -88,13 +92,74 @@ async function waitPhase(page, phase, timeout = 15000) {
   );
 }
 
+const savedGraphics = (page) => page.evaluate(() => JSON.parse(JSON.parse(localStorage.getItem("pf-settings-v1")).payload).graphics);
+
+// Graphics panel through the visible UI: Auto -> Low -> High, one override,
+// live apply (body + canvas data-gfx-preset, summary), persistence across a
+// reload, then an Ultra chamber run (no console noise in any preset).
+async function graphicsPass(page, label) {
+  await step(`[${label}] graphics: presets, override, live apply`, async () => {
+    await page.click(".pf-title-grid .pf-card:has-text('Profile & settings')");
+    await page.waitForSelector(".pf-overlay[aria-label='Settings']");
+    const section = page.locator("#pf-gfx-section");
+    await section.scrollIntoViewIfNeeded();
+    const autoText = await page.locator("#pf-gfx-preset option[value='auto']").textContent();
+    if (!/Auto \(detected: Low\)/.test(autoText)) throw new Error("software GPU should auto-detect Low: " + autoText);
+    if ((await page.evaluate(() => document.body.dataset.gfxPreset)) !== "low") throw new Error("auto did not resolve to low");
+    await page.selectOption("#pf-gfx-preset", "low");
+    await page.selectOption("#pf-gfx-preset", "high");
+    await page.waitForFunction(() => document.body.dataset.gfxPreset === "high");
+    const shadowsOpt = await page.locator("#pf-gfx-shadows option[value='preset']").textContent();
+    if (!shadowsOpt.includes("Medium")) throw new Error("From preset label wrong: " + shadowsOpt);
+    await page.selectOption("#pf-gfx-bloom", "off");
+    const summary = await page.textContent("#pf-gfx-summary");
+    if (!/shadows/.test(summary) || /bloom/.test(summary) || !/px/.test(summary)) throw new Error("summary not updated: " + summary);
+    const g = await savedGraphics(page);
+    if (g.preset !== "high" || g.bloom !== "off") throw new Error("graphics not saved: " + JSON.stringify(g));
+    // panel fits: the Done button is reachable inside the scrolling panel
+    await page.locator(".pf-overlay .pf-btn-primary:has-text('Done')").scrollIntoViewIfNeeded();
+    const box = await page.locator(".pf-panel.pf-settings").boundingBox();
+    const vp = page.viewportSize();
+    if (box.x < 0 || box.y < 0 || box.x + box.width > vp.width + 1 || box.y + box.height > vp.height + 1) {
+      throw new Error("settings panel overflows viewport: " + JSON.stringify(box));
+    }
+    await page.screenshot({ path: SHOT("graphics", label) });
+  });
+
+  await step(`[${label}] graphics: survives reload, applies to chamber`, async () => {
+    await page.reload({ waitUntil: "load" });
+    await page.waitForSelector(".pf-screen-title:not([hidden])");
+    if ((await page.evaluate(() => document.body.dataset.gfxPreset)) !== "high") throw new Error("preset lost on reload");
+    await page.click(".pf-title-grid .pf-card:has-text('Profile & settings')");
+    await page.waitForSelector("#pf-gfx-section");
+    if ((await page.inputValue("#pf-gfx-preset")) !== "high") throw new Error("preset select not restored");
+    if ((await page.inputValue("#pf-gfx-bloom")) !== "off") throw new Error("override not restored");
+    // choosing a preset clears overrides
+    await page.selectOption("#pf-gfx-preset", "ultra");
+    if ((await page.inputValue("#pf-gfx-bloom")) !== "preset") throw new Error("preset did not clear overrides");
+    const g = await savedGraphics(page);
+    if (g.preset !== "ultra" || "bloom" in g) throw new Error("ultra not saved cleanly: " + JSON.stringify(g));
+    await page.click(".pf-overlay .pf-btn-primary:has-text('Done')");
+    await page.click(".pf-screen-title .pf-btn-big");
+    await waitPhase(page, "build");
+    await page.waitForFunction(() => document.querySelector(".pf-canvas")?.dataset.gfxPreset === "ultra");
+    await page.click(".pf-tray .pf-btn-go");
+    await waitPhase(page, "run");
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: SHOT("ultra", label) });
+    await page.click(".pf-screen-play .pf-rail-left .pf-btn:has-text('Pause')");
+    await page.click(".pf-overlay .pf-btn:has-text('Leave chamber')");
+    await page.waitForSelector(".pf-screen-title:not([hidden])");
+  });
+}
+
 async function runPass(browser, label, viewport, hasTouch) {
   const context = await browser.newContext({ viewport, hasTouch });
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   page.on("console", (m) => {
-    if (m.type() === "error" && !browserNoise.test(m.text())) errors.push(`console: ${m.text()}`);
+    if ((m.type() === "error" || m.type() === "warning") && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
   });
 
   try {
@@ -142,12 +207,13 @@ async function runPass(browser, label, viewport, hasTouch) {
         await page.click(".pf-overlay .pf-btn:has-text('Settings')");
         await page.waitForSelector(".pf-overlay[aria-label='Settings']");
         await page.check(".pf-overlay input[aria-label='Reduced motion']");
-        await page.selectOption(".pf-overlay select[aria-label='Graphics quality']", "low");
+        await page.selectOption("#pf-gfx-preset", "low");
         const applied = await page.evaluate(() => ({
           rm: document.body.classList.contains("pf-rm"),
-          saved: JSON.parse(JSON.parse(localStorage.getItem("pf-settings-v1")).payload).quality,
+          saved: JSON.parse(JSON.parse(localStorage.getItem("pf-settings-v1")).payload).graphics.preset,
+          canvas: document.querySelector(".pf-canvas").dataset.gfxPreset,
         }));
-        if (!applied.rm || applied.saved !== "low") throw new Error("settings not applied: " + JSON.stringify(applied));
+        if (!applied.rm || applied.saved !== "low" || applied.canvas !== "low") throw new Error("settings not applied: " + JSON.stringify(applied));
         await page.screenshot({ path: SHOT("settings", label) });
         await page.click(".pf-overlay .pf-btn-primary:has-text('Done')");
         await page.waitForSelector(".pf-overlay[aria-label='Paused']"); // back to pause
@@ -268,6 +334,14 @@ async function runPass(browser, label, viewport, hasTouch) {
         }
       });
     }
+    if (label === "mobile") {
+      await step("mobile: leave chamber for the graphics pass", async () => {
+        await page.click(".pf-screen-play .pf-rail-left .pf-btn:has-text('Pause')");
+        await page.click(".pf-overlay .pf-btn:has-text('Leave chamber')");
+        await page.waitForSelector(".pf-screen-title:not([hidden])");
+      });
+    }
+    await graphicsPass(page, label);
   } finally {
     await context.close();
   }
@@ -282,7 +356,7 @@ const { server, port } = await serve();
 runPass.port = port;
 const browser = await chromium.launch({
   executablePath: "/usr/bin/google-chrome",
-  args: ["--no-sandbox", "--enable-unsafe-swiftshader"],
+  args: ["--no-sandbox", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
 });
 
 try {

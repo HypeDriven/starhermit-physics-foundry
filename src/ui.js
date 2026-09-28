@@ -11,6 +11,29 @@ import {
   ACHIEVEMENTS, dailyLevel, getLevel,
 } from "./content.js";
 import { createGameSession } from "./session.js";
+import { PRESETS, CATEGORIES, SHADOW_MAP, detectPreset, resolve as resolveGfx, presetTier, choosePreset } from "./gfx.js";
+import { translator, describeLocalized } from "./gfx-i18n.js";
+
+// GPU name from WEBGL_debug_renderer_info (probed once on a throwaway context).
+let gpuProbe = null;
+function probeGpu() {
+  if (gpuProbe) return gpuProbe;
+  let name = "";
+  try {
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl2") || c.getContext("webgl");
+    if (gl) {
+      const ext = gl.getExtension("WEBGL_debug_renderer_info");
+      name = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      const lose = gl.getExtension("WEBGL_lose_context");
+      if (lose) lose.loseContext();
+    }
+  } catch { /* no GPU info; Auto falls back to Balanced */ }
+  const mobile = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(any-pointer: fine)").matches)
+    || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "");
+  gpuProbe = { name: String(name || ""), detected: detectPreset(name, { mobile }) };
+  return gpuProbe;
+}
 
 const MATERIAL_KEYS = Object.keys(MATERIALS);
 const TERMINAL_TEXT = {
@@ -91,8 +114,8 @@ export function init(deps) {
     audio.setBusVolume("voice", settings.voice);
     audio.setMuted(settings.muted);
     applyA11yClasses();
+    applyGraphics();
     if (renderer) {
-      renderer.setQuality(settings.quality);
       renderer.setReducedMotion(settings.reducedMotion);
       if (renderer.setFraming) renderer.setFraming(settings.cameraDefault === "tight" ? 0.02 : 0.1);
     }
@@ -122,6 +145,20 @@ export function init(deps) {
     const t = el("div", { class: "pf-toast pf-toast-" + kind, role: "status", text: msg });
     toastRegion.append(t);
     setTimeout(() => t.remove(), 4500);
+  }
+
+  // ------------------------------------------------------------ graphics settings
+  const tg = translator(typeof navigator !== "undefined" ? navigator.language : "en-US");
+  function gfxSaved() {
+    if (!settings.graphics || typeof settings.graphics !== "object") settings.graphics = { preset: "auto" };
+    return settings.graphics;
+  }
+  function applyGraphics() {
+    const r = resolveGfx(gfxSaved(), probeGpu().detected);
+    document.body.dataset.gfxPreset = r.preset;
+    document.body.dataset.gfxAuto = r.auto ? "1" : "0";
+    if (renderer && renderer.setGraphics) renderer.setGraphics(gfxSaved(), probeGpu().detected);
+    return r;
   }
 
   function applyA11yClasses() {
@@ -161,6 +198,8 @@ export function init(deps) {
   let dailyInfo = null;
   let timeOffset = 0;
 
+  applyGraphics(); // body data attributes before the chamber exists
+
   const canvasWrap = el("div", { class: "pf-canvas-wrap" });
   const canvas = el("canvas", { class: "pf-canvas", "aria-label": "Test chamber view. Use the action tray or keyboard for all actions." });
   canvasWrap.append(canvas);
@@ -169,8 +208,8 @@ export function init(deps) {
   function ensureRenderer() {
     if (renderer || !createRenderer) return renderer;
     renderer = createRenderer(canvas, { onPick: handlePick });
+    applyGraphics();
     if (renderer) {
-      renderer.setQuality(settings.quality);
       renderer.setReducedMotion(settings.reducedMotion);
       if (renderer.setFraming) renderer.setFraming(settings.cameraDefault === "tight" ? 0.02 : 0.1);
     }
@@ -1099,6 +1138,115 @@ export function init(deps) {
     return "Local guest profile — progress stays in this browser.";
   }
 
+  // Graphics section: quality preset, render scale, per-effect overrides,
+  // adaptive resolution, frame-rate readout and a GPU / cost summary line.
+  // Every change applies live and is saved with the other settings.
+  function buildGraphicsSection() {
+    const g = gfxSaved();
+    const gpu = probeGpu();
+    const tierName = (p) => tg(p);
+    const section = el("section", { class: "pf-gfx", id: "pf-gfx-section", "aria-labelledby": "pf-gfx-head" });
+
+    const presetSel = el("select", { class: "pf-input", id: "pf-gfx-preset", "data-gfx": "preset", "aria-label": tg("quality") });
+    const scaleIn = el("input", { type: "range", id: "pf-gfx-scale", "data-gfx": "render_scale", min: "50", max: "200", step: "5", "aria-label": tg("renderScale") });
+    const scaleOut = el("output", { class: "pf-gfx-val", for: "pf-gfx-scale" });
+    const catSels = {};
+    const adaptiveIn = el("input", { type: "checkbox", id: "pf-gfx-adaptive", "data-gfx": "adaptive", "aria-label": tg("adaptive") });
+    const fpsIn = el("input", { type: "checkbox", id: "pf-gfx-fps", "data-gfx": "show_fps", "aria-label": tg("showFps") });
+    const summary = el("p", { class: "pf-note pf-gfx-summary", id: "pf-gfx-summary", "aria-live": "polite" });
+    const note = el("p", { class: "pf-note pf-gfx-note", id: "pf-gfx-note", text: tg("postFailed") });
+    note.hidden = true;
+
+    function fillOptions() {
+      const r = resolveGfx(g, gpu.detected);
+      presetSel.replaceChildren(
+        el("option", { value: "auto", text: tg("auto", { tier: tierName(gpu.detected) }) }),
+        ...PRESETS.map((p) => el("option", { value: p, text: tierName(p) })));
+      presetSel.value = PRESETS.includes(g.preset) ? g.preset : "auto";
+      for (const [cat, sel] of Object.entries(catSels)) {
+        const tiers = CATEGORIES[cat];
+        sel.replaceChildren(
+          el("option", { value: "preset", text: tg("fromPreset", { tier: tg("t_" + presetTier(r.preset, cat)) }) }),
+          ...tiers.map((t) => el("option", { value: t, text: tg("t_" + t) })));
+        sel.value = tiers.includes(g[cat]) ? g[cat] : "preset";
+      }
+      const pct = Math.round((Number(g.render_scale) || 1) * 100);
+      scaleIn.value = String(Math.min(200, Math.max(50, pct)));
+      scaleOut.textContent = scaleIn.value + "%";
+      adaptiveIn.checked = g.adaptive !== false;
+      fpsIn.checked = !!g.show_fps;
+    }
+
+    function refreshSummary() {
+      const r = resolveGfx(g, gpu.detected);
+      let pixels;
+      let postFailed = false;
+      // live numbers only while the chamber canvas is on screen
+      const info = renderer && renderer.graphicsInfo && canvas.clientWidth > 0 ? renderer.graphicsInfo() : null;
+      if (info && info.pixels[0] > 0) { pixels = info.pixels; postFailed = info.postFailed; }
+      else {
+        const ratio = Math.min(window.devicePixelRatio || 1, r.dprCap) * r.scale;
+        pixels = [Math.round(window.innerWidth * ratio), Math.round(window.innerHeight * ratio)];
+      }
+      summary.textContent = (gpu.name || tg("unknownGpu")) + " · " + describeLocalized(tg, r, SHADOW_MAP, pixels)
+        + (info && info.fps ? " · " + info.fps + " fps" : "");
+      note.hidden = !(postFailed && r.post);
+    }
+
+    function commit() {
+      saveSettings();
+      applyGraphics();
+      refreshSummary();
+    }
+
+    presetSel.addEventListener("change", () => {
+      // choosing a preset clears the per-effect overrides
+      const next = choosePreset(g, presetSel.value);
+      for (const k of Object.keys(g)) delete g[k];
+      Object.assign(g, next);
+      fillOptions();
+      commit();
+      audio.play("ui-select");
+    });
+    scaleIn.addEventListener("input", () => {
+      g.render_scale = Number(scaleIn.value) / 100;
+      scaleOut.textContent = scaleIn.value + "%";
+      commit();
+    });
+    adaptiveIn.addEventListener("change", () => { g.adaptive = adaptiveIn.checked; commit(); });
+    fpsIn.addEventListener("change", () => { g.show_fps = fpsIn.checked; commit(); });
+
+    const rows = [];
+    for (const cat of Object.keys(CATEGORIES)) {
+      const sel = el("select", { class: "pf-input", id: "pf-gfx-" + cat, "data-gfx-cat": cat, "aria-label": tg("cat_" + cat) });
+      sel.addEventListener("change", () => {
+        if (sel.value === "preset") delete g[cat];
+        else g[cat] = sel.value;
+        commit();
+      });
+      catSels[cat] = sel;
+      rows.push(el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("cat_" + cat) }), sel]));
+    }
+
+    section.append(
+      el("h3", { id: "pf-gfx-head", text: tg("graphics") }),
+      el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("quality") }), presetSel]),
+      el("label", { class: "pf-field pf-gfx-row pf-gfx-scale" }, [el("span", { text: tg("renderScale") }), scaleIn, scaleOut]),
+      ...rows,
+      el("label", { class: "pf-field pf-check" }, [adaptiveIn, el("span", { text: tg("adaptive") })]),
+      el("label", { class: "pf-field pf-check" }, [fpsIn, el("span", { text: tg("showFps") })]),
+      summary,
+      note,
+    );
+    fillOptions();
+    refreshSummary();
+    const timer = setInterval(() => {
+      if (!section.isConnected) { clearInterval(timer); return; }
+      refreshSummary();
+    }, 1000);
+    return section;
+  }
+
   function openSettings() {
     closeOverlays();
     const s = settings;
@@ -1130,14 +1278,7 @@ export function init(deps) {
       return el("label", { class: "pf-field pf-check" }, [input, el("span", { text: label })]);
     };
 
-    const qualitySel = el("select", { class: "pf-input", "aria-label": "Graphics quality" },
-      ["low", "medium", "high"].map((q) => el("option", { value: q, text: q, selected: s.quality === q ? "" : null })));
-    qualitySel.value = s.quality;
-    qualitySel.addEventListener("change", () => {
-      s.quality = qualitySel.value;
-      saveSettings();
-      if (renderer) renderer.setQuality(s.quality);
-    });
+    const gfxSection = buildGraphicsSection();
 
     const camSel = el("select", { class: "pf-input", "aria-label": "Camera default" },
       [el("option", { value: "frame", text: "Full chamber" }), el("option", { value: "tight", text: "Tight frame" })]);
@@ -1161,8 +1302,8 @@ export function init(deps) {
         el("h3", { text: "Audio" }),
         slider("Music", "music"), slider("Effects", "effects"), slider("Ambience", "ambience"), slider("Voice", "voice"),
         toggle("Mute all", "muted", (v) => audio.setMuted(v)),
-        el("h3", { text: "Graphics" }),
-        el("label", { class: "pf-field" }, [el("span", { text: "Quality tier" }), qualitySel]),
+        gfxSection,
+        el("h3", { text: "Display" }),
         el("label", { class: "pf-field" }, [el("span", { text: "Camera default" }), camSel]),
         toggle("Reduced motion", "reducedMotion", (v) => { if (renderer) renderer.setReducedMotion(v); }),
         toggle("High contrast", "highContrast"),

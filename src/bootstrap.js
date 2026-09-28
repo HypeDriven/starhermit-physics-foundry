@@ -26,7 +26,7 @@ function defaultSettings() {
   return {
     version: DOC_VERSION,
     music: 0.5, effects: 0.8, ambience: 0.4, voice: 0.5, muted: false,
-    quality: "high", reducedMotion: false, highContrast: false, largeText: false,
+    graphics: { preset: "auto" }, reducedMotion: false, highContrast: false, largeText: false,
     leftHanded: false, cameraDefault: "frame", jointMode: "toggle", haptics: false,
     consentAnalytics: false,
   };
