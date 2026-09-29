@@ -21,6 +21,7 @@ await esbuild.build({
 copyFileSync(resolve(root, "src", "style.css"), resolve(outdir, "style.css"));
 copyFileSync(resolve(root, "starhermit.txt"), resolve(outdir, "starhermit.txt"));
 copyFileSync(resolve(root, "favicon.svg"), resolve(outdir, "favicon.svg"));
+copyFileSync(resolve(root, "browser-guard.js"), resolve(outdir, "browser-guard.js"));
 copyFileSync(resolve(root, "coverart.png"), resolve(outdir, "coverart.png"));
 cpSync(resolve(root, "sfx"), resolve(outdir, "sfx"), { recursive: true });
 
@@ -34,6 +35,7 @@ const html = `<!DOCTYPE html>
 <title>Physics Foundry</title>
 <link rel="stylesheet" href="./style.css" />
 <script type="module" src="./bootstrap.js"></script>
+<script src="./browser-guard.js"></script>
 </head>
 <body class="pf-body">
 <noscript><p style="padding:2rem;text-align:center">JavaScript is required to play Physics Foundry.</p></noscript>
