@@ -16,9 +16,8 @@
  * Server: an embedded minimal static server on an ephemeral port. The repo's
  * server.js is the declared StarHermit authoritative script (starhermit.txt:
  * server=server.js) and its API routes mutate data/*.json, so it is NOT used
- * here; the client detects the missing API marker and runs its supported
- * offline/guest path (daily falls back to a local seed, leaderboards show
- * "offline"). All gameplay is local and fully covered.
+ * here. Standalone the client makes zero same-origin /api or /ws requests
+ * (asserted below): daily seed, boards and achievements are local.
  *
  * Run: npm run test:e2e
  */
@@ -32,11 +31,7 @@ const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SHOT = (stage, vp) => `/tmp/physics-foundry-e2e-${stage}-${vp}.png`;
 
 // Benign GPU/swiftshader noise (from tools/production_game_audit.mjs).
-const browserNoise = /GL Driver Message|GPU stall due to ReadPixels|Automatic fallback to software WebGL|EnableWebGLDeveloperExtensions|Failed to load resource: the server responded with a status of 404/i;
-// The game deliberately probes GET /api/v1/time on startup even on a partial
-// host (platform.js): on the embedded static server it 404s, which the client
-// catches and degrades to its offline/guest path. That one benign 404 is what
-// the last alternative above (resource-load 404) is covering.
+const browserNoise = /GL Driver Message|GPU stall due to ReadPixels|Automatic fallback to software WebGL|EnableWebGLDeveloperExtensions/i;
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -158,6 +153,10 @@ async function runPass(browser, label, viewport, hasTouch) {
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+  page.on("request", (r) => {
+    const u = new URL(r.url());
+    if (u.port === String(runPass.port) && /^\/(api|ws)(\/|$)/.test(u.pathname)) errors.push(`own-server request: ${r.method()} ${u.pathname}`);
+  });
   page.on("console", (m) => {
     if ((m.type() === "error" || m.type() === "warning") && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
   });

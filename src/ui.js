@@ -3,16 +3,16 @@
 // region but is never the only UI: every canvas action has a DOM equivalent.
 
 import {
-  MATERIALS, JOINT_TYPES, SCHEMA_VERSION, DT, CHAMBER,
-  dailySeed as fnvDailySeed,
+  MATERIALS, JOINT_TYPES, DT, CHAMBER,
 } from "./rules.js";
 import {
-  CONTENT_VERSION, THEMES, LEARN_LESSONS, JOURNEY_LEVELS, CHALLENGE_LEVELS,
+  THEMES, LEARN_LESSONS, JOURNEY_LEVELS, CHALLENGE_LEVELS,
   ACHIEVEMENTS, dailyLevel, getLevel,
 } from "./content.js";
 import { createGameSession } from "./session.js";
 import { PRESETS, CATEGORIES, SHADOW_MAP, detectPreset, resolve as resolveGfx, presetTier, choosePreset } from "./gfx.js";
 import { translator, describeLocalized } from "./gfx-i18n.js";
+import { currentPlatformStrings } from "./platform-i18n.js";
 
 // GPU name from WEBGL_debug_renderer_info (probed once on a throwaway context).
 let gpuProbe = null;
@@ -75,6 +75,7 @@ export function init(deps) {
   function saveSettings() {
     storage.saveSettings(settings);
     platform.cloudSave(currentDoc());
+    platform.syncSettings(settings);
     updateNetStatus();
     analytics("settings-change", { consent: settings.consentAnalytics });
   }
@@ -95,7 +96,7 @@ export function init(deps) {
     if (!net) return;
     const bits = [];
     if (platform.isHosted()) bits.push(platform.getNickname() || "Player");
-    bits.push(platform.isOffline() ? "offline" : "online");
+    bits.push(platform.isOffline() ? "local" : "online");
     if (platform.isHosted()) bits.push(platform.getSyncStatus());
     net.textContent = bits.join(" · ");
   }
@@ -133,7 +134,7 @@ export function init(deps) {
 
   const header = el("header", { class: "pf-top" }, [
     el("h1", { class: "pf-logo", text: "Physics Foundry" }),
-    el("span", { class: "pf-net-status", id: "pf-net", text: platform.isOffline() ? "offline" : "" }),
+    el("span", { class: "pf-net-status", id: "pf-net", text: platform.isOffline() ? "local" : "" }),
   ]);
   const main = el("main", { class: "pf-main", id: "pf-main" });
   root.append(header, main, live, alertLive, toastRegion);
@@ -196,7 +197,6 @@ export function init(deps) {
   let pauseOverlay = null;
   let settingsOverlay = null;
   let dailyInfo = null;
-  let timeOffset = 0;
 
   applyGraphics(); // body data attributes before the chamber exists
 
@@ -281,9 +281,24 @@ export function init(deps) {
       el("div", { class: "pf-title-foot" }, [
         el("button", { class: "pf-btn pf-btn-secondary", text: "How to play", onclick: () => openHelp("title") }),
         el("button", { class: "pf-btn pf-btn-secondary", text: "Leaderboards", onclick: () => { renderScores(); showScreen("scores"); } }),
+        platform.inviteLink() ? el("button", { class: "pf-btn pf-btn-secondary", id: "pf-invite", text: ps.invite, onclick: () => inviteFriend() }) : null,
+        platform.canSignIn() ? el("button", { class: "pf-btn pf-btn-secondary", id: "pf-signin", text: ps.signIn, onclick: () => platform.signIn() }) : null,
       ])
     );
     updateDailyCountdown();
+  }
+
+  // StarHermit invite link (signed in only) -> clipboard + confirmation toast.
+  const ps = currentPlatformStrings();
+  async function inviteFriend() {
+    const link = platform.inviteLink();
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast(ps.inviteCopied);
+    } catch {
+      toast(ps.inviteFailed.replace("{link}", link));
+    }
   }
 
   // Returning players reach the playfield in at most two actions:
@@ -651,6 +666,40 @@ export function init(deps) {
   // taps sound immediately without waiting for a canvas pick.
   document.addEventListener("pointerdown", () => audio.unlock());
 
+  // Keyboard bindings: declared as control.* in starhermit.txt; the player's
+  // StarHermit overrides replace these defaults when signed in.
+  const DEFAULT_BINDINGS = {
+    cursor_up: ["ArrowUp", "KeyW"],
+    cursor_down: ["ArrowDown", "KeyS"],
+    cursor_left: ["ArrowLeft", "KeyA"],
+    cursor_right: ["ArrowRight", "KeyD"],
+    spawn: ["Enter", "NumpadEnter", "Space"],
+    material_1: ["Digit1", "Numpad1"],
+    material_2: ["Digit2", "Numpad2"],
+    material_3: ["Digit3", "Numpad3"],
+    material_4: ["Digit4", "Numpad4"],
+    joint: ["KeyJ"],
+    delete: ["Delete", "Backspace"],
+    run: ["KeyR"],
+    undo: ["KeyU"],
+    reframe: ["KeyC"],
+    pause: ["Escape"],
+  };
+  let bindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+  function actionFor(code) {
+    for (const [action, codes] of Object.entries(bindings)) if (codes.includes(code)) return action;
+    return null;
+  }
+  function keyName(code) {
+    const named = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→", Escape: "Esc", Space: "Space", NumpadEnter: "Num Enter" };
+    if (named[code]) return named[code];
+    if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+    if (/^Digit\d$/.test(code)) return code.slice(5);
+    if (/^Numpad\d$/.test(code)) return "Num " + code.slice(6);
+    return code;
+  }
+  const keysFor = (...actions) => actions.map((a) => (bindings[a] || []).map(keyName).join(" / ")).join(" · ");
+
   document.addEventListener("keydown", (ev) => {
     // Overlays are modal and can be open over any screen (settings is also
     // reachable from the title), so they are handled before the play checks.
@@ -679,14 +728,14 @@ export function init(deps) {
       }
       return;
     }
-    const k = ev.key.toLowerCase();
+    const k = actionFor(ev.code);
     const handled = () => { ev.preventDefault(); audio.unlock(); };
-    if (k === "arrowup" || k === "w") { handled(); moveCursor(0, 1); }
-    else if (k === "arrowdown" || k === "s") { handled(); moveCursor(0, -1); }
-    else if (k === "arrowleft" || k === "a") { handled(); moveCursor(-1, 0); }
-    else if (k === "arrowright" || k === "d") { handled(); moveCursor(1, 0); }
-    else if (k === "enter" || k === " ") { handled(); trySpawn(cursor.x, cursor.y); }
-    else if (k === "j") {
+    if (k === "cursor_up") { handled(); moveCursor(0, 1); }
+    else if (k === "cursor_down") { handled(); moveCursor(0, -1); }
+    else if (k === "cursor_left") { handled(); moveCursor(-1, 0); }
+    else if (k === "cursor_right") { handled(); moveCursor(1, 0); }
+    else if (k === "spawn") { handled(); trySpawn(cursor.x, cursor.y); }
+    else if (k === "joint") {
       handled();
       if (currentLevel.allowedJoints.length) {
         jointMode = true;
@@ -695,17 +744,17 @@ export function init(deps) {
         renderTray();
       }
     }
-    else if (k === "delete" || k === "backspace") { handled(); deleteSelected(); }
-    else if (k === "r") { handled(); doRun(); }
-    else if (k === "u") { handled(); doUndo(); }
-    else if (k === "escape") {
+    else if (k === "delete") { handled(); deleteSelected(); }
+    else if (k === "run") { handled(); doRun(); }
+    else if (k === "undo") { handled(); doUndo(); }
+    else if (k === "pause") {
       handled();
       if (jointMode) { jointMode = false; jointAnchor = null; renderTray(); }
       else pauseGame();
     }
-    else if (k === "c") { handled(); if (renderer && renderer.frameChamber) renderer.frameChamber(); announce("Camera re-framed"); }
-    else if (["1", "2", "3", "4"].includes(k)) {
-      const i = Number(k) - 1;
+    else if (k === "reframe") { handled(); if (renderer && renderer.frameChamber) renderer.frameChamber(); announce("Camera re-framed"); }
+    else if (/^material_[1-4]$/.test(k || "")) {
+      const i = Number(k.slice(-1)) - 1;
       if (currentLevel.allowedMaterials[i]) {
         handled();
         selectedMaterial = currentLevel.allowedMaterials[i];
@@ -715,7 +764,7 @@ export function init(deps) {
     }
   });
   document.addEventListener("keyup", (ev) => {
-    if (ev.key.toLowerCase() === "j" && settings.jointMode === "hold") {
+    if (actionFor(ev.code) === "joint" && settings.jointMode === "hold") {
       jointMode = false;
       jointAnchor = null;
       if (!screens.play.hidden) renderTray();
@@ -844,8 +893,6 @@ export function init(deps) {
     const a = ACHIEVEMENTS[key];
     toast("Achievement unlocked: " + (a ? a.name : key), "ok");
     audio.play("achievement");
-    // the dev backend also keeps idempotent unlocks; hosted they stay local
-    platform.unlockAchievement(key, progress.playerId).then(() => {});
   }
 
   const resultsScreen = makeScreen("results");
@@ -871,41 +918,10 @@ export function init(deps) {
       && !currentCtx.practice;
     const submitWrap = el("div", { class: "pf-submit" });
     if (ranked && (currentMode === "journey" || currentMode === "daily")) {
-      if (platform.isHosted()) {
-        // Platform leaderboards are script-owned: clients cannot submit, and
-        // identity comes from the account profile rather than a typed name.
-        submitWrap.append(el("p", { class: "pf-note", text: "Ranked run recorded locally. Platform leaderboards are verified server-side and read-only for clients." }));
-      } else {
-        const submitBtn = el("button", {
-          class: "pf-btn pf-btn-secondary", text: "Verify & share replay",
-          onclick: async () => {
-            submitBtn.disabled = true;
-            const replay = session.getReplay();
-            const payload = {
-              board: currentMode === "daily" ? "daily" : "global",
-              name: "foundry-" + String(progress.playerId).slice(0, 8),
-              contentVersion: CONTENT_VERSION,
-              rulesetVersion: SCHEMA_VERSION,
-              commands: replay.commands,
-              stateHashes: replay.stateHashes,
-              seed: session.state.seed,
-              durationMs: r.durationMs,
-              assists: 0,
-            };
-            if (currentMode === "daily") payload.date = currentCtx.daily.date;
-            else payload.levelId = currentLevel.id;
-            const res = await platform.submitScore(payload);
-            if (res.error) {
-              flashError("Submit failed: " + res.error);
-              submitBtn.disabled = false;
-            } else {
-              toast("Rank " + res.rank + " with " + res.score + " points", "ok");
-              submitBtn.textContent = "Submitted — rank " + res.rank;
-            }
-          },
-        });
-        submitWrap.append(submitBtn);
-      }
+      // Platform leaderboards are script-owned: clients never submit.
+      submitWrap.append(el("p", { class: "pf-note", text: platform.isHosted()
+        ? "Ranked run recorded locally. Platform leaderboards are verified server-side and read-only for clients."
+        : "Ranked run recorded on this device." }));
     } else {
       submitWrap.append(el("p", { class: "pf-note", text: "Unranked session — no leaderboard submission." }));
     }
@@ -965,15 +981,8 @@ export function init(deps) {
   async function startDaily() {
     let date, seed;
     const d = await platform.getDaily();
-    if (!d.error) {
-      date = d.date; seed = d.seed;
-      dailyInfo = d;
-    } else {
-      // local fallback: derive from local UTC date
-      date = new Date(Date.now() + timeOffset).toISOString().slice(0, 10);
-      seed = fnvDailySeed(date);
-      dailyInfo = { date, seed, offline: true };
-    }
+    date = d.date; seed = d.seed;
+    dailyInfo = d;
     const level = dailyLevel(date);
     if (progress.dailyAttempts[date]) {
       toast("Daily already attempted today — playing unranked practice run", "info");
@@ -1376,15 +1385,15 @@ export function init(deps) {
   function renderHelp() {
     helpScreen.innerHTML = "";
     const keys = [
-      ["Arrows / WASD", "Move the spawn cursor"],
-      ["Enter / Space", "Spawn selected material at cursor"],
-      ["1-4", "Select material"],
-      ["J", "Joint mode (" + (settings.jointMode === "hold" ? "hold" : "toggle") + "), then pick two bodies"],
-      ["Delete", "Remove selected body"],
-      ["R", "Run the simulation"],
-      ["U", "Undo last build action"],
-      ["C", "Re-frame camera"],
-      ["Esc", "Pause / cancel joint mode"],
+      [keysFor("cursor_up", "cursor_left", "cursor_down", "cursor_right"), "Move the spawn cursor"],
+      [keysFor("spawn"), "Spawn selected material at cursor"],
+      [keysFor("material_1", "material_2", "material_3", "material_4"), "Select material 1-4"],
+      [keysFor("joint"), "Joint mode (" + (settings.jointMode === "hold" ? "hold" : "toggle") + "), then pick two bodies"],
+      [keysFor("delete"), "Remove selected body"],
+      [keysFor("run"), "Run the simulation"],
+      [keysFor("undo"), "Undo last build action"],
+      [keysFor("reframe"), "Re-frame camera"],
+      [keysFor("pause"), "Pause / cancel joint mode"],
     ];
     helpScreen.append(
       el("h2", { text: "How to play" }),
@@ -1465,6 +1474,19 @@ export function init(deps) {
     ]));
   }
 
+  // Local journey bests when not signed in (no own-server boards).
+  function renderLocalBests(wrap) {
+    const rows = JOURNEY_LEVELS.filter((l) => progress.bests[l.id]);
+    if (!rows.length) {
+      wrap.append(el("p", { class: "pf-note", text: "No local journey bests yet." }));
+      return;
+    }
+    wrap.append(el("table", { class: "pf-score-table" }, [
+      el("tr", {}, [el("th", { text: "Chamber" }), el("th", { text: "Best" })]),
+      ...rows.map((l) => el("tr", {}, [el("td", { text: l.name }), el("td", { text: String(progress.bests[l.id]) })])),
+    ]));
+  }
+
   async function renderScores() {
     scoresScreen.innerHTML = "";
     scoresScreen.append(el("h2", { text: "Leaderboards" }));
@@ -1478,7 +1500,8 @@ export function init(deps) {
       const res = await platform.getLeaderboard(board);
       if (res.error) {
         if (board === "daily") { renderLocalDaily(wrap); continue; }
-        wrap.append(el("p", { class: "pf-note", text: res.error === "offline" ? "Offline — board unavailable. Play and submit when connected." : "Board error: " + res.error }));
+        if (res.error === "local") { head.textContent = "Local bests (Journey)"; renderLocalBests(wrap); continue; }
+        wrap.append(el("p", { class: "pf-note", text: "Board error: " + res.error }));
         continue;
       }
       // the platform exposes a single read-only board; per-day views stay local
@@ -1503,7 +1526,7 @@ export function init(deps) {
   function updateDailyCountdown() {
     const node = titleScreen.querySelector("#pf-daily-cd");
     if (!node) return;
-    const now = Date.now() + timeOffset;
+    const now = Date.now();
     const next = new Date(now);
     next.setUTCHours(24, 0, 0, 0);
     const ms = next.getTime() - now;
@@ -1515,13 +1538,26 @@ export function init(deps) {
   // Platform identity, cloud restore, server time and daily info; every call
   // degrades gracefully when there is no launch token (local play).
   updateNetStatus();
+  platform.loadBindings(DEFAULT_BINDINGS).then((b) => { bindings = b; if (!screens.help.hidden) renderHelp(); });
+  platform.onAuthChange(({ signedIn }) => {
+    if (!signedIn) toast(ps.signedOut);
+    updateNetStatus();
+    if (!screens.title.hidden) renderTitle();
+  });
   platform.fetchProfile().then(updateNetStatus);
-  platform.cloudLoad().then((doc) => { if (doc) applyRemoteDoc(doc); updateNetStatus(); });
-  platform.getServerTime().then((r) => {
-    if (!r.error) timeOffset = r.offset || 0;
+  platform.cloudLoad().then(async (doc) => {
+    if (doc) applyRemoteDoc(doc);
+    // Platform settings KV wins over local values for known preference keys.
+    const remote = await platform.loadRemoteSettings();
+    const picked = {};
+    for (const [k, v] of Object.entries(remote)) {
+      if (k !== "version" && k in settings && v != null && typeof v === typeof settings[k]) picked[k] = v;
+    }
+    if (Object.keys(picked).length) applyRemoteDoc({ settings: picked });
+    else platform.syncSettings(settings);
     updateNetStatus();
   });
-  platform.getDaily().then((d) => { if (!d.error) dailyInfo = d; });
+  platform.getDaily().then((d) => { dailyInfo = d; });
 
   // ------------------------------------------------------------ boot into title
   renderTitle();

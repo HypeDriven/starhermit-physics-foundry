@@ -1,159 +1,124 @@
-// StarHermit platform adapter contract checks. The hosted path is exercised
-// against a mocked host (no network): fragment token read + strip, Bearer on
-// every call, profile nickname, read-only leaderboard, cloud-save zip+base64,
-// 45-min refresh, and the guarantee that the repo's own dev-server routes are
-// never requested on-platform.
+// StarHermit adapter (src/platform.js) over the shared SDK with a mocked host
+// (no network): fragment token read + strip, profile nickname, cloud save in
+// slot game:<slug>, settings KV patch, bindings, read-only leaderboard, and
+// the guarantee that nothing platform-side is requested standalone and the
+// repo's own dev-server routes are never requested on-platform.
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
-const TOKEN_V1 = "hdr." + Buffer.from(JSON.stringify({ sub: "user-1234-abcd", game_scope: "physics-foundry", exp: 9999999999 })).toString("base64url") + ".sig";
-const TOKEN_V2 = "hdr." + Buffer.from(JSON.stringify({ sub: "user-1234-abcd", game_scope: "physics-foundry", exp: 9999999999 })).toString("base64url") + ".sig2";
+// The SDK is a classic browser script (this package is ESM): evaluate it the
+// way a <script> tag would, against a stand-in global.
+const holder = {};
+new Function("self", "module", readFileSync(new URL("../starhermit-sdk.js", import.meta.url), "utf8"))(holder, undefined);
+const SDK = holder.StarHermit;
+
+const b64u = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+const TOKEN = "hdr." + b64u({ sub: "user-1234-abcd", game_scope: "pf-slug", exp: Math.floor(Date.now() / 1000) + 3600 }) + ".sig";
 
 const calls = [];
-const timers = [];
-let replaceStateUrl = null;
+const saves = {};
+const kv = { music: 0.25 };
+let replaced = null;
 
-function jsonRes(obj, status = 200) {
-  return new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
+function route(url, init) {
+  const r = (status, body) => new Response(body, { status });
+  const j = (o) => r(200, JSON.stringify(o));
+  if (url === "/api/v1/users/user-1234-abcd/profile") return j({ username: "should-not-display", nickname: "Forge Tester" });
+  if (url === "/api/v1/users/u-rival-9/profile") return j({ username: "rival-user", nickname: "" });
+  if (url.startsWith("/api/v1/me/cloud-saves/")) {
+    const key = decodeURIComponent(url.split("/cloud-saves/")[1]);
+    if (init.method === "PUT") { saves[key] = Buffer.from(JSON.parse(init.body).dataBase64, "base64"); return j({}); }
+    return saves[key] ? r(200, saves[key]) : r(404, "");
+  }
+  if (url === "/api/v1/games/pf-slug/settings" && init.method === "PATCH") { Object.assign(kv, JSON.parse(init.body).settings); return j({}); }
+  if (url === "/api/v1/games/pf-slug/settings") return j({ settings: kv });
+  if (url === "/api/v1/games/pf-slug/controls") return j({ actions: [{ action: "run", codes: ["KeyG"] }] });
+  if (url === "/api/v1/games/pf-slug/leaderboards") return j([{ id: "lb-1", key: "score", name: "Best score" }]);
+  if (url.startsWith("/api/v1/leaderboards/lb-1/entries")) return j({ items: [{ userId: "u-rival-9", score: 512, rank: 1 }], total: 1 });
+  return r(404, "");
 }
 
-function route(call) {
-  const { path, opts } = call;
-  if (path === "/api/v1/users/user-1234-abcd/profile") return jsonRes({ id: "user-1234-abcd", username: "should-not-display", nickname: "Forge Tester" });
-  if (path === "/api/v1/users/u-rival-9/profile") return jsonRes({ id: "u-rival-9", username: "rival-user", nickname: "" });
-  if (path.startsWith("/api/v1/me/cloud-saves/") && opts.method === "PUT") return jsonRes({ ok: true });
-  if (path.startsWith("/api/v1/me/cloud-saves/")) return new Response(null, { status: 404 });
-  if (path === "/api/v1/games/physics-foundry/launch-token" && opts.method === "POST") return jsonRes({ token: TOKEN_V2 });
-  if (path === "/api/v1/games/physics-foundry") return jsonRes({ id: "physics-foundry", leaderboardId: "lb-1" });
-  if (path.startsWith("/api/v1/leaderboards/lb-1/entries")) return jsonRes({ entries: [{ userId: "u-rival-9", score: 512, components: { goal: 300 } }] });
-  if (path === "/api/v1/daily") return jsonRes({ date: "2026-09-11", seed: 123456, contentVersion: 1, rulesetVersion: 1, excluded: false });
-  return jsonRes({ error: "not-found" }, 404);
-}
-
-function installHost(url) {
+function install(href) {
   calls.length = 0;
-  replaceStateUrl = null;
-  globalThis.window = {
-    location: { href: url },
-    history: { replaceState: (_a, _b, to) => { replaceStateUrl = to; } },
-    addEventListener: () => {},
+  const u = new URL(href);
+  const win = {
+    location: { hash: u.hash, search: u.search, pathname: u.pathname, origin: u.origin, hostname: u.hostname, href },
+    history: { replaceState: (_a, _b, to) => { replaced = to; } },
   };
-  globalThis.document = { addEventListener: () => {}, hidden: false };
-  globalThis.fetch = async (path, opts = {}) => {
-    const call = { path, opts: opts || {}, headers: (opts && opts.headers) || {} };
-    calls.push(call);
-    return route(call);
-  };
+  const fetch = async (url, init = {}) => { calls.push({ url, method: init.method || "GET", init }); return route(url, init); };
+  globalThis.window = { addEventListener() {} };
+  globalThis.document = { addEventListener() {}, hidden: false };
+  globalThis.fetch = fetch;
+  globalThis.StarHermit = SDK.create({ window: win, fetch, setTimeout: () => 0, clearTimeout: () => {} });
 }
 
-globalThis.setTimeout = (fn, ms = 0) => { const t = { fn, ms, cleared: false }; timers.push(t); return timers.length; };
-globalThis.clearTimeout = (id) => { const t = timers[id - 1]; if (t) t.cleared = true; };
-
-function runTimer(ms) {
-  const t = timers.find((x) => !x.cleared && x.ms === ms);
-  assert.ok(t, "no live timer with ms=" + ms);
-  return t.fn();
-}
-
-let platform;
-
-test.before(async () => {
-  installHost("https://physics-foundry.starhermit.com/index.html#game_token=" + TOKEN_V1 + "&session_id=abc");
-  platform = await import("../src/platform.js");
-  platform.handshake();
-});
-
-const bearerOf = (call) => call.headers.Authorization || "";
 const FABRICATED = ["/api/v1/time", "/api/v1/daily", "/api/v1/achievements", "/api/v1/leaderboard/submit"];
 
-test("fragment token read once and stripped; sub/game_scope decoded", () => {
+test("hosted: token, nickname, cloud save, settings, bindings, leaderboard", async () => {
+  install("https://example.test/index.html#game_token=" + TOKEN + "&session_id=abc");
+  const platform = await import("../src/platform.js?hosted");
+  platform.handshake();
   assert.equal(platform.isHosted(), true);
-  assert.equal(platform.getGameScope(), "physics-foundry");
-  assert.equal(replaceStateUrl, "/index.html");
-  assert.equal(globalThis.window.location.href.includes("game_token"), true); // href itself untouched; strip is via replaceState
-  assert.equal(platform.getNickname(), "Player user-123"); // pre-profile fallback
-});
+  assert.equal(platform.getGameScope(), "pf-slug");
+  assert.equal(platform.getUserId(), "user-1234-abcd");
+  assert.equal(replaced, "/index.html");
+  assert.equal(platform.getNickname(), "Player user-1"); // pre-profile fallback
 
-test("profile nickname via /api/v1/users/{sub}/profile with Bearer; never /api/v1/me", async () => {
-  const ok = await platform.fetchProfile();
-  assert.equal(ok, true);
+  assert.equal(await platform.fetchProfile(), true);
   assert.equal(platform.getNickname(), "Forge Tester");
-  const p = calls.find((c) => c.path === "/api/v1/users/user-1234-abcd/profile");
-  assert.ok(p, "profile call missing");
-  assert.equal(bearerOf(p), "Bearer " + TOKEN_V1);
-  assert.ok(!calls.some((c) => c.path === "/api/v1/me"), "/api/v1/me must never be called");
-});
+  assert.ok(calls.every((c) => c.url !== "/api/v1/me"), "/api/v1/me must never be called");
+  assert.ok(calls.every((c) => c.init.headers.Authorization === "Bearer " + TOKEN));
 
-test("hosted leaderboard is read-only with nickname resolution", async () => {
-  const res = await platform.getLeaderboard("global");
-  assert.equal(res.hosted, true);
-  assert.deepEqual(res.entries, [{ name: "Player u-rival-", score: 512, goal: 300 }]); // username never displayed
-  assert.ok(calls.some((c) => c.path.startsWith("/api/v1/leaderboards/lb-1/entries")));
-  const ro = await platform.submitScore({ board: "global" });
-  assert.deepEqual(ro, { error: "read-only" });
-  assert.equal((await platform.unlockAchievement("first-completion", "p-1")).ok, true);
-});
-
-test("cloud save: 2 s debounce, zip+base64 PUT with Bearer, sync status", async () => {
   const doc = { settings: { music: 0.5 }, progress: { bests: { "journey-1": 900 } } };
   platform.cloudSave(doc);
   assert.equal(platform.getSyncStatus(), "saving");
-  assert.ok(!calls.some((c) => c.path.startsWith("/api/v1/me/cloud-saves/") && c.opts.method === "PUT"), "PUT must wait for the debounce");
-  await runTimer(2000);
+  assert.equal(await platform.flushCloudSave(), true);
   assert.equal(platform.getSyncStatus(), "synced");
-  const put = calls.find((c) => c.path === "/api/v1/me/cloud-saves/physics-foundry" && c.opts.method === "PUT");
-  assert.ok(put, "cloud PUT missing");
-  assert.equal(bearerOf(put), "Bearer " + TOKEN_V1);
-  const body = JSON.parse(put.opts.body);
-  const zipBytes = platform.base64ToBytes(body.dataBase64);
-  const back = JSON.parse(new TextDecoder().decode(platform.unzipFirstEntry(zipBytes)));
-  assert.deepEqual(back, doc);
-});
+  assert.deepEqual(Object.keys(saves), ["game:pf-slug"]);
+  assert.deepEqual(await platform.cloudLoad(), doc);
 
-test("45-min refresh re-mints the token via the game route and swaps it in", async () => {
-  await runTimer(45 * 60 * 1000);
-  const refresh = calls.find((c) => c.path === "/api/v1/games/physics-foundry/launch-token" && c.opts.method === "POST");
-  assert.ok(refresh, "launch-token refresh missing");
-  assert.equal(bearerOf(refresh), "Bearer " + TOKEN_V1);
-  await platform.fetchProfile();
-  const p = calls[calls.length - 1];
-  assert.equal(bearerOf(p), "Bearer " + TOKEN_V2);
-});
+  assert.deepEqual(await platform.loadRemoteSettings(), { music: 0.25 });
+  await platform.syncSettings({ version: 1, music: 0.25, muted: true });
+  const patches = calls.filter((c) => c.method === "PATCH");
+  assert.equal(patches.length, 1);
+  assert.deepEqual(JSON.parse(patches[0].init.body), { settings: { muted: true } });
 
-test("no fabricated hosted routes are ever requested on-platform", () => {
-  for (const call of calls) {
-    assert.ok(!FABRICATED.includes(call.path), "fabricated route called: " + call.path);
-    assert.ok(!/^\/api\/1\/leaderboard\?/.test(call.path), "fabricated route called: " + call.path);
-  }
-});
+  assert.deepEqual(await platform.loadBindings({ run: ["KeyR"], undo: ["KeyU"] }), { run: ["KeyG"], undo: ["KeyU"] });
 
-test("hosted daily is derived locally without a network call", async () => {
-  const before = calls.length;
+  const lb = await platform.getLeaderboard("global");
+  assert.equal(lb.hosted, true);
+  assert.deepEqual(lb.entries, [{ name: "Player u-riva", score: 512, goal: 0 }]); // username never displayed
+  assert.match(platform.inviteLink(), /\/game-invite\/user-1234-abcd\/pf-slug$/);
+
   const d = await platform.getDaily();
   assert.match(d.date, /^\d{4}-\d{2}-\d{2}$/);
-  assert.equal(typeof d.seed, "number");
-  assert.equal(calls.length, before);
+  for (const c of calls) assert.ok(!FABRICATED.includes(c.url), "dev route called on-platform: " + c.url);
 });
 
-test("local dev: query token accepted on localhost with Bearer on its-backend routes", async () => {
-  installHost("http://localhost:8080/?token=" + TOKEN_V1);
-  const dev = await import("../src/platform.js?dev");
-  dev.handshake();
-  assert.equal(dev.isHosted(), false); // query-param token is dev-only
-  const d = await dev.getDaily();
-  assert.equal(d.date, "2026-09-11");
-  const dailyCall = calls.find((c) => c.path === "/api/v1/daily");
-  assert.ok(dailyCall, "dev daily call missing");
-  assert.equal(bearerOf(dailyCall), "Bearer " + TOKEN_V1);
+test("standalone: no platform request, local defaults", async () => {
+  install("http://localhost:8080/index.html");
+  const platform = await import("../src/platform.js?standalone");
+  platform.handshake();
+  assert.equal(platform.isHosted(), false);
+  assert.equal(platform.getGameScope(), "");
+  assert.equal(await platform.fetchProfile(), false);
+  assert.equal(await platform.cloudLoad(), null);
+  platform.cloudSave({ a: 1 });
+  assert.deepEqual(await platform.loadRemoteSettings(), {});
+  assert.equal(await platform.syncSettings({ music: 1 }), null);
+  assert.deepEqual(await platform.loadBindings({ run: ["KeyR"] }), { run: ["KeyR"] });
+  assert.equal(platform.inviteLink(), null);
+  assert.equal(platform.canSignIn(), false);
+  assert.deepEqual(await platform.getLeaderboard("global"), { error: "local" });
+  assert.match((await platform.getDaily()).date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(calls.length, 0);
 });
 
-test("query token refused off localhost", async () => {
-  installHost("http://example.com/?token=" + TOKEN_V1);
-  const dev = await import("../src/platform.js?dev2");
-  dev.handshake();
-  assert.equal(dev.isHosted(), false);
-  assert.equal(dev.getGameScope(), "");
-  await dev.fetchProfile(); // no-op without a sub
-  assert.equal(calls.length, 0); // nothing was requested at all
-  assert.ok(calls.every((c) => !c.headers.Authorization), "no Bearer without a token");
+test("sign-in offered on <id>.starhermit.com without a token", async () => {
+  install("https://pf-slug.starhermit.com/index.html");
+  const platform = await import("../src/platform.js?signin");
+  platform.handshake();
+  assert.equal(platform.canSignIn(), true);
+  assert.equal(calls.length, 0);
 });

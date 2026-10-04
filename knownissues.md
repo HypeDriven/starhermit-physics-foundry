@@ -30,7 +30,8 @@ progression path itself was fine; clicking "Next chamber" directly works.
 on a partial host (`src/platform.js`). Against the embedded static e2e server that
 request returns 404, which the client catches and degrades to its offline/guest
 path. That one benign 404 surfaced as a browser console error and tripped the
-"no page errors" assertion; the test's benign-noise filter now covers it.
+"no page errors" assertion. (2026-10-04: the probe is gone — standalone makes no
+`/api` requests and the e2e asserts it; the 404 filter was removed.)
 
 **Verified**
 

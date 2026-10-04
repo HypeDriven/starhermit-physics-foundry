@@ -496,6 +496,84 @@ var init_rules = __esm({
   }
 });
 
+// src/gfx.js
+function detectPreset(gpu, { mobile = false } = {}) {
+  const g = String(gpu || "").toLowerCase();
+  let p = "balanced";
+  if (/swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/.test(g)) p = "low";
+  else if (/nvidia|geforce|rtx|gtx|quadro|radeon rx|radeon pro|amd radeon(?! graphics)|apple m\d/.test(g)) p = "high";
+  if (mobile && PRESETS.indexOf(p) > PRESETS.indexOf("balanced")) p = "balanced";
+  return p;
+}
+function resolve(saved, detected) {
+  const s = saved || {};
+  const auto = !PRESETS.includes(s.preset);
+  const preset = auto ? PRESETS.includes(detected) ? detected : "balanced" : s.preset;
+  const row = TABLE[preset];
+  const out = {
+    preset,
+    auto,
+    renderScale: clamp(Number(s.render_scale) || 1, 0.5, 2),
+    dprCap: row.dprCap
+  };
+  out.scale = row.scale * out.renderScale;
+  for (const [cat, tiers] of Object.entries(CATEGORIES)) {
+    out[cat] = tiers.includes(s[cat]) ? s[cat] : row[cat];
+  }
+  out.adaptive = s.adaptive !== false;
+  out.showFps = !!s.show_fps;
+  out.post = out.ao !== "off" || out.bloom === "on" || out.grade === "on" || out.antialias === "fxaa" || out.antialias === "smaa";
+  return out;
+}
+function choosePreset(saved, preset) {
+  const s = saved || {};
+  const out = { preset: PRESETS.includes(preset) ? preset : "auto" };
+  for (const k of ["render_scale", "adaptive", "show_fps"]) if (k in s) out[k] = s[k];
+  return out;
+}
+function presetTier(preset, cat) {
+  return TABLE[preset] ? TABLE[preset][cat] : void 0;
+}
+function describe(r, pixels) {
+  const parts = [
+    r.shadows === "off" ? "no shadows" : `${SHADOW_MAP[r.shadows]}\xB2 shadows`,
+    r.ao === "off" ? null : r.ao === "high" ? "full ambient occlusion" : "ambient occlusion",
+    r.bloom === "on" ? "bloom" : null,
+    r.reflections === "on" ? "reflections" : null,
+    r.antialias === "off" ? "no anti-aliasing" : r.antialias.toUpperCase(),
+    pixels ? `${pixels[0]}\xD7${pixels[1]} px` : null
+  ];
+  return parts.filter(Boolean).join(" \xB7 ");
+}
+function clamp(v, a, b) {
+  return Math.min(b, Math.max(a, v));
+}
+var PRESETS, CATEGORIES, TABLE, SHADOW_MAP, PARTICLE_CAP;
+var init_gfx = __esm({
+  "src/gfx.js"() {
+    PRESETS = ["low", "balanced", "high", "ultra"];
+    CATEGORIES = {
+      shadows: ["off", "low", "medium", "high"],
+      ao: ["off", "on", "high"],
+      bloom: ["off", "on"],
+      grade: ["off", "on"],
+      antialias: ["off", "fxaa", "smaa", "msaa"],
+      reflections: ["off", "on"],
+      particles: ["low", "high"],
+      background: ["static", "animated"],
+      detail: ["plain", "detailed"]
+    };
+    TABLE = {
+      low: { scale: 1, dprCap: 1, shadows: "off", ao: "off", bloom: "off", grade: "off", antialias: "msaa", reflections: "off", particles: "low", background: "static", detail: "plain" },
+      balanced: { scale: 1, dprCap: 1.5, shadows: "low", ao: "off", bloom: "on", grade: "on", antialias: "fxaa", reflections: "on", particles: "high", background: "animated", detail: "detailed" },
+      high: { scale: 1, dprCap: 2, shadows: "medium", ao: "on", bloom: "on", grade: "on", antialias: "smaa", reflections: "on", particles: "high", background: "animated", detail: "detailed" },
+      ultra: { scale: 1.25, dprCap: 2, shadows: "high", ao: "high", bloom: "on", grade: "on", antialias: "msaa", reflections: "on", particles: "high", background: "animated", detail: "detailed" }
+    };
+    SHADOW_MAP = { off: 0, low: 1024, medium: 2048, high: 4096 };
+    PARTICLE_CAP = { low: 300, high: 2e3 };
+  }
+});
+
 // vendor/three.module.js
 function generateUUID() {
   const d0 = Math.random() * 4294967295 | 0;
@@ -505,7 +583,7 @@ function generateUUID() {
   const uuid = _lut[d0 & 255] + _lut[d0 >> 8 & 255] + _lut[d0 >> 16 & 255] + _lut[d0 >> 24 & 255] + "-" + _lut[d1 & 255] + _lut[d1 >> 8 & 255] + "-" + _lut[d1 >> 16 & 15 | 64] + _lut[d1 >> 24 & 255] + "-" + _lut[d2 & 63 | 128] + _lut[d2 >> 8 & 255] + "-" + _lut[d2 >> 16 & 255] + _lut[d2 >> 24 & 255] + _lut[d3 & 255] + _lut[d3 >> 8 & 255] + _lut[d3 >> 16 & 255] + _lut[d3 >> 24 & 255];
   return uuid.toLowerCase();
 }
-function clamp(value, min, max) {
+function clamp2(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 function euclideanModulo(n, m) {
@@ -7473,6 +7551,9 @@ function convertArray(array, type, forceClone) {
 function isTypedArray(object) {
   return ArrayBuffer.isView(object) && !(object instanceof DataView);
 }
+function now() {
+  return (typeof performance === "undefined" ? Date : performance).now();
+}
 function ascSort(a, b) {
   return a.distance - b.distance;
 }
@@ -7487,7 +7568,7 @@ function intersectObject(object, raycaster, intersects, recursive) {
     }
   }
 }
-var REVISION, CullFaceNone, CullFaceBack, CullFaceFront, PCFShadowMap, PCFSoftShadowMap, VSMShadowMap, FrontSide, BackSide, DoubleSide, NoBlending, NormalBlending, AdditiveBlending, SubtractiveBlending, MultiplyBlending, CustomBlending, AddEquation, SubtractEquation, ReverseSubtractEquation, MinEquation, MaxEquation, ZeroFactor, OneFactor, SrcColorFactor, OneMinusSrcColorFactor, SrcAlphaFactor, OneMinusSrcAlphaFactor, DstAlphaFactor, OneMinusDstAlphaFactor, DstColorFactor, OneMinusDstColorFactor, SrcAlphaSaturateFactor, ConstantColorFactor, OneMinusConstantColorFactor, ConstantAlphaFactor, OneMinusConstantAlphaFactor, NeverDepth, AlwaysDepth, LessDepth, LessEqualDepth, EqualDepth, GreaterEqualDepth, GreaterDepth, NotEqualDepth, MultiplyOperation, MixOperation, AddOperation, NoToneMapping, LinearToneMapping, ReinhardToneMapping, CineonToneMapping, ACESFilmicToneMapping, CustomToneMapping, AgXToneMapping, UVMapping, CubeReflectionMapping, CubeRefractionMapping, EquirectangularReflectionMapping, EquirectangularRefractionMapping, CubeUVReflectionMapping, RepeatWrapping, ClampToEdgeWrapping, MirroredRepeatWrapping, NearestFilter, NearestMipmapNearestFilter, NearestMipmapLinearFilter, LinearFilter, LinearMipmapNearestFilter, LinearMipmapLinearFilter, UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, FloatType, HalfFloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt248Type, AlphaFormat, RGBAFormat, LuminanceFormat, LuminanceAlphaFormat, DepthFormat, DepthStencilFormat, RedFormat, RedIntegerFormat, RGFormat, RGIntegerFormat, RGBAIntegerFormat, RGB_S3TC_DXT1_Format, RGBA_S3TC_DXT1_Format, RGBA_S3TC_DXT3_Format, RGBA_S3TC_DXT5_Format, RGB_PVRTC_4BPPV1_Format, RGB_PVRTC_2BPPV1_Format, RGBA_PVRTC_4BPPV1_Format, RGBA_PVRTC_2BPPV1_Format, RGB_ETC1_Format, RGB_ETC2_Format, RGBA_ETC2_EAC_Format, RGBA_ASTC_4x4_Format, RGBA_ASTC_5x4_Format, RGBA_ASTC_5x5_Format, RGBA_ASTC_6x5_Format, RGBA_ASTC_6x6_Format, RGBA_ASTC_8x5_Format, RGBA_ASTC_8x6_Format, RGBA_ASTC_8x8_Format, RGBA_ASTC_10x5_Format, RGBA_ASTC_10x6_Format, RGBA_ASTC_10x8_Format, RGBA_ASTC_10x10_Format, RGBA_ASTC_12x10_Format, RGBA_ASTC_12x12_Format, RGBA_BPTC_Format, RGB_BPTC_SIGNED_Format, RGB_BPTC_UNSIGNED_Format, RED_RGTC1_Format, SIGNED_RED_RGTC1_Format, RED_GREEN_RGTC2_Format, SIGNED_RED_GREEN_RGTC2_Format, InterpolateDiscrete, InterpolateLinear, InterpolateSmooth, ZeroCurvatureEnding, ZeroSlopeEnding, WrapAroundEnding, LinearEncoding, sRGBEncoding, BasicDepthPacking, RGBADepthPacking, TangentSpaceNormalMap, ObjectSpaceNormalMap, NoColorSpace, SRGBColorSpace, LinearSRGBColorSpace, DisplayP3ColorSpace, LinearDisplayP3ColorSpace, LinearTransfer, SRGBTransfer, Rec709Primaries, P3Primaries, KeepStencilOp, AlwaysStencilFunc, NeverCompare, LessCompare, EqualCompare, LessEqualCompare, GreaterCompare, NotEqualCompare, GreaterEqualCompare, AlwaysCompare, StaticDrawUsage, GLSL3, _SRGBAFormat, WebGLCoordinateSystem, WebGPUCoordinateSystem, EventDispatcher, _lut, DEG2RAD, RAD2DEG, Vector2, Matrix3, _m3, _cache, LINEAR_SRGB_TO_LINEAR_DISPLAY_P3, LINEAR_DISPLAY_P3_TO_LINEAR_SRGB, COLOR_SPACES, SUPPORTED_WORKING_COLOR_SPACES, ColorManagement, _canvas, ImageUtils, _sourceId, Source, _textureId, Texture, Vector4, RenderTarget, WebGLRenderTarget, DataArrayTexture, Data3DTexture, Quaternion, Vector3, _vector$c, _quaternion$4, Box3, _points, _vector$b, _box$4, _v0$2, _v1$7, _v2$4, _f0, _f1, _f2, _center, _extents, _triangleNormal, _testAxis, _box$3, _v1$6, _v2$3, Sphere, _vector$a, _segCenter, _segDir, _diff, _edge1, _edge2, _normal$1, Ray, Matrix4, _v1$5, _m1$2, _zero, _one, _x, _y, _z, _matrix$1, _quaternion$3, Euler, Layers, _object3DId, _v1$4, _q1, _m1$1, _target, _position$3, _scale$2, _quaternion$2, _xAxis, _yAxis, _zAxis, _addedEvent, _removedEvent, Object3D, _v0$1, _v1$3, _v2$2, _v3$2, _vab, _vac, _vbc, _vap, _vbp, _vcp, Triangle, _colorKeywords, _hslA, _hslB, Color, _color, _materialId, Material, MeshBasicMaterial, _vector$9, _vector2$1, BufferAttribute, Uint16BufferAttribute, Uint32BufferAttribute, Float32BufferAttribute, _id$2, _m1, _obj, _offset, _box$2, _boxMorphTargets, _vector$8, BufferGeometry, _inverseMatrix$3, _ray$3, _sphere$6, _sphereHitAt, _vA$1, _vB$1, _vC$1, _tempA, _morphA, _uvA$1, _uvB$1, _uvC$1, _normalA, _normalB, _normalC, _intersectionPoint, _intersectionPointWorld, Mesh, BoxGeometry, UniformsUtils, default_vertex, default_fragment, ShaderMaterial, Camera, _v3$1, _minTarget, _maxTarget, PerspectiveCamera, fov, aspect, CubeCamera, CubeTexture, WebGLCubeRenderTarget, _vector1, _vector2, _normalMatrix, Plane, _sphere$5, _vector$7, Frustum, PlaneGeometry, alphahash_fragment, alphahash_pars_fragment, alphamap_fragment, alphamap_pars_fragment, alphatest_fragment, alphatest_pars_fragment, aomap_fragment, aomap_pars_fragment, batching_pars_vertex, batching_vertex, begin_vertex, beginnormal_vertex, bsdfs, iridescence_fragment, bumpmap_pars_fragment, clipping_planes_fragment, clipping_planes_pars_fragment, clipping_planes_pars_vertex, clipping_planes_vertex, color_fragment, color_pars_fragment, color_pars_vertex, color_vertex, common, cube_uv_reflection_fragment, defaultnormal_vertex, displacementmap_pars_vertex, displacementmap_vertex, emissivemap_fragment, emissivemap_pars_fragment, colorspace_fragment, colorspace_pars_fragment, envmap_fragment, envmap_common_pars_fragment, envmap_pars_fragment, envmap_pars_vertex, envmap_vertex, fog_vertex, fog_pars_vertex, fog_fragment, fog_pars_fragment, gradientmap_pars_fragment, lightmap_fragment, lightmap_pars_fragment, lights_lambert_fragment, lights_lambert_pars_fragment, lights_pars_begin, envmap_physical_pars_fragment, lights_toon_fragment, lights_toon_pars_fragment, lights_phong_fragment, lights_phong_pars_fragment, lights_physical_fragment, lights_physical_pars_fragment, lights_fragment_begin, lights_fragment_maps, lights_fragment_end, logdepthbuf_fragment, logdepthbuf_pars_fragment, logdepthbuf_pars_vertex, logdepthbuf_vertex, map_fragment, map_pars_fragment, map_particle_fragment, map_particle_pars_fragment, metalnessmap_fragment, metalnessmap_pars_fragment, morphcolor_vertex, morphnormal_vertex, morphtarget_pars_vertex, morphtarget_vertex, normal_fragment_begin, normal_fragment_maps, normal_pars_fragment, normal_pars_vertex, normal_vertex, normalmap_pars_fragment, clearcoat_normal_fragment_begin, clearcoat_normal_fragment_maps, clearcoat_pars_fragment, iridescence_pars_fragment, opaque_fragment, packing, premultiplied_alpha_fragment, project_vertex, dithering_fragment, dithering_pars_fragment, roughnessmap_fragment, roughnessmap_pars_fragment, shadowmap_pars_fragment, shadowmap_pars_vertex, shadowmap_vertex, shadowmask_pars_fragment, skinbase_vertex, skinning_pars_vertex, skinning_vertex, skinnormal_vertex, specularmap_fragment, specularmap_pars_fragment, tonemapping_fragment, tonemapping_pars_fragment, transmission_fragment, transmission_pars_fragment, uv_pars_fragment, uv_pars_vertex, uv_vertex, worldpos_vertex, vertex$h, fragment$h, vertex$g, fragment$g, vertex$f, fragment$f, vertex$e, fragment$e, vertex$d, fragment$d, vertex$c, fragment$c, vertex$b, fragment$b, vertex$a, fragment$a, vertex$9, fragment$9, vertex$8, fragment$8, vertex$7, fragment$7, vertex$6, fragment$6, vertex$5, fragment$5, vertex$4, fragment$4, vertex$3, fragment$3, vertex$2, fragment$2, vertex$1, fragment$1, ShaderChunk, UniformsLib, ShaderLib, _rgb, OrthographicCamera, LOD_MIN, EXTRA_LOD_SIGMA, MAX_SAMPLES, _flatCamera, _clearColor, _oldTarget, _oldActiveCubeFace, _oldActiveMipmapLevel, PHI, INV_PHI, _axisDirections, PMREMGenerator, DepthTexture, emptyTexture, emptyShadowTexture, emptyArrayTexture, empty3dTexture, emptyCubeTexture, arrayCacheF32, arrayCacheI32, mat4array, mat3array, mat2array, SingleUniform, PureArrayUniform, StructuredUniform, RePathPart, WebGLUniforms, COMPLETION_STATUS_KHR, programIdCount, includePattern, shaderChunkMap, unrollLoopPattern, _id$1, WebGLShaderCache, WebGLShaderStage, nextVersion, MeshDepthMaterial, MeshDistanceMaterial, vertex, fragment, ArrayCamera, Group, _moveEvent, WebXRController, _occlusion_vertex, _occlusion_fragment, WebXRDepthSensing, WebXRManager, WebGLRenderer, WebGL1Renderer, Scene, PointsMaterial, _inverseMatrix, _ray, _sphere, _position$2, Points, CanvasTexture, CylinderGeometry, RingGeometry, TorusGeometry, MeshStandardMaterial, Interpolant, CubicInterpolant, LinearInterpolant, DiscreteInterpolant, KeyframeTrack, BooleanKeyframeTrack, ColorKeyframeTrack, NumberKeyframeTrack, QuaternionLinearInterpolant, QuaternionKeyframeTrack, StringKeyframeTrack, VectorKeyframeTrack, LoadingManager, DefaultLoadingManager, Loader, Light, HemisphereLight, _projScreenMatrix$1, _lightPositionWorld$1, _lookTarget$1, LightShadow, DirectionalLightShadow, DirectionalLight, AmbientLight, _RESERVED_CHARS_RE, _reservedRe, _wordChar, _wordCharOrDot, _directoryRe, _nodeRe, _objectRe, _propertyRe, _trackRe, _supportedObjectNames, Composite, PropertyBinding, _controlInterpolantsResultBuffer, Raycaster;
+var REVISION, CullFaceNone, CullFaceBack, CullFaceFront, PCFShadowMap, PCFSoftShadowMap, VSMShadowMap, FrontSide, BackSide, DoubleSide, NoBlending, NormalBlending, AdditiveBlending, SubtractiveBlending, MultiplyBlending, CustomBlending, AddEquation, SubtractEquation, ReverseSubtractEquation, MinEquation, MaxEquation, ZeroFactor, OneFactor, SrcColorFactor, OneMinusSrcColorFactor, SrcAlphaFactor, OneMinusSrcAlphaFactor, DstAlphaFactor, OneMinusDstAlphaFactor, DstColorFactor, OneMinusDstColorFactor, SrcAlphaSaturateFactor, ConstantColorFactor, OneMinusConstantColorFactor, ConstantAlphaFactor, OneMinusConstantAlphaFactor, NeverDepth, AlwaysDepth, LessDepth, LessEqualDepth, EqualDepth, GreaterEqualDepth, GreaterDepth, NotEqualDepth, MultiplyOperation, MixOperation, AddOperation, NoToneMapping, LinearToneMapping, ReinhardToneMapping, CineonToneMapping, ACESFilmicToneMapping, CustomToneMapping, AgXToneMapping, UVMapping, CubeReflectionMapping, CubeRefractionMapping, EquirectangularReflectionMapping, EquirectangularRefractionMapping, CubeUVReflectionMapping, RepeatWrapping, ClampToEdgeWrapping, MirroredRepeatWrapping, NearestFilter, NearestMipmapNearestFilter, NearestMipmapLinearFilter, LinearFilter, LinearMipmapNearestFilter, LinearMipmapLinearFilter, UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, FloatType, HalfFloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt248Type, AlphaFormat, RGBAFormat, LuminanceFormat, LuminanceAlphaFormat, DepthFormat, DepthStencilFormat, RedFormat, RedIntegerFormat, RGFormat, RGIntegerFormat, RGBAIntegerFormat, RGB_S3TC_DXT1_Format, RGBA_S3TC_DXT1_Format, RGBA_S3TC_DXT3_Format, RGBA_S3TC_DXT5_Format, RGB_PVRTC_4BPPV1_Format, RGB_PVRTC_2BPPV1_Format, RGBA_PVRTC_4BPPV1_Format, RGBA_PVRTC_2BPPV1_Format, RGB_ETC1_Format, RGB_ETC2_Format, RGBA_ETC2_EAC_Format, RGBA_ASTC_4x4_Format, RGBA_ASTC_5x4_Format, RGBA_ASTC_5x5_Format, RGBA_ASTC_6x5_Format, RGBA_ASTC_6x6_Format, RGBA_ASTC_8x5_Format, RGBA_ASTC_8x6_Format, RGBA_ASTC_8x8_Format, RGBA_ASTC_10x5_Format, RGBA_ASTC_10x6_Format, RGBA_ASTC_10x8_Format, RGBA_ASTC_10x10_Format, RGBA_ASTC_12x10_Format, RGBA_ASTC_12x12_Format, RGBA_BPTC_Format, RGB_BPTC_SIGNED_Format, RGB_BPTC_UNSIGNED_Format, RED_RGTC1_Format, SIGNED_RED_RGTC1_Format, RED_GREEN_RGTC2_Format, SIGNED_RED_GREEN_RGTC2_Format, InterpolateDiscrete, InterpolateLinear, InterpolateSmooth, ZeroCurvatureEnding, ZeroSlopeEnding, WrapAroundEnding, LinearEncoding, sRGBEncoding, BasicDepthPacking, RGBADepthPacking, TangentSpaceNormalMap, ObjectSpaceNormalMap, NoColorSpace, SRGBColorSpace, LinearSRGBColorSpace, DisplayP3ColorSpace, LinearDisplayP3ColorSpace, LinearTransfer, SRGBTransfer, Rec709Primaries, P3Primaries, KeepStencilOp, AlwaysStencilFunc, NeverCompare, LessCompare, EqualCompare, LessEqualCompare, GreaterCompare, NotEqualCompare, GreaterEqualCompare, AlwaysCompare, StaticDrawUsage, GLSL3, _SRGBAFormat, WebGLCoordinateSystem, WebGPUCoordinateSystem, EventDispatcher, _lut, DEG2RAD, RAD2DEG, Vector2, Matrix3, _m3, _cache, LINEAR_SRGB_TO_LINEAR_DISPLAY_P3, LINEAR_DISPLAY_P3_TO_LINEAR_SRGB, COLOR_SPACES, SUPPORTED_WORKING_COLOR_SPACES, ColorManagement, _canvas, ImageUtils, _sourceId, Source, _textureId, Texture, Vector4, RenderTarget, WebGLRenderTarget, DataArrayTexture, Data3DTexture, Quaternion, Vector3, _vector$c, _quaternion$4, Box3, _points, _vector$b, _box$4, _v0$2, _v1$7, _v2$4, _f0, _f1, _f2, _center, _extents, _triangleNormal, _testAxis, _box$3, _v1$6, _v2$3, Sphere, _vector$a, _segCenter, _segDir, _diff, _edge1, _edge2, _normal$1, Ray, Matrix4, _v1$5, _m1$2, _zero, _one, _x, _y, _z, _matrix$1, _quaternion$3, Euler, Layers, _object3DId, _v1$4, _q1, _m1$1, _target, _position$3, _scale$2, _quaternion$2, _xAxis, _yAxis, _zAxis, _addedEvent, _removedEvent, Object3D, _v0$1, _v1$3, _v2$2, _v3$2, _vab, _vac, _vbc, _vap, _vbp, _vcp, Triangle, _colorKeywords, _hslA, _hslB, Color, _color, _materialId, Material, MeshBasicMaterial, _vector$9, _vector2$1, BufferAttribute, Uint16BufferAttribute, Uint32BufferAttribute, Float32BufferAttribute, _id$2, _m1, _obj, _offset, _box$2, _boxMorphTargets, _vector$8, BufferGeometry, _inverseMatrix$3, _ray$3, _sphere$6, _sphereHitAt, _vA$1, _vB$1, _vC$1, _tempA, _morphA, _uvA$1, _uvB$1, _uvC$1, _normalA, _normalB, _normalC, _intersectionPoint, _intersectionPointWorld, Mesh, BoxGeometry, UniformsUtils, default_vertex, default_fragment, ShaderMaterial, Camera, _v3$1, _minTarget, _maxTarget, PerspectiveCamera, fov, aspect, CubeCamera, CubeTexture, WebGLCubeRenderTarget, _vector1, _vector2, _normalMatrix, Plane, _sphere$5, _vector$7, Frustum, PlaneGeometry, alphahash_fragment, alphahash_pars_fragment, alphamap_fragment, alphamap_pars_fragment, alphatest_fragment, alphatest_pars_fragment, aomap_fragment, aomap_pars_fragment, batching_pars_vertex, batching_vertex, begin_vertex, beginnormal_vertex, bsdfs, iridescence_fragment, bumpmap_pars_fragment, clipping_planes_fragment, clipping_planes_pars_fragment, clipping_planes_pars_vertex, clipping_planes_vertex, color_fragment, color_pars_fragment, color_pars_vertex, color_vertex, common, cube_uv_reflection_fragment, defaultnormal_vertex, displacementmap_pars_vertex, displacementmap_vertex, emissivemap_fragment, emissivemap_pars_fragment, colorspace_fragment, colorspace_pars_fragment, envmap_fragment, envmap_common_pars_fragment, envmap_pars_fragment, envmap_pars_vertex, envmap_vertex, fog_vertex, fog_pars_vertex, fog_fragment, fog_pars_fragment, gradientmap_pars_fragment, lightmap_fragment, lightmap_pars_fragment, lights_lambert_fragment, lights_lambert_pars_fragment, lights_pars_begin, envmap_physical_pars_fragment, lights_toon_fragment, lights_toon_pars_fragment, lights_phong_fragment, lights_phong_pars_fragment, lights_physical_fragment, lights_physical_pars_fragment, lights_fragment_begin, lights_fragment_maps, lights_fragment_end, logdepthbuf_fragment, logdepthbuf_pars_fragment, logdepthbuf_pars_vertex, logdepthbuf_vertex, map_fragment, map_pars_fragment, map_particle_fragment, map_particle_pars_fragment, metalnessmap_fragment, metalnessmap_pars_fragment, morphcolor_vertex, morphnormal_vertex, morphtarget_pars_vertex, morphtarget_vertex, normal_fragment_begin, normal_fragment_maps, normal_pars_fragment, normal_pars_vertex, normal_vertex, normalmap_pars_fragment, clearcoat_normal_fragment_begin, clearcoat_normal_fragment_maps, clearcoat_pars_fragment, iridescence_pars_fragment, opaque_fragment, packing, premultiplied_alpha_fragment, project_vertex, dithering_fragment, dithering_pars_fragment, roughnessmap_fragment, roughnessmap_pars_fragment, shadowmap_pars_fragment, shadowmap_pars_vertex, shadowmap_vertex, shadowmask_pars_fragment, skinbase_vertex, skinning_pars_vertex, skinning_vertex, skinnormal_vertex, specularmap_fragment, specularmap_pars_fragment, tonemapping_fragment, tonemapping_pars_fragment, transmission_fragment, transmission_pars_fragment, uv_pars_fragment, uv_pars_vertex, uv_vertex, worldpos_vertex, vertex$h, fragment$h, vertex$g, fragment$g, vertex$f, fragment$f, vertex$e, fragment$e, vertex$d, fragment$d, vertex$c, fragment$c, vertex$b, fragment$b, vertex$a, fragment$a, vertex$9, fragment$9, vertex$8, fragment$8, vertex$7, fragment$7, vertex$6, fragment$6, vertex$5, fragment$5, vertex$4, fragment$4, vertex$3, fragment$3, vertex$2, fragment$2, vertex$1, fragment$1, ShaderChunk, UniformsLib, ShaderLib, _rgb, OrthographicCamera, LOD_MIN, EXTRA_LOD_SIGMA, MAX_SAMPLES, _flatCamera, _clearColor, _oldTarget, _oldActiveCubeFace, _oldActiveMipmapLevel, PHI, INV_PHI, _axisDirections, PMREMGenerator, DepthTexture, emptyTexture, emptyShadowTexture, emptyArrayTexture, empty3dTexture, emptyCubeTexture, arrayCacheF32, arrayCacheI32, mat4array, mat3array, mat2array, SingleUniform, PureArrayUniform, StructuredUniform, RePathPart, WebGLUniforms, COMPLETION_STATUS_KHR, programIdCount, includePattern, shaderChunkMap, unrollLoopPattern, _id$1, WebGLShaderCache, WebGLShaderStage, nextVersion, MeshDepthMaterial, MeshDistanceMaterial, vertex, fragment, ArrayCamera, Group, _moveEvent, WebXRController, _occlusion_vertex, _occlusion_fragment, WebXRDepthSensing, WebXRManager, WebGLRenderer, WebGL1Renderer, Scene, DataTexture, PointsMaterial, _inverseMatrix, _ray, _sphere, _position$2, Points, CanvasTexture, CircleGeometry, CylinderGeometry, RingGeometry, SphereGeometry, TorusGeometry, RawShaderMaterial, MeshStandardMaterial, MeshPhysicalMaterial, MeshNormalMaterial, Interpolant, CubicInterpolant, LinearInterpolant, DiscreteInterpolant, KeyframeTrack, BooleanKeyframeTrack, ColorKeyframeTrack, NumberKeyframeTrack, QuaternionLinearInterpolant, QuaternionKeyframeTrack, StringKeyframeTrack, VectorKeyframeTrack, LoadingManager, DefaultLoadingManager, Loader, Light, HemisphereLight, _projScreenMatrix$1, _lightPositionWorld$1, _lookTarget$1, LightShadow, _projScreenMatrix, _lightPositionWorld, _lookTarget, PointLightShadow, PointLight, DirectionalLightShadow, DirectionalLight, AmbientLight, Clock, _RESERVED_CHARS_RE, _reservedRe, _wordChar, _wordCharOrDot, _directoryRe, _nodeRe, _objectRe, _propertyRe, _trackRe, _supportedObjectNames, Composite, PropertyBinding, _controlInterpolantsResultBuffer, Raycaster;
 var init_three_module = __esm({
   "vendor/three.module.js"() {
     REVISION = "161";
@@ -7895,7 +7976,7 @@ var init_three_module = __esm({
         const denominator = Math.sqrt(this.lengthSq() * v.lengthSq());
         if (denominator === 0) return Math.PI / 2;
         const theta = this.dot(v) / denominator;
-        return Math.acos(clamp(theta, -1, 1));
+        return Math.acos(clamp2(theta, -1, 1));
       }
       distanceTo(v) {
         return Math.sqrt(this.distanceToSquared(v));
@@ -9333,7 +9414,7 @@ var init_three_module = __esm({
         return this.normalize();
       }
       angleTo(q) {
-        return 2 * Math.acos(Math.abs(clamp(this.dot(q), -1, 1)));
+        return 2 * Math.acos(Math.abs(clamp2(this.dot(q), -1, 1)));
       }
       rotateTowards(q, step) {
         const angle = this.angleTo(q);
@@ -9802,7 +9883,7 @@ var init_three_module = __esm({
         const denominator = Math.sqrt(this.lengthSq() * v.lengthSq());
         if (denominator === 0) return Math.PI / 2;
         const theta = this.dot(v) / denominator;
-        return Math.acos(clamp(theta, -1, 1));
+        return Math.acos(clamp2(theta, -1, 1));
       }
       distanceTo(v) {
         return Math.sqrt(this.distanceToSquared(v));
@@ -11395,7 +11476,7 @@ var init_three_module = __esm({
         const m31 = te[2], m32 = te[6], m33 = te[10];
         switch (order) {
           case "XYZ":
-            this._y = Math.asin(clamp(m13, -1, 1));
+            this._y = Math.asin(clamp2(m13, -1, 1));
             if (Math.abs(m13) < 0.9999999) {
               this._x = Math.atan2(-m23, m33);
               this._z = Math.atan2(-m12, m11);
@@ -11405,7 +11486,7 @@ var init_three_module = __esm({
             }
             break;
           case "YXZ":
-            this._x = Math.asin(-clamp(m23, -1, 1));
+            this._x = Math.asin(-clamp2(m23, -1, 1));
             if (Math.abs(m23) < 0.9999999) {
               this._y = Math.atan2(m13, m33);
               this._z = Math.atan2(m21, m22);
@@ -11415,7 +11496,7 @@ var init_three_module = __esm({
             }
             break;
           case "ZXY":
-            this._x = Math.asin(clamp(m32, -1, 1));
+            this._x = Math.asin(clamp2(m32, -1, 1));
             if (Math.abs(m32) < 0.9999999) {
               this._y = Math.atan2(-m31, m33);
               this._z = Math.atan2(-m12, m22);
@@ -11425,7 +11506,7 @@ var init_three_module = __esm({
             }
             break;
           case "ZYX":
-            this._y = Math.asin(-clamp(m31, -1, 1));
+            this._y = Math.asin(-clamp2(m31, -1, 1));
             if (Math.abs(m31) < 0.9999999) {
               this._x = Math.atan2(m32, m33);
               this._z = Math.atan2(m21, m11);
@@ -11435,7 +11516,7 @@ var init_three_module = __esm({
             }
             break;
           case "YZX":
-            this._z = Math.asin(clamp(m21, -1, 1));
+            this._z = Math.asin(clamp2(m21, -1, 1));
             if (Math.abs(m21) < 0.9999999) {
               this._x = Math.atan2(-m23, m22);
               this._y = Math.atan2(-m31, m11);
@@ -11445,7 +11526,7 @@ var init_three_module = __esm({
             }
             break;
           case "XZY":
-            this._z = Math.asin(-clamp(m12, -1, 1));
+            this._z = Math.asin(-clamp2(m12, -1, 1));
             if (Math.abs(m12) < 0.9999999) {
               this._x = Math.atan2(m32, m22);
               this._y = Math.atan2(m13, m11);
@@ -12452,8 +12533,8 @@ var init_three_module = __esm({
       }
       setHSL(h, s, l, colorSpace = ColorManagement.workingColorSpace) {
         h = euclideanModulo(h, 1);
-        s = clamp(s, 0, 1);
-        l = clamp(l, 0, 1);
+        s = clamp2(s, 0, 1);
+        l = clamp2(l, 0, 1);
         if (s === 0) {
           this.r = this.g = this.b = l;
         } else {
@@ -12575,7 +12656,7 @@ var init_three_module = __esm({
       }
       getHex(colorSpace = SRGBColorSpace) {
         ColorManagement.fromWorkingColorSpace(_color.copy(this), colorSpace);
-        return Math.round(clamp(_color.r * 255, 0, 255)) * 65536 + Math.round(clamp(_color.g * 255, 0, 255)) * 256 + Math.round(clamp(_color.b * 255, 0, 255));
+        return Math.round(clamp2(_color.r * 255, 0, 255)) * 65536 + Math.round(clamp2(_color.g * 255, 0, 255)) * 256 + Math.round(clamp2(_color.b * 255, 0, 255));
       }
       getHexString(colorSpace = SRGBColorSpace) {
         return ("000000" + this.getHex(colorSpace).toString(16)).slice(-6);
@@ -17125,7 +17206,7 @@ void main() {
         let _clippingEnabled = false;
         let _localClippingEnabled = false;
         let _transmissionRenderTarget = null;
-        const _projScreenMatrix = new Matrix4();
+        const _projScreenMatrix2 = new Matrix4();
         const _vector22 = new Vector2();
         const _vector3 = new Vector3();
         const _emptyScene = { background: null, fog: null, environment: null, overrideMaterial: null, isScene: true };
@@ -17570,7 +17651,7 @@ void main() {
         };
         this.compileAsync = function(scene, camera, targetScene = null) {
           const materials2 = this.compile(scene, camera, targetScene);
-          return new Promise((resolve) => {
+          return new Promise((resolve2) => {
             function checkMaterialsReady() {
               materials2.forEach(function(material) {
                 const materialProperties = properties.get(material);
@@ -17580,7 +17661,7 @@ void main() {
                 }
               });
               if (materials2.size === 0) {
-                resolve(scene);
+                resolve2(scene);
                 return;
               }
               setTimeout(checkMaterialsReady, 10);
@@ -17628,8 +17709,8 @@ void main() {
           currentRenderState = renderStates.get(scene, renderStateStack.length);
           currentRenderState.init();
           renderStateStack.push(currentRenderState);
-          _projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-          _frustum.setFromProjectionMatrix(_projScreenMatrix);
+          _projScreenMatrix2.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+          _frustum.setFromProjectionMatrix(_projScreenMatrix2);
           _localClippingEnabled = this.localClippingEnabled;
           _clippingEnabled = clipping.init(this.clippingPlanes, _localClippingEnabled);
           currentRenderList = renderLists.get(scene, renderListStack.length);
@@ -17696,7 +17777,7 @@ void main() {
             } else if (object.isSprite) {
               if (!object.frustumCulled || _frustum.intersectsSprite(object)) {
                 if (sortObjects) {
-                  _vector3.setFromMatrixPosition(object.matrixWorld).applyMatrix4(_projScreenMatrix);
+                  _vector3.setFromMatrixPosition(object.matrixWorld).applyMatrix4(_projScreenMatrix2);
                 }
                 const geometry = objects.update(object);
                 const material = object.material;
@@ -17716,7 +17797,7 @@ void main() {
                     if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
                     _vector3.copy(geometry.boundingSphere.center);
                   }
-                  _vector3.applyMatrix4(object.matrixWorld).applyMatrix4(_projScreenMatrix);
+                  _vector3.applyMatrix4(object.matrixWorld).applyMatrix4(_projScreenMatrix2);
                 }
                 if (Array.isArray(material)) {
                   const groups = geometry.groups;
@@ -18421,6 +18502,16 @@ void main() {
         return data;
       }
     };
+    DataTexture = class extends Texture {
+      constructor(data = null, width = 1, height = 1, format, type, mapping, wrapS, wrapT, magFilter = NearestFilter, minFilter = NearestFilter, anisotropy, colorSpace) {
+        super(null, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy, colorSpace);
+        this.isDataTexture = true;
+        this.image = { data, width, height };
+        this.generateMipmaps = false;
+        this.flipY = false;
+        this.unpackAlignment = 1;
+      }
+    };
     PointsMaterial = class extends Material {
       constructor(parameters) {
         super();
@@ -18521,6 +18612,53 @@ void main() {
         super(canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy);
         this.isCanvasTexture = true;
         this.needsUpdate = true;
+      }
+    };
+    CircleGeometry = class _CircleGeometry extends BufferGeometry {
+      constructor(radius = 1, segments = 32, thetaStart = 0, thetaLength = Math.PI * 2) {
+        super();
+        this.type = "CircleGeometry";
+        this.parameters = {
+          radius,
+          segments,
+          thetaStart,
+          thetaLength
+        };
+        segments = Math.max(3, segments);
+        const indices = [];
+        const vertices = [];
+        const normals = [];
+        const uvs = [];
+        const vertex2 = new Vector3();
+        const uv = new Vector2();
+        vertices.push(0, 0, 0);
+        normals.push(0, 0, 1);
+        uvs.push(0.5, 0.5);
+        for (let s = 0, i = 3; s <= segments; s++, i += 3) {
+          const segment = thetaStart + s / segments * thetaLength;
+          vertex2.x = radius * Math.cos(segment);
+          vertex2.y = radius * Math.sin(segment);
+          vertices.push(vertex2.x, vertex2.y, vertex2.z);
+          normals.push(0, 0, 1);
+          uv.x = (vertices[i] / radius + 1) / 2;
+          uv.y = (vertices[i + 1] / radius + 1) / 2;
+          uvs.push(uv.x, uv.y);
+        }
+        for (let i = 1; i <= segments; i++) {
+          indices.push(i, i + 1, 0);
+        }
+        this.setIndex(indices);
+        this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+        this.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+        this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+      }
+      copy(source) {
+        super.copy(source);
+        this.parameters = Object.assign({}, source.parameters);
+        return this;
+      }
+      static fromJSON(data) {
+        return new _CircleGeometry(data.radius, data.segments, data.thetaStart, data.thetaLength);
       }
     };
     CylinderGeometry = class _CylinderGeometry extends BufferGeometry {
@@ -18709,6 +18847,76 @@ void main() {
         return new _RingGeometry(data.innerRadius, data.outerRadius, data.thetaSegments, data.phiSegments, data.thetaStart, data.thetaLength);
       }
     };
+    SphereGeometry = class _SphereGeometry extends BufferGeometry {
+      constructor(radius = 1, widthSegments = 32, heightSegments = 16, phiStart = 0, phiLength = Math.PI * 2, thetaStart = 0, thetaLength = Math.PI) {
+        super();
+        this.type = "SphereGeometry";
+        this.parameters = {
+          radius,
+          widthSegments,
+          heightSegments,
+          phiStart,
+          phiLength,
+          thetaStart,
+          thetaLength
+        };
+        widthSegments = Math.max(3, Math.floor(widthSegments));
+        heightSegments = Math.max(2, Math.floor(heightSegments));
+        const thetaEnd = Math.min(thetaStart + thetaLength, Math.PI);
+        let index = 0;
+        const grid = [];
+        const vertex2 = new Vector3();
+        const normal = new Vector3();
+        const indices = [];
+        const vertices = [];
+        const normals = [];
+        const uvs = [];
+        for (let iy = 0; iy <= heightSegments; iy++) {
+          const verticesRow = [];
+          const v = iy / heightSegments;
+          let uOffset = 0;
+          if (iy === 0 && thetaStart === 0) {
+            uOffset = 0.5 / widthSegments;
+          } else if (iy === heightSegments && thetaEnd === Math.PI) {
+            uOffset = -0.5 / widthSegments;
+          }
+          for (let ix = 0; ix <= widthSegments; ix++) {
+            const u = ix / widthSegments;
+            vertex2.x = -radius * Math.cos(phiStart + u * phiLength) * Math.sin(thetaStart + v * thetaLength);
+            vertex2.y = radius * Math.cos(thetaStart + v * thetaLength);
+            vertex2.z = radius * Math.sin(phiStart + u * phiLength) * Math.sin(thetaStart + v * thetaLength);
+            vertices.push(vertex2.x, vertex2.y, vertex2.z);
+            normal.copy(vertex2).normalize();
+            normals.push(normal.x, normal.y, normal.z);
+            uvs.push(u + uOffset, 1 - v);
+            verticesRow.push(index++);
+          }
+          grid.push(verticesRow);
+        }
+        for (let iy = 0; iy < heightSegments; iy++) {
+          for (let ix = 0; ix < widthSegments; ix++) {
+            const a = grid[iy][ix + 1];
+            const b = grid[iy][ix];
+            const c = grid[iy + 1][ix];
+            const d = grid[iy + 1][ix + 1];
+            if (iy !== 0 || thetaStart > 0) indices.push(a, b, d);
+            if (iy !== heightSegments - 1 || thetaEnd < Math.PI) indices.push(b, c, d);
+          }
+        }
+        this.setIndex(indices);
+        this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+        this.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+        this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+      }
+      copy(source) {
+        super.copy(source);
+        this.parameters = Object.assign({}, source.parameters);
+        return this;
+      }
+      static fromJSON(data) {
+        return new _SphereGeometry(data.radius, data.widthSegments, data.heightSegments, data.phiStart, data.phiLength, data.thetaStart, data.thetaLength);
+      }
+    };
     TorusGeometry = class _TorusGeometry extends BufferGeometry {
       constructor(radius = 1, tube = 0.4, radialSegments = 12, tubularSegments = 48, arc = Math.PI * 2) {
         super();
@@ -18767,6 +18975,13 @@ void main() {
       }
       static fromJSON(data) {
         return new _TorusGeometry(data.radius, data.tube, data.radialSegments, data.tubularSegments, data.arc);
+      }
+    };
+    RawShaderMaterial = class extends ShaderMaterial {
+      constructor(parameters) {
+        super(parameters);
+        this.isRawShaderMaterial = true;
+        this.type = "RawShaderMaterial";
       }
     };
     MeshStandardMaterial = class extends Material {
@@ -18840,6 +19055,173 @@ void main() {
         this.wireframeLinejoin = source.wireframeLinejoin;
         this.flatShading = source.flatShading;
         this.fog = source.fog;
+        return this;
+      }
+    };
+    MeshPhysicalMaterial = class extends MeshStandardMaterial {
+      constructor(parameters) {
+        super();
+        this.isMeshPhysicalMaterial = true;
+        this.defines = {
+          "STANDARD": "",
+          "PHYSICAL": ""
+        };
+        this.type = "MeshPhysicalMaterial";
+        this.anisotropyRotation = 0;
+        this.anisotropyMap = null;
+        this.clearcoatMap = null;
+        this.clearcoatRoughness = 0;
+        this.clearcoatRoughnessMap = null;
+        this.clearcoatNormalScale = new Vector2(1, 1);
+        this.clearcoatNormalMap = null;
+        this.ior = 1.5;
+        Object.defineProperty(this, "reflectivity", {
+          get: function() {
+            return clamp2(2.5 * (this.ior - 1) / (this.ior + 1), 0, 1);
+          },
+          set: function(reflectivity) {
+            this.ior = (1 + 0.4 * reflectivity) / (1 - 0.4 * reflectivity);
+          }
+        });
+        this.iridescenceMap = null;
+        this.iridescenceIOR = 1.3;
+        this.iridescenceThicknessRange = [100, 400];
+        this.iridescenceThicknessMap = null;
+        this.sheenColor = new Color(0);
+        this.sheenColorMap = null;
+        this.sheenRoughness = 1;
+        this.sheenRoughnessMap = null;
+        this.transmissionMap = null;
+        this.thickness = 0;
+        this.thicknessMap = null;
+        this.attenuationDistance = Infinity;
+        this.attenuationColor = new Color(1, 1, 1);
+        this.specularIntensity = 1;
+        this.specularIntensityMap = null;
+        this.specularColor = new Color(1, 1, 1);
+        this.specularColorMap = null;
+        this._anisotropy = 0;
+        this._clearcoat = 0;
+        this._iridescence = 0;
+        this._sheen = 0;
+        this._transmission = 0;
+        this.setValues(parameters);
+      }
+      get anisotropy() {
+        return this._anisotropy;
+      }
+      set anisotropy(value) {
+        if (this._anisotropy > 0 !== value > 0) {
+          this.version++;
+        }
+        this._anisotropy = value;
+      }
+      get clearcoat() {
+        return this._clearcoat;
+      }
+      set clearcoat(value) {
+        if (this._clearcoat > 0 !== value > 0) {
+          this.version++;
+        }
+        this._clearcoat = value;
+      }
+      get iridescence() {
+        return this._iridescence;
+      }
+      set iridescence(value) {
+        if (this._iridescence > 0 !== value > 0) {
+          this.version++;
+        }
+        this._iridescence = value;
+      }
+      get sheen() {
+        return this._sheen;
+      }
+      set sheen(value) {
+        if (this._sheen > 0 !== value > 0) {
+          this.version++;
+        }
+        this._sheen = value;
+      }
+      get transmission() {
+        return this._transmission;
+      }
+      set transmission(value) {
+        if (this._transmission > 0 !== value > 0) {
+          this.version++;
+        }
+        this._transmission = value;
+      }
+      copy(source) {
+        super.copy(source);
+        this.defines = {
+          "STANDARD": "",
+          "PHYSICAL": ""
+        };
+        this.anisotropy = source.anisotropy;
+        this.anisotropyRotation = source.anisotropyRotation;
+        this.anisotropyMap = source.anisotropyMap;
+        this.clearcoat = source.clearcoat;
+        this.clearcoatMap = source.clearcoatMap;
+        this.clearcoatRoughness = source.clearcoatRoughness;
+        this.clearcoatRoughnessMap = source.clearcoatRoughnessMap;
+        this.clearcoatNormalMap = source.clearcoatNormalMap;
+        this.clearcoatNormalScale.copy(source.clearcoatNormalScale);
+        this.ior = source.ior;
+        this.iridescence = source.iridescence;
+        this.iridescenceMap = source.iridescenceMap;
+        this.iridescenceIOR = source.iridescenceIOR;
+        this.iridescenceThicknessRange = [...source.iridescenceThicknessRange];
+        this.iridescenceThicknessMap = source.iridescenceThicknessMap;
+        this.sheen = source.sheen;
+        this.sheenColor.copy(source.sheenColor);
+        this.sheenColorMap = source.sheenColorMap;
+        this.sheenRoughness = source.sheenRoughness;
+        this.sheenRoughnessMap = source.sheenRoughnessMap;
+        this.transmission = source.transmission;
+        this.transmissionMap = source.transmissionMap;
+        this.thickness = source.thickness;
+        this.thicknessMap = source.thicknessMap;
+        this.attenuationDistance = source.attenuationDistance;
+        this.attenuationColor.copy(source.attenuationColor);
+        this.specularIntensity = source.specularIntensity;
+        this.specularIntensityMap = source.specularIntensityMap;
+        this.specularColor.copy(source.specularColor);
+        this.specularColorMap = source.specularColorMap;
+        return this;
+      }
+    };
+    MeshNormalMaterial = class extends Material {
+      constructor(parameters) {
+        super();
+        this.isMeshNormalMaterial = true;
+        this.type = "MeshNormalMaterial";
+        this.bumpMap = null;
+        this.bumpScale = 1;
+        this.normalMap = null;
+        this.normalMapType = TangentSpaceNormalMap;
+        this.normalScale = new Vector2(1, 1);
+        this.displacementMap = null;
+        this.displacementScale = 1;
+        this.displacementBias = 0;
+        this.wireframe = false;
+        this.wireframeLinewidth = 1;
+        this.flatShading = false;
+        this.setValues(parameters);
+      }
+      copy(source) {
+        super.copy(source);
+        this.bumpMap = source.bumpMap;
+        this.bumpScale = source.bumpScale;
+        this.normalMap = source.normalMap;
+        this.normalMapType = source.normalMapType;
+        this.normalScale.copy(source.normalScale);
+        this.displacementMap = source.displacementMap;
+        this.displacementScale = source.displacementScale;
+        this.displacementBias = source.displacementBias;
+        this.wireframe = source.wireframe;
+        this.wireframeLinewidth = source.wireframeLinewidth;
+        this.flatShading = source.flatShading;
         return this;
       }
     };
@@ -19384,8 +19766,8 @@ void main() {
       }
       loadAsync(url, onProgress) {
         const scope = this;
-        return new Promise(function(resolve, reject) {
-          scope.load(url, resolve, onProgress, reject);
+        return new Promise(function(resolve2, reject) {
+          scope.load(url, resolve2, onProgress, reject);
         });
       }
       parse() {
@@ -19550,6 +19932,104 @@ void main() {
         return object;
       }
     };
+    _projScreenMatrix = /* @__PURE__ */ new Matrix4();
+    _lightPositionWorld = /* @__PURE__ */ new Vector3();
+    _lookTarget = /* @__PURE__ */ new Vector3();
+    PointLightShadow = class extends LightShadow {
+      constructor() {
+        super(new PerspectiveCamera(90, 1, 0.5, 500));
+        this.isPointLightShadow = true;
+        this._frameExtents = new Vector2(4, 2);
+        this._viewportCount = 6;
+        this._viewports = [
+          // These viewports map a cube-map onto a 2D texture with the
+          // following orientation:
+          //
+          //  xzXZ
+          //   y Y
+          //
+          // X - Positive x direction
+          // x - Negative x direction
+          // Y - Positive y direction
+          // y - Negative y direction
+          // Z - Positive z direction
+          // z - Negative z direction
+          // positive X
+          new Vector4(2, 1, 1, 1),
+          // negative X
+          new Vector4(0, 1, 1, 1),
+          // positive Z
+          new Vector4(3, 1, 1, 1),
+          // negative Z
+          new Vector4(1, 1, 1, 1),
+          // positive Y
+          new Vector4(3, 0, 1, 1),
+          // negative Y
+          new Vector4(1, 0, 1, 1)
+        ];
+        this._cubeDirections = [
+          new Vector3(1, 0, 0),
+          new Vector3(-1, 0, 0),
+          new Vector3(0, 0, 1),
+          new Vector3(0, 0, -1),
+          new Vector3(0, 1, 0),
+          new Vector3(0, -1, 0)
+        ];
+        this._cubeUps = [
+          new Vector3(0, 1, 0),
+          new Vector3(0, 1, 0),
+          new Vector3(0, 1, 0),
+          new Vector3(0, 1, 0),
+          new Vector3(0, 0, 1),
+          new Vector3(0, 0, -1)
+        ];
+      }
+      updateMatrices(light, viewportIndex = 0) {
+        const camera = this.camera;
+        const shadowMatrix = this.matrix;
+        const far = light.distance || camera.far;
+        if (far !== camera.far) {
+          camera.far = far;
+          camera.updateProjectionMatrix();
+        }
+        _lightPositionWorld.setFromMatrixPosition(light.matrixWorld);
+        camera.position.copy(_lightPositionWorld);
+        _lookTarget.copy(camera.position);
+        _lookTarget.add(this._cubeDirections[viewportIndex]);
+        camera.up.copy(this._cubeUps[viewportIndex]);
+        camera.lookAt(_lookTarget);
+        camera.updateMatrixWorld();
+        shadowMatrix.makeTranslation(-_lightPositionWorld.x, -_lightPositionWorld.y, -_lightPositionWorld.z);
+        _projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        this._frustum.setFromProjectionMatrix(_projScreenMatrix);
+      }
+    };
+    PointLight = class extends Light {
+      constructor(color, intensity, distance = 0, decay = 2) {
+        super(color, intensity);
+        this.isPointLight = true;
+        this.type = "PointLight";
+        this.distance = distance;
+        this.decay = decay;
+        this.shadow = new PointLightShadow();
+      }
+      get power() {
+        return this.intensity * 4 * Math.PI;
+      }
+      set power(power) {
+        this.intensity = power / (4 * Math.PI);
+      }
+      dispose() {
+        this.shadow.dispose();
+      }
+      copy(source, recursive) {
+        super.copy(source, recursive);
+        this.distance = source.distance;
+        this.decay = source.decay;
+        this.shadow = source.shadow.clone();
+        return this;
+      }
+    };
     DirectionalLightShadow = class extends LightShadow {
       constructor() {
         super(new OrthographicCamera(-5, 5, 5, -5, 0.5, 500));
@@ -19581,6 +20061,44 @@ void main() {
         super(color, intensity);
         this.isAmbientLight = true;
         this.type = "AmbientLight";
+      }
+    };
+    Clock = class {
+      constructor(autoStart = true) {
+        this.autoStart = autoStart;
+        this.startTime = 0;
+        this.oldTime = 0;
+        this.elapsedTime = 0;
+        this.running = false;
+      }
+      start() {
+        this.startTime = now();
+        this.oldTime = this.startTime;
+        this.elapsedTime = 0;
+        this.running = true;
+      }
+      stop() {
+        this.getElapsedTime();
+        this.running = false;
+        this.autoStart = false;
+      }
+      getElapsedTime() {
+        this.getDelta();
+        return this.elapsedTime;
+      }
+      getDelta() {
+        let diff = 0;
+        if (this.autoStart && !this.running) {
+          this.start();
+          return 0;
+        }
+        if (this.running) {
+          const newTime = now();
+          diff = (newTime - this.oldTime) / 1e3;
+          this.oldTime = newTime;
+          this.elapsedTime += diff;
+        }
+        return diff;
       }
     };
     _RESERVED_CHARS_RE = "\\[\\]\\.:\\/";
@@ -20020,6 +20538,3167 @@ void main() {
   }
 });
 
+// vendor/three/addons/shaders/CopyShader.js
+var CopyShader;
+var init_CopyShader = __esm({
+  "vendor/three/addons/shaders/CopyShader.js"() {
+    CopyShader = {
+      name: "CopyShader",
+      uniforms: {
+        "tDiffuse": { value: null },
+        "opacity": { value: 1 }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+
+		uniform float opacity;
+
+		uniform sampler2D tDiffuse;
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vec4 texel = texture2D( tDiffuse, vUv );
+			gl_FragColor = opacity * texel;
+
+
+		}`
+      )
+    };
+  }
+});
+
+// vendor/three/addons/postprocessing/Pass.js
+var Pass, _camera, FullscreenTriangleGeometry, _geometry, FullScreenQuad;
+var init_Pass = __esm({
+  "vendor/three/addons/postprocessing/Pass.js"() {
+    init_three_module();
+    Pass = class {
+      constructor() {
+        this.isPass = true;
+        this.enabled = true;
+        this.needsSwap = true;
+        this.clear = false;
+        this.renderToScreen = false;
+      }
+      setSize() {
+      }
+      render() {
+        console.error("THREE.Pass: .render() must be implemented in derived pass.");
+      }
+      dispose() {
+      }
+    };
+    _camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    FullscreenTriangleGeometry = class extends BufferGeometry {
+      constructor() {
+        super();
+        this.setAttribute("position", new Float32BufferAttribute([-1, 3, 0, -1, -1, 0, 3, -1, 0], 3));
+        this.setAttribute("uv", new Float32BufferAttribute([0, 2, 0, 0, 2, 0], 2));
+      }
+    };
+    _geometry = new FullscreenTriangleGeometry();
+    FullScreenQuad = class {
+      constructor(material) {
+        this._mesh = new Mesh(_geometry, material);
+      }
+      dispose() {
+        this._mesh.geometry.dispose();
+      }
+      render(renderer) {
+        renderer.render(this._mesh, _camera);
+      }
+      get material() {
+        return this._mesh.material;
+      }
+      set material(value) {
+        this._mesh.material = value;
+      }
+    };
+  }
+});
+
+// vendor/three/addons/postprocessing/ShaderPass.js
+var ShaderPass;
+var init_ShaderPass = __esm({
+  "vendor/three/addons/postprocessing/ShaderPass.js"() {
+    init_three_module();
+    init_Pass();
+    ShaderPass = class extends Pass {
+      constructor(shader, textureID) {
+        super();
+        this.textureID = textureID !== void 0 ? textureID : "tDiffuse";
+        if (shader instanceof ShaderMaterial) {
+          this.uniforms = shader.uniforms;
+          this.material = shader;
+        } else if (shader) {
+          this.uniforms = UniformsUtils.clone(shader.uniforms);
+          this.material = new ShaderMaterial({
+            name: shader.name !== void 0 ? shader.name : "unspecified",
+            defines: Object.assign({}, shader.defines),
+            uniforms: this.uniforms,
+            vertexShader: shader.vertexShader,
+            fragmentShader: shader.fragmentShader
+          });
+        }
+        this.fsQuad = new FullScreenQuad(this.material);
+      }
+      render(renderer, writeBuffer, readBuffer) {
+        if (this.uniforms[this.textureID]) {
+          this.uniforms[this.textureID].value = readBuffer.texture;
+        }
+        this.fsQuad.material = this.material;
+        if (this.renderToScreen) {
+          renderer.setRenderTarget(null);
+          this.fsQuad.render(renderer);
+        } else {
+          renderer.setRenderTarget(writeBuffer);
+          if (this.clear) renderer.clear(renderer.autoClearColor, renderer.autoClearDepth, renderer.autoClearStencil);
+          this.fsQuad.render(renderer);
+        }
+      }
+      dispose() {
+        this.material.dispose();
+        this.fsQuad.dispose();
+      }
+    };
+  }
+});
+
+// vendor/three/addons/postprocessing/MaskPass.js
+var MaskPass, ClearMaskPass;
+var init_MaskPass = __esm({
+  "vendor/three/addons/postprocessing/MaskPass.js"() {
+    init_Pass();
+    MaskPass = class extends Pass {
+      constructor(scene, camera) {
+        super();
+        this.scene = scene;
+        this.camera = camera;
+        this.clear = true;
+        this.needsSwap = false;
+        this.inverse = false;
+      }
+      render(renderer, writeBuffer, readBuffer) {
+        const context = renderer.getContext();
+        const state = renderer.state;
+        state.buffers.color.setMask(false);
+        state.buffers.depth.setMask(false);
+        state.buffers.color.setLocked(true);
+        state.buffers.depth.setLocked(true);
+        let writeValue, clearValue;
+        if (this.inverse) {
+          writeValue = 0;
+          clearValue = 1;
+        } else {
+          writeValue = 1;
+          clearValue = 0;
+        }
+        state.buffers.stencil.setTest(true);
+        state.buffers.stencil.setOp(context.REPLACE, context.REPLACE, context.REPLACE);
+        state.buffers.stencil.setFunc(context.ALWAYS, writeValue, 4294967295);
+        state.buffers.stencil.setClear(clearValue);
+        state.buffers.stencil.setLocked(true);
+        renderer.setRenderTarget(readBuffer);
+        if (this.clear) renderer.clear();
+        renderer.render(this.scene, this.camera);
+        renderer.setRenderTarget(writeBuffer);
+        if (this.clear) renderer.clear();
+        renderer.render(this.scene, this.camera);
+        state.buffers.color.setLocked(false);
+        state.buffers.depth.setLocked(false);
+        state.buffers.color.setMask(true);
+        state.buffers.depth.setMask(true);
+        state.buffers.stencil.setLocked(false);
+        state.buffers.stencil.setFunc(context.EQUAL, 1, 4294967295);
+        state.buffers.stencil.setOp(context.KEEP, context.KEEP, context.KEEP);
+        state.buffers.stencil.setLocked(true);
+      }
+    };
+    ClearMaskPass = class extends Pass {
+      constructor() {
+        super();
+        this.needsSwap = false;
+      }
+      render(renderer) {
+        renderer.state.buffers.stencil.setLocked(false);
+        renderer.state.buffers.stencil.setTest(false);
+      }
+    };
+  }
+});
+
+// vendor/three/addons/postprocessing/EffectComposer.js
+var EffectComposer;
+var init_EffectComposer = __esm({
+  "vendor/three/addons/postprocessing/EffectComposer.js"() {
+    init_three_module();
+    init_CopyShader();
+    init_ShaderPass();
+    init_MaskPass();
+    init_MaskPass();
+    EffectComposer = class {
+      constructor(renderer, renderTarget) {
+        this.renderer = renderer;
+        this._pixelRatio = renderer.getPixelRatio();
+        if (renderTarget === void 0) {
+          const size = renderer.getSize(new Vector2());
+          this._width = size.width;
+          this._height = size.height;
+          renderTarget = new WebGLRenderTarget(this._width * this._pixelRatio, this._height * this._pixelRatio, { type: HalfFloatType });
+          renderTarget.texture.name = "EffectComposer.rt1";
+        } else {
+          this._width = renderTarget.width;
+          this._height = renderTarget.height;
+        }
+        this.renderTarget1 = renderTarget;
+        this.renderTarget2 = renderTarget.clone();
+        this.renderTarget2.texture.name = "EffectComposer.rt2";
+        this.writeBuffer = this.renderTarget1;
+        this.readBuffer = this.renderTarget2;
+        this.renderToScreen = true;
+        this.passes = [];
+        this.copyPass = new ShaderPass(CopyShader);
+        this.copyPass.material.blending = NoBlending;
+        this.clock = new Clock();
+      }
+      swapBuffers() {
+        const tmp = this.readBuffer;
+        this.readBuffer = this.writeBuffer;
+        this.writeBuffer = tmp;
+      }
+      addPass(pass) {
+        this.passes.push(pass);
+        pass.setSize(this._width * this._pixelRatio, this._height * this._pixelRatio);
+      }
+      insertPass(pass, index) {
+        this.passes.splice(index, 0, pass);
+        pass.setSize(this._width * this._pixelRatio, this._height * this._pixelRatio);
+      }
+      removePass(pass) {
+        const index = this.passes.indexOf(pass);
+        if (index !== -1) {
+          this.passes.splice(index, 1);
+        }
+      }
+      isLastEnabledPass(passIndex) {
+        for (let i = passIndex + 1; i < this.passes.length; i++) {
+          if (this.passes[i].enabled) {
+            return false;
+          }
+        }
+        return true;
+      }
+      render(deltaTime) {
+        if (deltaTime === void 0) {
+          deltaTime = this.clock.getDelta();
+        }
+        const currentRenderTarget = this.renderer.getRenderTarget();
+        let maskActive = false;
+        for (let i = 0, il = this.passes.length; i < il; i++) {
+          const pass = this.passes[i];
+          if (pass.enabled === false) continue;
+          pass.renderToScreen = this.renderToScreen && this.isLastEnabledPass(i);
+          pass.render(this.renderer, this.writeBuffer, this.readBuffer, deltaTime, maskActive);
+          if (pass.needsSwap) {
+            if (maskActive) {
+              const context = this.renderer.getContext();
+              const stencil = this.renderer.state.buffers.stencil;
+              stencil.setFunc(context.NOTEQUAL, 1, 4294967295);
+              this.copyPass.render(this.renderer, this.writeBuffer, this.readBuffer, deltaTime);
+              stencil.setFunc(context.EQUAL, 1, 4294967295);
+            }
+            this.swapBuffers();
+          }
+          if (MaskPass !== void 0) {
+            if (pass instanceof MaskPass) {
+              maskActive = true;
+            } else if (pass instanceof ClearMaskPass) {
+              maskActive = false;
+            }
+          }
+        }
+        this.renderer.setRenderTarget(currentRenderTarget);
+      }
+      reset(renderTarget) {
+        if (renderTarget === void 0) {
+          const size = this.renderer.getSize(new Vector2());
+          this._pixelRatio = this.renderer.getPixelRatio();
+          this._width = size.width;
+          this._height = size.height;
+          renderTarget = this.renderTarget1.clone();
+          renderTarget.setSize(this._width * this._pixelRatio, this._height * this._pixelRatio);
+        }
+        this.renderTarget1.dispose();
+        this.renderTarget2.dispose();
+        this.renderTarget1 = renderTarget;
+        this.renderTarget2 = renderTarget.clone();
+        this.writeBuffer = this.renderTarget1;
+        this.readBuffer = this.renderTarget2;
+      }
+      setSize(width, height) {
+        this._width = width;
+        this._height = height;
+        const effectiveWidth = this._width * this._pixelRatio;
+        const effectiveHeight = this._height * this._pixelRatio;
+        this.renderTarget1.setSize(effectiveWidth, effectiveHeight);
+        this.renderTarget2.setSize(effectiveWidth, effectiveHeight);
+        for (let i = 0; i < this.passes.length; i++) {
+          this.passes[i].setSize(effectiveWidth, effectiveHeight);
+        }
+      }
+      setPixelRatio(pixelRatio) {
+        this._pixelRatio = pixelRatio;
+        this.setSize(this._width, this._height);
+      }
+      dispose() {
+        this.renderTarget1.dispose();
+        this.renderTarget2.dispose();
+        this.copyPass.dispose();
+      }
+    };
+  }
+});
+
+// vendor/three/addons/postprocessing/RenderPass.js
+var RenderPass;
+var init_RenderPass = __esm({
+  "vendor/three/addons/postprocessing/RenderPass.js"() {
+    init_three_module();
+    init_Pass();
+    RenderPass = class extends Pass {
+      constructor(scene, camera, overrideMaterial = null, clearColor = null, clearAlpha = null) {
+        super();
+        this.scene = scene;
+        this.camera = camera;
+        this.overrideMaterial = overrideMaterial;
+        this.clearColor = clearColor;
+        this.clearAlpha = clearAlpha;
+        this.clear = true;
+        this.clearDepth = false;
+        this.needsSwap = false;
+        this._oldClearColor = new Color();
+      }
+      render(renderer, writeBuffer, readBuffer) {
+        const oldAutoClear = renderer.autoClear;
+        renderer.autoClear = false;
+        let oldClearAlpha, oldOverrideMaterial;
+        if (this.overrideMaterial !== null) {
+          oldOverrideMaterial = this.scene.overrideMaterial;
+          this.scene.overrideMaterial = this.overrideMaterial;
+        }
+        if (this.clearColor !== null) {
+          renderer.getClearColor(this._oldClearColor);
+          renderer.setClearColor(this.clearColor);
+        }
+        if (this.clearAlpha !== null) {
+          oldClearAlpha = renderer.getClearAlpha();
+          renderer.setClearAlpha(this.clearAlpha);
+        }
+        if (this.clearDepth == true) {
+          renderer.clearDepth();
+        }
+        renderer.setRenderTarget(this.renderToScreen ? null : readBuffer);
+        if (this.clear === true) {
+          renderer.clear(renderer.autoClearColor, renderer.autoClearDepth, renderer.autoClearStencil);
+        }
+        renderer.render(this.scene, this.camera);
+        if (this.clearColor !== null) {
+          renderer.setClearColor(this._oldClearColor);
+        }
+        if (this.clearAlpha !== null) {
+          renderer.setClearAlpha(oldClearAlpha);
+        }
+        if (this.overrideMaterial !== null) {
+          this.scene.overrideMaterial = oldOverrideMaterial;
+        }
+        renderer.autoClear = oldAutoClear;
+      }
+    };
+  }
+});
+
+// vendor/three/addons/shaders/OutputShader.js
+var OutputShader;
+var init_OutputShader = __esm({
+  "vendor/three/addons/shaders/OutputShader.js"() {
+    OutputShader = {
+      name: "OutputShader",
+      uniforms: {
+        "tDiffuse": { value: null },
+        "toneMappingExposure": { value: 1 }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+		precision highp float;
+
+		uniform mat4 modelViewMatrix;
+		uniform mat4 projectionMatrix;
+
+		attribute vec3 position;
+		attribute vec2 uv;
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+	
+		precision highp float;
+
+		uniform sampler2D tDiffuse;
+
+		#include <tonemapping_pars_fragment>
+		#include <colorspace_pars_fragment>
+
+		varying vec2 vUv;
+
+		void main() {
+
+			gl_FragColor = texture2D( tDiffuse, vUv );
+
+			// tone mapping
+
+			#ifdef LINEAR_TONE_MAPPING
+
+				gl_FragColor.rgb = LinearToneMapping( gl_FragColor.rgb );
+
+			#elif defined( REINHARD_TONE_MAPPING )
+
+				gl_FragColor.rgb = ReinhardToneMapping( gl_FragColor.rgb );
+
+			#elif defined( CINEON_TONE_MAPPING )
+
+				gl_FragColor.rgb = OptimizedCineonToneMapping( gl_FragColor.rgb );
+
+			#elif defined( ACES_FILMIC_TONE_MAPPING )
+
+				gl_FragColor.rgb = ACESFilmicToneMapping( gl_FragColor.rgb );
+
+			#elif defined( AGX_TONE_MAPPING )
+
+				gl_FragColor.rgb = AgXToneMapping( gl_FragColor.rgb );
+
+			#endif
+
+			// color space
+
+			#ifdef SRGB_TRANSFER
+
+				gl_FragColor = sRGBTransferOETF( gl_FragColor );
+
+			#endif
+
+		}`
+      )
+    };
+  }
+});
+
+// vendor/three/addons/postprocessing/OutputPass.js
+var OutputPass;
+var init_OutputPass = __esm({
+  "vendor/three/addons/postprocessing/OutputPass.js"() {
+    init_three_module();
+    init_Pass();
+    init_OutputShader();
+    OutputPass = class extends Pass {
+      constructor() {
+        super();
+        const shader = OutputShader;
+        this.uniforms = UniformsUtils.clone(shader.uniforms);
+        this.material = new RawShaderMaterial({
+          name: shader.name,
+          uniforms: this.uniforms,
+          vertexShader: shader.vertexShader,
+          fragmentShader: shader.fragmentShader
+        });
+        this.fsQuad = new FullScreenQuad(this.material);
+        this._outputColorSpace = null;
+        this._toneMapping = null;
+      }
+      render(renderer, writeBuffer, readBuffer) {
+        this.uniforms["tDiffuse"].value = readBuffer.texture;
+        this.uniforms["toneMappingExposure"].value = renderer.toneMappingExposure;
+        if (this._outputColorSpace !== renderer.outputColorSpace || this._toneMapping !== renderer.toneMapping) {
+          this._outputColorSpace = renderer.outputColorSpace;
+          this._toneMapping = renderer.toneMapping;
+          this.material.defines = {};
+          if (ColorManagement.getTransfer(this._outputColorSpace) === SRGBTransfer) this.material.defines.SRGB_TRANSFER = "";
+          if (this._toneMapping === LinearToneMapping) this.material.defines.LINEAR_TONE_MAPPING = "";
+          else if (this._toneMapping === ReinhardToneMapping) this.material.defines.REINHARD_TONE_MAPPING = "";
+          else if (this._toneMapping === CineonToneMapping) this.material.defines.CINEON_TONE_MAPPING = "";
+          else if (this._toneMapping === ACESFilmicToneMapping) this.material.defines.ACES_FILMIC_TONE_MAPPING = "";
+          else if (this._toneMapping === AgXToneMapping) this.material.defines.AGX_TONE_MAPPING = "";
+          this.material.needsUpdate = true;
+        }
+        if (this.renderToScreen === true) {
+          renderer.setRenderTarget(null);
+          this.fsQuad.render(renderer);
+        } else {
+          renderer.setRenderTarget(writeBuffer);
+          if (this.clear) renderer.clear(renderer.autoClearColor, renderer.autoClearDepth, renderer.autoClearStencil);
+          this.fsQuad.render(renderer);
+        }
+      }
+      dispose() {
+        this.material.dispose();
+        this.fsQuad.dispose();
+      }
+    };
+  }
+});
+
+// vendor/three/addons/shaders/GTAOShader.js
+function generateMagicSquareNoise(size = 5) {
+  const noiseSize = Math.floor(size) % 2 === 0 ? Math.floor(size) + 1 : Math.floor(size);
+  const magicSquare = generateMagicSquare(noiseSize);
+  const noiseSquareSize = magicSquare.length;
+  const data = new Uint8Array(noiseSquareSize * 4);
+  for (let inx = 0; inx < noiseSquareSize; ++inx) {
+    const iAng = magicSquare[inx];
+    const angle = 2 * Math.PI * iAng / noiseSquareSize;
+    const randomVec = new Vector3(
+      Math.cos(angle),
+      Math.sin(angle),
+      0
+    ).normalize();
+    data[inx * 4] = (randomVec.x * 0.5 + 0.5) * 255;
+    data[inx * 4 + 1] = (randomVec.y * 0.5 + 0.5) * 255;
+    data[inx * 4 + 2] = 127;
+    data[inx * 4 + 3] = 255;
+  }
+  const noiseTexture = new DataTexture(data, noiseSize, noiseSize);
+  noiseTexture.wrapS = RepeatWrapping;
+  noiseTexture.wrapT = RepeatWrapping;
+  noiseTexture.needsUpdate = true;
+  return noiseTexture;
+}
+function generateMagicSquare(size) {
+  const noiseSize = Math.floor(size) % 2 === 0 ? Math.floor(size) + 1 : Math.floor(size);
+  const noiseSquareSize = noiseSize * noiseSize;
+  const magicSquare = Array(noiseSquareSize).fill(0);
+  let i = Math.floor(noiseSize / 2);
+  let j = noiseSize - 1;
+  for (let num = 1; num <= noiseSquareSize; ) {
+    if (i === -1 && j === noiseSize) {
+      j = noiseSize - 2;
+      i = 0;
+    } else {
+      if (j === noiseSize) {
+        j = 0;
+      }
+      if (i < 0) {
+        i = noiseSize - 1;
+      }
+    }
+    if (magicSquare[i * noiseSize + j] !== 0) {
+      j -= 2;
+      i++;
+      continue;
+    } else {
+      magicSquare[i * noiseSize + j] = num++;
+    }
+    j++;
+    i--;
+  }
+  return magicSquare;
+}
+var GTAOShader, GTAODepthShader, GTAOBlendShader;
+var init_GTAOShader = __esm({
+  "vendor/three/addons/shaders/GTAOShader.js"() {
+    init_three_module();
+    GTAOShader = {
+      name: "GTAOShader",
+      defines: {
+        PERSPECTIVE_CAMERA: 1,
+        SAMPLES: 16,
+        NORMAL_VECTOR_TYPE: 1,
+        DEPTH_SWIZZLING: "x",
+        SCREEN_SPACE_RADIUS: 0,
+        SCREEN_SPACE_RADIUS_SCALE: 100,
+        SCENE_CLIP_BOX: 0
+      },
+      uniforms: {
+        tNormal: { value: null },
+        tDepth: { value: null },
+        tNoise: { value: null },
+        resolution: { value: new Vector2() },
+        cameraNear: { value: null },
+        cameraFar: { value: null },
+        cameraProjectionMatrix: { value: new Matrix4() },
+        cameraProjectionMatrixInverse: { value: new Matrix4() },
+        cameraWorldMatrix: { value: new Matrix4() },
+        radius: { value: 0.25 },
+        distanceExponent: { value: 1 },
+        thickness: { value: 1 },
+        distanceFallOff: { value: 1 },
+        scale: { value: 1 },
+        sceneBoxMin: { value: new Vector3(-1, -1, -1) },
+        sceneBoxMax: { value: new Vector3(1, 1, 1) }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+
+		varying vec2 vUv;
+
+		void main() {
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+		varying vec2 vUv;
+		uniform highp sampler2D tNormal;
+		uniform highp sampler2D tDepth;
+		uniform sampler2D tNoise;
+		uniform vec2 resolution;
+		uniform float cameraNear;
+		uniform float cameraFar;
+		uniform mat4 cameraProjectionMatrix;
+		uniform mat4 cameraProjectionMatrixInverse;		
+		uniform mat4 cameraWorldMatrix;
+		uniform float radius;
+		uniform float distanceExponent;
+		uniform float thickness;
+		uniform float distanceFallOff;
+		uniform float scale;
+		#if SCENE_CLIP_BOX == 1
+			uniform vec3 sceneBoxMin;
+			uniform vec3 sceneBoxMax;
+		#endif
+		
+		#include <common>
+		#include <packing>
+
+		#ifndef FRAGMENT_OUTPUT
+		#define FRAGMENT_OUTPUT vec4(vec3(ao), 1.)
+		#endif
+
+		vec3 getViewPosition(const in vec2 screenPosition, const in float depth) {
+			vec4 clipSpacePosition = vec4(vec3(screenPosition, depth) * 2.0 - 1.0, 1.0);
+			vec4 viewSpacePosition = cameraProjectionMatrixInverse * clipSpacePosition;
+			return viewSpacePosition.xyz / viewSpacePosition.w;
+		}
+
+		float getDepth(const vec2 uv) {  
+			return textureLod(tDepth, uv.xy, 0.0).DEPTH_SWIZZLING;
+		}
+
+		float fetchDepth(const ivec2 uv) {   
+			return texelFetch(tDepth, uv.xy, 0).DEPTH_SWIZZLING;
+		}
+
+		float getViewZ(const in float depth) {
+			#if PERSPECTIVE_CAMERA == 1
+				return perspectiveDepthToViewZ(depth, cameraNear, cameraFar);
+			#else
+				return orthographicDepthToViewZ(depth, cameraNear, cameraFar);
+			#endif
+		}
+
+		vec3 computeNormalFromDepth(const vec2 uv) {
+			vec2 size = vec2(textureSize(tDepth, 0));
+			ivec2 p = ivec2(uv * size);
+			float c0 = fetchDepth(p);
+			float l2 = fetchDepth(p - ivec2(2, 0));
+			float l1 = fetchDepth(p - ivec2(1, 0));
+			float r1 = fetchDepth(p + ivec2(1, 0));
+			float r2 = fetchDepth(p + ivec2(2, 0));
+			float b2 = fetchDepth(p - ivec2(0, 2));
+			float b1 = fetchDepth(p - ivec2(0, 1));
+			float t1 = fetchDepth(p + ivec2(0, 1));
+			float t2 = fetchDepth(p + ivec2(0, 2));
+			float dl = abs((2.0 * l1 - l2) - c0);
+			float dr = abs((2.0 * r1 - r2) - c0);
+			float db = abs((2.0 * b1 - b2) - c0);
+			float dt = abs((2.0 * t1 - t2) - c0);
+			vec3 ce = getViewPosition(uv, c0).xyz;
+			vec3 dpdx = (dl < dr) ? ce - getViewPosition((uv - vec2(1.0 / size.x, 0.0)), l1).xyz : -ce + getViewPosition((uv + vec2(1.0 / size.x, 0.0)), r1).xyz;
+			vec3 dpdy = (db < dt) ? ce - getViewPosition((uv - vec2(0.0, 1.0 / size.y)), b1).xyz : -ce + getViewPosition((uv + vec2(0.0, 1.0 / size.y)), t1).xyz;
+			return normalize(cross(dpdx, dpdy));
+		}
+
+		vec3 getViewNormal(const vec2 uv) {
+			#if NORMAL_VECTOR_TYPE == 2
+				return normalize(textureLod(tNormal, uv, 0.).rgb);
+			#elif NORMAL_VECTOR_TYPE == 1
+				return unpackRGBToNormal(textureLod(tNormal, uv, 0.).rgb);
+			#else
+				return computeNormalFromDepth(uv);
+			#endif
+		}
+
+		vec3 getSceneUvAndDepth(vec3 sampleViewPos) {
+			vec4 sampleClipPos = cameraProjectionMatrix * vec4(sampleViewPos, 1.);
+			vec2 sampleUv = sampleClipPos.xy / sampleClipPos.w * 0.5 + 0.5;
+			float sampleSceneDepth = getDepth(sampleUv);
+			return vec3(sampleUv, sampleSceneDepth);
+		}
+		
+		void main() {
+			float depth = getDepth(vUv.xy);
+			if (depth >= 1.0) {
+				discard;
+				return;
+			}
+			vec3 viewPos = getViewPosition(vUv, depth);
+			vec3 viewNormal = getViewNormal(vUv);
+
+			float radiusToUse = radius;
+			float distanceFalloffToUse = thickness;
+			#if SCREEN_SPACE_RADIUS == 1
+				float radiusScale = getViewPosition(vec2(0.5 + float(SCREEN_SPACE_RADIUS_SCALE) / resolution.x, 0.0), depth).x;
+				radiusToUse *= radiusScale;
+				distanceFalloffToUse *= radiusScale;
+			#endif
+
+			#if SCENE_CLIP_BOX == 1
+				vec3 worldPos = (cameraWorldMatrix * vec4(viewPos, 1.0)).xyz;
+				float boxDistance = length(max(vec3(0.0), max(sceneBoxMin - worldPos, worldPos - sceneBoxMax)));
+				if (boxDistance > radiusToUse) {
+					discard;
+					return;
+				}
+			#endif
+			
+			vec2 noiseResolution = vec2(textureSize(tNoise, 0));
+			vec2 noiseUv = vUv * resolution / noiseResolution;
+			vec4 noiseTexel = textureLod(tNoise, noiseUv, 0.0);
+			vec3 randomVec = noiseTexel.xyz * 2.0 - 1.0;
+			vec3 tangent = normalize(vec3(randomVec.xy, 0.));
+			vec3 bitangent = vec3(-tangent.y, tangent.x, 0.);
+			mat3 kernelMatrix = mat3(tangent, bitangent, vec3(0., 0., 1.));
+
+			const int DIRECTIONS = SAMPLES < 30 ? 3 : 5;
+			const int STEPS = (SAMPLES + DIRECTIONS - 1) / DIRECTIONS;
+			float ao = 0.0, totalWeight = 0.0;
+			for (int i = 0; i < DIRECTIONS; ++i) {
+				
+				float angle = float(i) / float(DIRECTIONS) * PI;
+				vec4 sampleDir = vec4(cos(angle), sin(angle), 0., 0.5 + 0.5 * noiseTexel.w); 
+				sampleDir.xyz = normalize(kernelMatrix * sampleDir.xyz);
+
+				vec3 viewDir = normalize(-viewPos.xyz);
+				vec3 sliceBitangent = normalize(cross(sampleDir.xyz, viewDir));
+				vec3 sliceTangent = cross(sliceBitangent, viewDir);
+				vec3 normalInSlice = normalize(viewNormal - sliceBitangent * dot(viewNormal, sliceBitangent));
+				
+				vec3 tangentToNormalInSlice = cross(normalInSlice, sliceBitangent);
+				vec2 cosHorizons = vec2(dot(viewDir, tangentToNormalInSlice), dot(viewDir, -tangentToNormalInSlice));
+				
+				for (int j = 0; j < STEPS; ++j) {
+					vec3 sampleViewOffset = sampleDir.xyz * radiusToUse * sampleDir.w * pow(float(j + 1) / float(STEPS), distanceExponent);	
+
+					vec3 sampleSceneUvDepth = getSceneUvAndDepth(viewPos + sampleViewOffset);
+					vec3 sampleSceneViewPos = getViewPosition(sampleSceneUvDepth.xy, sampleSceneUvDepth.z);
+					vec3 viewDelta = sampleSceneViewPos - viewPos;
+					if (abs(viewDelta.z) < thickness) {
+						float sampleCosHorizon = dot(viewDir, normalize(viewDelta));
+						cosHorizons.x += max(0., (sampleCosHorizon - cosHorizons.x) * mix(1., 2. / float(j + 2), distanceFallOff));
+					}		
+
+					sampleSceneUvDepth = getSceneUvAndDepth(viewPos - sampleViewOffset);
+					sampleSceneViewPos = getViewPosition(sampleSceneUvDepth.xy, sampleSceneUvDepth.z);
+					viewDelta = sampleSceneViewPos - viewPos;
+					if (abs(viewDelta.z) < thickness) {
+						float sampleCosHorizon = dot(viewDir, normalize(viewDelta));
+						cosHorizons.y += max(0., (sampleCosHorizon - cosHorizons.y) * mix(1., 2. / float(j + 2), distanceFallOff));
+					}
+				}
+
+				vec2 sinHorizons = sqrt(1. - cosHorizons * cosHorizons);
+				float nx = dot(normalInSlice, sliceTangent);
+				float ny = dot(normalInSlice, viewDir);
+				float nxb = 1. / 2. * (acos(cosHorizons.y) - acos(cosHorizons.x) + sinHorizons.x * cosHorizons.x - sinHorizons.y * cosHorizons.y);
+				float nyb = 1. / 2. * (2. - cosHorizons.x * cosHorizons.x - cosHorizons.y * cosHorizons.y);
+				float occlusion = nx * nxb + ny * nyb;
+				ao += occlusion;
+			}
+
+			ao = clamp(ao / float(DIRECTIONS), 0., 1.);		
+		#if SCENE_CLIP_BOX == 1
+			ao = mix(ao, 1., smoothstep(0., radiusToUse, boxDistance));
+		#endif
+			ao = pow(ao, scale);
+
+			gl_FragColor = FRAGMENT_OUTPUT;
+		}`
+      )
+    };
+    GTAODepthShader = {
+      name: "GTAODepthShader",
+      defines: {
+        PERSPECTIVE_CAMERA: 1
+      },
+      uniforms: {
+        tDepth: { value: null },
+        cameraNear: { value: null },
+        cameraFar: { value: null }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+		varying vec2 vUv;
+
+		void main() {
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+		uniform sampler2D tDepth;
+		uniform float cameraNear;
+		uniform float cameraFar;
+		varying vec2 vUv;
+
+		#include <packing>
+
+		float getLinearDepth( const in vec2 screenPosition ) {
+			#if PERSPECTIVE_CAMERA == 1
+				float fragCoordZ = texture2D( tDepth, screenPosition ).x;
+				float viewZ = perspectiveDepthToViewZ( fragCoordZ, cameraNear, cameraFar );
+				return viewZToOrthographicDepth( viewZ, cameraNear, cameraFar );
+			#else
+				return texture2D( tDepth, screenPosition ).x;
+			#endif
+		}
+
+		void main() {
+			float depth = getLinearDepth( vUv );
+			gl_FragColor = vec4( vec3( 1.0 - depth ), 1.0 );
+
+		}`
+      )
+    };
+    GTAOBlendShader = {
+      name: "GTAOBlendShader",
+      uniforms: {
+        tDiffuse: { value: null },
+        intensity: { value: 1 }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+		varying vec2 vUv;
+
+		void main() {
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+		uniform float intensity;
+		uniform sampler2D tDiffuse;
+		varying vec2 vUv;
+
+		void main() {
+			vec4 texel = texture2D( tDiffuse, vUv );
+			gl_FragColor = vec4(mix(vec3(1.), texel.rgb, intensity), texel.a);
+		}`
+      )
+    };
+  }
+});
+
+// vendor/three/addons/shaders/PoissonDenoiseShader.js
+function generatePdSamplePointInitializer(samples, rings, radiusExponent) {
+  const poissonDisk = generateDenoiseSamples(
+    samples,
+    rings,
+    radiusExponent
+  );
+  let glslCode = "vec3[SAMPLES](";
+  for (let i = 0; i < samples; i++) {
+    const sample = poissonDisk[i];
+    glslCode += `vec3(${sample.x}, ${sample.y}, ${sample.z})${i < samples - 1 ? "," : ")"}`;
+  }
+  return glslCode;
+}
+function generateDenoiseSamples(numSamples, numRings, radiusExponent) {
+  const samples = [];
+  for (let i = 0; i < numSamples; i++) {
+    const angle = 2 * Math.PI * numRings * i / numSamples;
+    const radius = Math.pow(i / (numSamples - 1), radiusExponent);
+    samples.push(new Vector3(Math.cos(angle), Math.sin(angle), radius));
+  }
+  return samples;
+}
+var PoissonDenoiseShader;
+var init_PoissonDenoiseShader = __esm({
+  "vendor/three/addons/shaders/PoissonDenoiseShader.js"() {
+    init_three_module();
+    PoissonDenoiseShader = {
+      name: "PoissonDenoiseShader",
+      defines: {
+        "SAMPLES": 16,
+        "SAMPLE_VECTORS": generatePdSamplePointInitializer(16, 2, 1),
+        "NORMAL_VECTOR_TYPE": 1,
+        "DEPTH_VALUE_SOURCE": 0
+      },
+      uniforms: {
+        "tDiffuse": { value: null },
+        "tNormal": { value: null },
+        "tDepth": { value: null },
+        "tNoise": { value: null },
+        "resolution": { value: new Vector2() },
+        "cameraProjectionMatrixInverse": { value: new Matrix4() },
+        "lumaPhi": { value: 5 },
+        "depthPhi": { value: 5 },
+        "normalPhi": { value: 5 },
+        "radius": { value: 4 },
+        "index": { value: 0 }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+
+		varying vec2 vUv;
+
+		void main() {
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+
+		varying vec2 vUv;
+
+		uniform sampler2D tDiffuse;
+		uniform sampler2D tNormal;
+		uniform sampler2D tDepth;
+		uniform sampler2D tNoise;
+		uniform vec2 resolution;
+		uniform mat4 cameraProjectionMatrixInverse;
+		uniform float lumaPhi;
+		uniform float depthPhi;
+		uniform float normalPhi;
+		uniform float radius;
+		uniform int index;
+		
+		#include <common>
+		#include <packing>
+
+		#ifndef SAMPLE_LUMINANCE
+		#define SAMPLE_LUMINANCE dot(vec3(0.2125, 0.7154, 0.0721), a)
+		#endif
+
+		#ifndef FRAGMENT_OUTPUT
+		#define FRAGMENT_OUTPUT vec4(denoised, 1.)
+		#endif
+
+		float getLuminance(const in vec3 a) {
+			return SAMPLE_LUMINANCE;
+		}
+
+		const vec3 poissonDisk[SAMPLES] = SAMPLE_VECTORS;
+
+		vec3 getViewPosition(const in vec2 screenPosition, const in float depth) {
+			vec4 clipSpacePosition = vec4(vec3(screenPosition, depth) * 2.0 - 1.0, 1.0);
+			vec4 viewSpacePosition = cameraProjectionMatrixInverse * clipSpacePosition;
+			return viewSpacePosition.xyz / viewSpacePosition.w;
+		}
+		
+		float getDepth(const vec2 uv) {
+		#if DEPTH_VALUE_SOURCE == 1    
+			return textureLod(tDepth, uv.xy, 0.0).a;
+		#else
+			return textureLod(tDepth, uv.xy, 0.0).r;
+		#endif
+		}
+
+		float fetchDepth(const ivec2 uv) {
+			#if DEPTH_VALUE_SOURCE == 1    
+				return texelFetch(tDepth, uv.xy, 0).a;
+			#else
+				return texelFetch(tDepth, uv.xy, 0).r;
+			#endif
+		}
+
+		vec3 computeNormalFromDepth(const vec2 uv) {
+			vec2 size = vec2(textureSize(tDepth, 0));
+			ivec2 p = ivec2(uv * size);
+			float c0 = fetchDepth(p);
+			float l2 = fetchDepth(p - ivec2(2, 0));
+			float l1 = fetchDepth(p - ivec2(1, 0));
+			float r1 = fetchDepth(p + ivec2(1, 0));
+			float r2 = fetchDepth(p + ivec2(2, 0));
+			float b2 = fetchDepth(p - ivec2(0, 2));
+			float b1 = fetchDepth(p - ivec2(0, 1));
+			float t1 = fetchDepth(p + ivec2(0, 1));
+			float t2 = fetchDepth(p + ivec2(0, 2));
+			float dl = abs((2.0 * l1 - l2) - c0);
+			float dr = abs((2.0 * r1 - r2) - c0);
+			float db = abs((2.0 * b1 - b2) - c0);
+			float dt = abs((2.0 * t1 - t2) - c0);
+			vec3 ce = getViewPosition(uv, c0).xyz;
+			vec3 dpdx = (dl < dr) ?  ce - getViewPosition((uv - vec2(1.0 / size.x, 0.0)), l1).xyz
+									: -ce + getViewPosition((uv + vec2(1.0 / size.x, 0.0)), r1).xyz;
+			vec3 dpdy = (db < dt) ?  ce - getViewPosition((uv - vec2(0.0, 1.0 / size.y)), b1).xyz
+									: -ce + getViewPosition((uv + vec2(0.0, 1.0 / size.y)), t1).xyz;
+			return normalize(cross(dpdx, dpdy));
+		}
+
+		vec3 getViewNormal(const vec2 uv) {
+		#if NORMAL_VECTOR_TYPE == 2
+			return normalize(textureLod(tNormal, uv, 0.).rgb);
+		#elif NORMAL_VECTOR_TYPE == 1
+			return unpackRGBToNormal(textureLod(tNormal, uv, 0.).rgb);
+		#else
+			return computeNormalFromDepth(uv);
+		#endif
+		}
+
+		void denoiseSample(in vec3 center, in vec3 viewNormal, in vec3 viewPos, in vec2 sampleUv, inout vec3 denoised, inout float totalWeight) {
+			vec4 sampleTexel = textureLod(tDiffuse, sampleUv, 0.0);
+			float sampleDepth = getDepth(sampleUv);
+			vec3 sampleNormal = getViewNormal(sampleUv);
+			vec3 neighborColor = sampleTexel.rgb;
+			vec3 viewPosSample = getViewPosition(sampleUv, sampleDepth);
+			
+			float normalDiff = dot(viewNormal, sampleNormal);
+			float normalSimilarity = pow(max(normalDiff, 0.), normalPhi);
+			float lumaDiff = abs(getLuminance(neighborColor) - getLuminance(center));
+			float lumaSimilarity = max(1.0 - lumaDiff / lumaPhi, 0.0);
+			float depthDiff = abs(dot(viewPos - viewPosSample, viewNormal));
+			float depthSimilarity = max(1. - depthDiff / depthPhi, 0.);
+			float w = lumaSimilarity * depthSimilarity * normalSimilarity;
+		
+			denoised += w * neighborColor;
+			totalWeight += w;
+		}
+		
+		void main() {
+			float depth = getDepth(vUv.xy);	
+			vec3 viewNormal = getViewNormal(vUv);	
+			if (depth == 1. || dot(viewNormal, viewNormal) == 0.) {
+				discard;
+				return;
+			}
+			vec4 texel = textureLod(tDiffuse, vUv, 0.0);
+			vec3 center = texel.rgb;
+			vec3 viewPos = getViewPosition(vUv, depth);
+
+			vec2 noiseResolution = vec2(textureSize(tNoise, 0));
+			vec2 noiseUv = vUv * resolution / noiseResolution;
+			vec4 noiseTexel = textureLod(tNoise, noiseUv, 0.0);
+      		vec2 noiseVec = vec2(sin(noiseTexel[index % 4] * 2. * PI), cos(noiseTexel[index % 4] * 2. * PI));
+    		mat2 rotationMatrix = mat2(noiseVec.x, -noiseVec.y, noiseVec.x, noiseVec.y);
+		
+			float totalWeight = 1.0;
+			vec3 denoised = texel.rgb;
+			for (int i = 0; i < SAMPLES; i++) {
+				vec3 sampleDir = poissonDisk[i];
+				vec2 offset = rotationMatrix * (sampleDir.xy * (1. + sampleDir.z * (radius - 1.)) / resolution);
+				vec2 sampleUv = vUv + offset;
+				denoiseSample(center, viewNormal, viewPos, sampleUv, denoised, totalWeight);
+			}
+		
+			if (totalWeight > 0.) { 
+				denoised /= totalWeight;
+			}
+			gl_FragColor = FRAGMENT_OUTPUT;
+		}`
+      )
+    };
+  }
+});
+
+// vendor/three/addons/math/SimplexNoise.js
+var SimplexNoise;
+var init_SimplexNoise = __esm({
+  "vendor/three/addons/math/SimplexNoise.js"() {
+    SimplexNoise = class {
+      constructor(r = Math) {
+        this.grad3 = [
+          [1, 1, 0],
+          [-1, 1, 0],
+          [1, -1, 0],
+          [-1, -1, 0],
+          [1, 0, 1],
+          [-1, 0, 1],
+          [1, 0, -1],
+          [-1, 0, -1],
+          [0, 1, 1],
+          [0, -1, 1],
+          [0, 1, -1],
+          [0, -1, -1]
+        ];
+        this.grad4 = [
+          [0, 1, 1, 1],
+          [0, 1, 1, -1],
+          [0, 1, -1, 1],
+          [0, 1, -1, -1],
+          [0, -1, 1, 1],
+          [0, -1, 1, -1],
+          [0, -1, -1, 1],
+          [0, -1, -1, -1],
+          [1, 0, 1, 1],
+          [1, 0, 1, -1],
+          [1, 0, -1, 1],
+          [1, 0, -1, -1],
+          [-1, 0, 1, 1],
+          [-1, 0, 1, -1],
+          [-1, 0, -1, 1],
+          [-1, 0, -1, -1],
+          [1, 1, 0, 1],
+          [1, 1, 0, -1],
+          [1, -1, 0, 1],
+          [1, -1, 0, -1],
+          [-1, 1, 0, 1],
+          [-1, 1, 0, -1],
+          [-1, -1, 0, 1],
+          [-1, -1, 0, -1],
+          [1, 1, 1, 0],
+          [1, 1, -1, 0],
+          [1, -1, 1, 0],
+          [1, -1, -1, 0],
+          [-1, 1, 1, 0],
+          [-1, 1, -1, 0],
+          [-1, -1, 1, 0],
+          [-1, -1, -1, 0]
+        ];
+        this.p = [];
+        for (let i = 0; i < 256; i++) {
+          this.p[i] = Math.floor(r.random() * 256);
+        }
+        this.perm = [];
+        for (let i = 0; i < 512; i++) {
+          this.perm[i] = this.p[i & 255];
+        }
+        this.simplex = [
+          [0, 1, 2, 3],
+          [0, 1, 3, 2],
+          [0, 0, 0, 0],
+          [0, 2, 3, 1],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [1, 2, 3, 0],
+          [0, 2, 1, 3],
+          [0, 0, 0, 0],
+          [0, 3, 1, 2],
+          [0, 3, 2, 1],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [1, 3, 2, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [1, 2, 0, 3],
+          [0, 0, 0, 0],
+          [1, 3, 0, 2],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [2, 3, 0, 1],
+          [2, 3, 1, 0],
+          [1, 0, 2, 3],
+          [1, 0, 3, 2],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [2, 0, 3, 1],
+          [0, 0, 0, 0],
+          [2, 1, 3, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [2, 0, 1, 3],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [3, 0, 1, 2],
+          [3, 0, 2, 1],
+          [0, 0, 0, 0],
+          [3, 1, 2, 0],
+          [2, 1, 0, 3],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [0, 0, 0, 0],
+          [3, 1, 0, 2],
+          [0, 0, 0, 0],
+          [3, 2, 0, 1],
+          [3, 2, 1, 0]
+        ];
+      }
+      dot(g, x, y) {
+        return g[0] * x + g[1] * y;
+      }
+      dot3(g, x, y, z) {
+        return g[0] * x + g[1] * y + g[2] * z;
+      }
+      dot4(g, x, y, z, w) {
+        return g[0] * x + g[1] * y + g[2] * z + g[3] * w;
+      }
+      noise(xin, yin) {
+        let n0;
+        let n1;
+        let n2;
+        const F2 = 0.5 * (Math.sqrt(3) - 1);
+        const s = (xin + yin) * F2;
+        const i = Math.floor(xin + s);
+        const j = Math.floor(yin + s);
+        const G2 = (3 - Math.sqrt(3)) / 6;
+        const t = (i + j) * G2;
+        const X0 = i - t;
+        const Y0 = j - t;
+        const x0 = xin - X0;
+        const y0 = yin - Y0;
+        let i1;
+        let j1;
+        if (x0 > y0) {
+          i1 = 1;
+          j1 = 0;
+        } else {
+          i1 = 0;
+          j1 = 1;
+        }
+        const x1 = x0 - i1 + G2;
+        const y1 = y0 - j1 + G2;
+        const x2 = x0 - 1 + 2 * G2;
+        const y2 = y0 - 1 + 2 * G2;
+        const ii = i & 255;
+        const jj = j & 255;
+        const gi0 = this.perm[ii + this.perm[jj]] % 12;
+        const gi1 = this.perm[ii + i1 + this.perm[jj + j1]] % 12;
+        const gi2 = this.perm[ii + 1 + this.perm[jj + 1]] % 12;
+        let t0 = 0.5 - x0 * x0 - y0 * y0;
+        if (t0 < 0) n0 = 0;
+        else {
+          t0 *= t0;
+          n0 = t0 * t0 * this.dot(this.grad3[gi0], x0, y0);
+        }
+        let t1 = 0.5 - x1 * x1 - y1 * y1;
+        if (t1 < 0) n1 = 0;
+        else {
+          t1 *= t1;
+          n1 = t1 * t1 * this.dot(this.grad3[gi1], x1, y1);
+        }
+        let t2 = 0.5 - x2 * x2 - y2 * y2;
+        if (t2 < 0) n2 = 0;
+        else {
+          t2 *= t2;
+          n2 = t2 * t2 * this.dot(this.grad3[gi2], x2, y2);
+        }
+        return 70 * (n0 + n1 + n2);
+      }
+      // 3D simplex noise
+      noise3d(xin, yin, zin) {
+        let n0;
+        let n1;
+        let n2;
+        let n3;
+        const F3 = 1 / 3;
+        const s = (xin + yin + zin) * F3;
+        const i = Math.floor(xin + s);
+        const j = Math.floor(yin + s);
+        const k = Math.floor(zin + s);
+        const G3 = 1 / 6;
+        const t = (i + j + k) * G3;
+        const X0 = i - t;
+        const Y0 = j - t;
+        const Z0 = k - t;
+        const x0 = xin - X0;
+        const y0 = yin - Y0;
+        const z0 = zin - Z0;
+        let i1;
+        let j1;
+        let k1;
+        let i2;
+        let j2;
+        let k2;
+        if (x0 >= y0) {
+          if (y0 >= z0) {
+            i1 = 1;
+            j1 = 0;
+            k1 = 0;
+            i2 = 1;
+            j2 = 1;
+            k2 = 0;
+          } else if (x0 >= z0) {
+            i1 = 1;
+            j1 = 0;
+            k1 = 0;
+            i2 = 1;
+            j2 = 0;
+            k2 = 1;
+          } else {
+            i1 = 0;
+            j1 = 0;
+            k1 = 1;
+            i2 = 1;
+            j2 = 0;
+            k2 = 1;
+          }
+        } else {
+          if (y0 < z0) {
+            i1 = 0;
+            j1 = 0;
+            k1 = 1;
+            i2 = 0;
+            j2 = 1;
+            k2 = 1;
+          } else if (x0 < z0) {
+            i1 = 0;
+            j1 = 1;
+            k1 = 0;
+            i2 = 0;
+            j2 = 1;
+            k2 = 1;
+          } else {
+            i1 = 0;
+            j1 = 1;
+            k1 = 0;
+            i2 = 1;
+            j2 = 1;
+            k2 = 0;
+          }
+        }
+        const x1 = x0 - i1 + G3;
+        const y1 = y0 - j1 + G3;
+        const z1 = z0 - k1 + G3;
+        const x2 = x0 - i2 + 2 * G3;
+        const y2 = y0 - j2 + 2 * G3;
+        const z2 = z0 - k2 + 2 * G3;
+        const x3 = x0 - 1 + 3 * G3;
+        const y3 = y0 - 1 + 3 * G3;
+        const z3 = z0 - 1 + 3 * G3;
+        const ii = i & 255;
+        const jj = j & 255;
+        const kk = k & 255;
+        const gi0 = this.perm[ii + this.perm[jj + this.perm[kk]]] % 12;
+        const gi1 = this.perm[ii + i1 + this.perm[jj + j1 + this.perm[kk + k1]]] % 12;
+        const gi2 = this.perm[ii + i2 + this.perm[jj + j2 + this.perm[kk + k2]]] % 12;
+        const gi3 = this.perm[ii + 1 + this.perm[jj + 1 + this.perm[kk + 1]]] % 12;
+        let t0 = 0.6 - x0 * x0 - y0 * y0 - z0 * z0;
+        if (t0 < 0) n0 = 0;
+        else {
+          t0 *= t0;
+          n0 = t0 * t0 * this.dot3(this.grad3[gi0], x0, y0, z0);
+        }
+        let t1 = 0.6 - x1 * x1 - y1 * y1 - z1 * z1;
+        if (t1 < 0) n1 = 0;
+        else {
+          t1 *= t1;
+          n1 = t1 * t1 * this.dot3(this.grad3[gi1], x1, y1, z1);
+        }
+        let t2 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2;
+        if (t2 < 0) n2 = 0;
+        else {
+          t2 *= t2;
+          n2 = t2 * t2 * this.dot3(this.grad3[gi2], x2, y2, z2);
+        }
+        let t3 = 0.6 - x3 * x3 - y3 * y3 - z3 * z3;
+        if (t3 < 0) n3 = 0;
+        else {
+          t3 *= t3;
+          n3 = t3 * t3 * this.dot3(this.grad3[gi3], x3, y3, z3);
+        }
+        return 32 * (n0 + n1 + n2 + n3);
+      }
+      // 4D simplex noise
+      noise4d(x, y, z, w) {
+        const grad4 = this.grad4;
+        const simplex = this.simplex;
+        const perm = this.perm;
+        const F4 = (Math.sqrt(5) - 1) / 4;
+        const G4 = (5 - Math.sqrt(5)) / 20;
+        let n0;
+        let n1;
+        let n2;
+        let n3;
+        let n4;
+        const s = (x + y + z + w) * F4;
+        const i = Math.floor(x + s);
+        const j = Math.floor(y + s);
+        const k = Math.floor(z + s);
+        const l = Math.floor(w + s);
+        const t = (i + j + k + l) * G4;
+        const X0 = i - t;
+        const Y0 = j - t;
+        const Z0 = k - t;
+        const W0 = l - t;
+        const x0 = x - X0;
+        const y0 = y - Y0;
+        const z0 = z - Z0;
+        const w0 = w - W0;
+        const c1 = x0 > y0 ? 32 : 0;
+        const c2 = x0 > z0 ? 16 : 0;
+        const c3 = y0 > z0 ? 8 : 0;
+        const c4 = x0 > w0 ? 4 : 0;
+        const c5 = y0 > w0 ? 2 : 0;
+        const c6 = z0 > w0 ? 1 : 0;
+        const c = c1 + c2 + c3 + c4 + c5 + c6;
+        const i1 = simplex[c][0] >= 3 ? 1 : 0;
+        const j1 = simplex[c][1] >= 3 ? 1 : 0;
+        const k1 = simplex[c][2] >= 3 ? 1 : 0;
+        const l1 = simplex[c][3] >= 3 ? 1 : 0;
+        const i2 = simplex[c][0] >= 2 ? 1 : 0;
+        const j2 = simplex[c][1] >= 2 ? 1 : 0;
+        const k2 = simplex[c][2] >= 2 ? 1 : 0;
+        const l2 = simplex[c][3] >= 2 ? 1 : 0;
+        const i3 = simplex[c][0] >= 1 ? 1 : 0;
+        const j3 = simplex[c][1] >= 1 ? 1 : 0;
+        const k3 = simplex[c][2] >= 1 ? 1 : 0;
+        const l3 = simplex[c][3] >= 1 ? 1 : 0;
+        const x1 = x0 - i1 + G4;
+        const y1 = y0 - j1 + G4;
+        const z1 = z0 - k1 + G4;
+        const w1 = w0 - l1 + G4;
+        const x2 = x0 - i2 + 2 * G4;
+        const y2 = y0 - j2 + 2 * G4;
+        const z2 = z0 - k2 + 2 * G4;
+        const w2 = w0 - l2 + 2 * G4;
+        const x3 = x0 - i3 + 3 * G4;
+        const y3 = y0 - j3 + 3 * G4;
+        const z3 = z0 - k3 + 3 * G4;
+        const w3 = w0 - l3 + 3 * G4;
+        const x4 = x0 - 1 + 4 * G4;
+        const y4 = y0 - 1 + 4 * G4;
+        const z4 = z0 - 1 + 4 * G4;
+        const w4 = w0 - 1 + 4 * G4;
+        const ii = i & 255;
+        const jj = j & 255;
+        const kk = k & 255;
+        const ll = l & 255;
+        const gi0 = perm[ii + perm[jj + perm[kk + perm[ll]]]] % 32;
+        const gi1 = perm[ii + i1 + perm[jj + j1 + perm[kk + k1 + perm[ll + l1]]]] % 32;
+        const gi2 = perm[ii + i2 + perm[jj + j2 + perm[kk + k2 + perm[ll + l2]]]] % 32;
+        const gi3 = perm[ii + i3 + perm[jj + j3 + perm[kk + k3 + perm[ll + l3]]]] % 32;
+        const gi4 = perm[ii + 1 + perm[jj + 1 + perm[kk + 1 + perm[ll + 1]]]] % 32;
+        let t0 = 0.6 - x0 * x0 - y0 * y0 - z0 * z0 - w0 * w0;
+        if (t0 < 0) n0 = 0;
+        else {
+          t0 *= t0;
+          n0 = t0 * t0 * this.dot4(grad4[gi0], x0, y0, z0, w0);
+        }
+        let t1 = 0.6 - x1 * x1 - y1 * y1 - z1 * z1 - w1 * w1;
+        if (t1 < 0) n1 = 0;
+        else {
+          t1 *= t1;
+          n1 = t1 * t1 * this.dot4(grad4[gi1], x1, y1, z1, w1);
+        }
+        let t2 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2 - w2 * w2;
+        if (t2 < 0) n2 = 0;
+        else {
+          t2 *= t2;
+          n2 = t2 * t2 * this.dot4(grad4[gi2], x2, y2, z2, w2);
+        }
+        let t3 = 0.6 - x3 * x3 - y3 * y3 - z3 * z3 - w3 * w3;
+        if (t3 < 0) n3 = 0;
+        else {
+          t3 *= t3;
+          n3 = t3 * t3 * this.dot4(grad4[gi3], x3, y3, z3, w3);
+        }
+        let t4 = 0.6 - x4 * x4 - y4 * y4 - z4 * z4 - w4 * w4;
+        if (t4 < 0) n4 = 0;
+        else {
+          t4 *= t4;
+          n4 = t4 * t4 * this.dot4(grad4[gi4], x4, y4, z4, w4);
+        }
+        return 27 * (n0 + n1 + n2 + n3 + n4);
+      }
+    };
+  }
+});
+
+// vendor/three/addons/postprocessing/GTAOPass.js
+var GTAOPass;
+var init_GTAOPass = __esm({
+  "vendor/three/addons/postprocessing/GTAOPass.js"() {
+    init_three_module();
+    init_Pass();
+    init_GTAOShader();
+    init_PoissonDenoiseShader();
+    init_CopyShader();
+    init_SimplexNoise();
+    GTAOPass = class _GTAOPass extends Pass {
+      constructor(scene, camera, width, height, parameters, aoParameters, pdParameters) {
+        super();
+        this.width = width !== void 0 ? width : 512;
+        this.height = height !== void 0 ? height : 512;
+        this.clear = true;
+        this.camera = camera;
+        this.scene = scene;
+        this.output = 0;
+        this._renderGBuffer = true;
+        this._visibilityCache = /* @__PURE__ */ new Map();
+        this.blendIntensity = 1;
+        this.pdRings = 2;
+        this.pdRadiusExponent = 2;
+        this.pdSamples = 16;
+        this.gtaoNoiseTexture = generateMagicSquareNoise();
+        this.pdNoiseTexture = this.generateNoise();
+        this.gtaoRenderTarget = new WebGLRenderTarget(this.width, this.height, { type: HalfFloatType });
+        this.pdRenderTarget = this.gtaoRenderTarget.clone();
+        this.gtaoMaterial = new ShaderMaterial({
+          defines: Object.assign({}, GTAOShader.defines),
+          uniforms: UniformsUtils.clone(GTAOShader.uniforms),
+          vertexShader: GTAOShader.vertexShader,
+          fragmentShader: GTAOShader.fragmentShader,
+          blending: NoBlending,
+          depthTest: false,
+          depthWrite: false
+        });
+        this.gtaoMaterial.defines.PERSPECTIVE_CAMERA = this.camera.isPerspectiveCamera ? 1 : 0;
+        this.gtaoMaterial.uniforms.tNoise.value = this.gtaoNoiseTexture;
+        this.gtaoMaterial.uniforms.resolution.value.set(this.width, this.height);
+        this.gtaoMaterial.uniforms.cameraNear.value = this.camera.near;
+        this.gtaoMaterial.uniforms.cameraFar.value = this.camera.far;
+        this.normalMaterial = new MeshNormalMaterial();
+        this.normalMaterial.blending = NoBlending;
+        this.pdMaterial = new ShaderMaterial({
+          defines: Object.assign({}, PoissonDenoiseShader.defines),
+          uniforms: UniformsUtils.clone(PoissonDenoiseShader.uniforms),
+          vertexShader: PoissonDenoiseShader.vertexShader,
+          fragmentShader: PoissonDenoiseShader.fragmentShader,
+          depthTest: false,
+          depthWrite: false
+        });
+        this.pdMaterial.uniforms.tDiffuse.value = this.gtaoRenderTarget.texture;
+        this.pdMaterial.uniforms.tNoise.value = this.pdNoiseTexture;
+        this.pdMaterial.uniforms.resolution.value.set(this.width, this.height);
+        this.pdMaterial.uniforms.lumaPhi.value = 10;
+        this.pdMaterial.uniforms.depthPhi.value = 2;
+        this.pdMaterial.uniforms.normalPhi.value = 3;
+        this.pdMaterial.uniforms.radius.value = 8;
+        this.depthRenderMaterial = new ShaderMaterial({
+          defines: Object.assign({}, GTAODepthShader.defines),
+          uniforms: UniformsUtils.clone(GTAODepthShader.uniforms),
+          vertexShader: GTAODepthShader.vertexShader,
+          fragmentShader: GTAODepthShader.fragmentShader,
+          blending: NoBlending
+        });
+        this.depthRenderMaterial.uniforms.cameraNear.value = this.camera.near;
+        this.depthRenderMaterial.uniforms.cameraFar.value = this.camera.far;
+        this.copyMaterial = new ShaderMaterial({
+          uniforms: UniformsUtils.clone(CopyShader.uniforms),
+          vertexShader: CopyShader.vertexShader,
+          fragmentShader: CopyShader.fragmentShader,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
+          blendSrc: DstColorFactor,
+          blendDst: ZeroFactor,
+          blendEquation: AddEquation,
+          blendSrcAlpha: DstAlphaFactor,
+          blendDstAlpha: ZeroFactor,
+          blendEquationAlpha: AddEquation
+        });
+        this.blendMaterial = new ShaderMaterial({
+          uniforms: UniformsUtils.clone(GTAOBlendShader.uniforms),
+          vertexShader: GTAOBlendShader.vertexShader,
+          fragmentShader: GTAOBlendShader.fragmentShader,
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
+          blending: CustomBlending,
+          blendSrc: DstColorFactor,
+          blendDst: ZeroFactor,
+          blendEquation: AddEquation,
+          blendSrcAlpha: DstAlphaFactor,
+          blendDstAlpha: ZeroFactor,
+          blendEquationAlpha: AddEquation
+        });
+        this.fsQuad = new FullScreenQuad(null);
+        this.originalClearColor = new Color();
+        this.setGBuffer(parameters ? parameters.depthTexture : void 0, parameters ? parameters.normalTexture : void 0);
+        if (aoParameters !== void 0) {
+          this.updateGtaoMaterial(aoParameters);
+        }
+        if (pdParameters !== void 0) {
+          this.updatePdMaterial(pdParameters);
+        }
+      }
+      dispose() {
+        this.gtaoNoiseTexture.dispose();
+        this.pdNoiseTexture.dispose();
+        this.normalRenderTarget.dispose();
+        this.gtaoRenderTarget.dispose();
+        this.pdRenderTarget.dispose();
+        this.normalMaterial.dispose();
+        this.pdMaterial.dispose();
+        this.copyMaterial.dispose();
+        this.depthRenderMaterial.dispose();
+        this.fsQuad.dispose();
+      }
+      get gtaoMap() {
+        return this.pdRenderTarget.texture;
+      }
+      setGBuffer(depthTexture, normalTexture) {
+        if (depthTexture !== void 0) {
+          this.depthTexture = depthTexture;
+          this.normalTexture = normalTexture;
+          this._renderGBuffer = false;
+        } else {
+          this.depthTexture = new DepthTexture();
+          this.depthTexture.format = DepthStencilFormat;
+          this.depthTexture.type = UnsignedInt248Type;
+          this.normalRenderTarget = new WebGLRenderTarget(this.width, this.height, {
+            minFilter: NearestFilter,
+            magFilter: NearestFilter,
+            type: HalfFloatType,
+            depthTexture: this.depthTexture
+          });
+          this.normalTexture = this.normalRenderTarget.texture;
+          this._renderGBuffer = true;
+        }
+        const normalVectorType = this.normalTexture ? 1 : 0;
+        const depthValueSource = this.depthTexture === this.normalTexture ? "w" : "x";
+        this.gtaoMaterial.defines.NORMAL_VECTOR_TYPE = normalVectorType;
+        this.gtaoMaterial.defines.DEPTH_SWIZZLING = depthValueSource;
+        this.gtaoMaterial.uniforms.tNormal.value = this.normalTexture;
+        this.gtaoMaterial.uniforms.tDepth.value = this.depthTexture;
+        this.pdMaterial.defines.NORMAL_VECTOR_TYPE = normalVectorType;
+        this.pdMaterial.defines.DEPTH_SWIZZLING = depthValueSource;
+        this.pdMaterial.uniforms.tNormal.value = this.normalTexture;
+        this.pdMaterial.uniforms.tDepth.value = this.depthTexture;
+        this.depthRenderMaterial.uniforms.tDepth.value = this.normalRenderTarget.depthTexture;
+      }
+      setSceneClipBox(box) {
+        if (box) {
+          this.gtaoMaterial.needsUpdate = this.gtaoMaterial.defines.SCENE_CLIP_BOX !== 1;
+          this.gtaoMaterial.defines.SCENE_CLIP_BOX = 1;
+          this.gtaoMaterial.uniforms.sceneBoxMin.value.copy(box.min);
+          this.gtaoMaterial.uniforms.sceneBoxMax.value.copy(box.max);
+        } else {
+          this.gtaoMaterial.needsUpdate = this.gtaoMaterial.defines.SCENE_CLIP_BOX === 0;
+          this.gtaoMaterial.defines.SCENE_CLIP_BOX = 0;
+        }
+      }
+      updateGtaoMaterial(parameters) {
+        if (parameters.radius !== void 0) {
+          this.gtaoMaterial.uniforms.radius.value = parameters.radius;
+        }
+        if (parameters.distanceExponent !== void 0) {
+          this.gtaoMaterial.uniforms.distanceExponent.value = parameters.distanceExponent;
+        }
+        if (parameters.thickness !== void 0) {
+          this.gtaoMaterial.uniforms.thickness.value = parameters.thickness;
+        }
+        if (parameters.distanceFallOff !== void 0) {
+          this.gtaoMaterial.uniforms.distanceFallOff.value = parameters.distanceFallOff;
+          this.gtaoMaterial.needsUpdate = true;
+        }
+        if (parameters.scale !== void 0) {
+          this.gtaoMaterial.uniforms.scale.value = parameters.scale;
+        }
+        if (parameters.samples !== void 0 && parameters.samples !== this.gtaoMaterial.defines.SAMPLES) {
+          this.gtaoMaterial.defines.SAMPLES = parameters.samples;
+          this.gtaoMaterial.needsUpdate = true;
+        }
+        if (parameters.screenSpaceRadius !== void 0 && (parameters.screenSpaceRadius ? 1 : 0) !== this.gtaoMaterial.defines.SCREEN_SPACE_RADIUS) {
+          this.gtaoMaterial.defines.SCREEN_SPACE_RADIUS = parameters.screenSpaceRadius ? 1 : 0;
+          this.gtaoMaterial.needsUpdate = true;
+        }
+      }
+      updatePdMaterial(parameters) {
+        let updateShader = false;
+        if (parameters.lumaPhi !== void 0) {
+          this.pdMaterial.uniforms.lumaPhi.value = parameters.lumaPhi;
+        }
+        if (parameters.depthPhi !== void 0) {
+          this.pdMaterial.uniforms.depthPhi.value = parameters.depthPhi;
+        }
+        if (parameters.normalPhi !== void 0) {
+          this.pdMaterial.uniforms.normalPhi.value = parameters.normalPhi;
+        }
+        if (parameters.radius !== void 0 && parameters.radius !== this.radius) {
+          this.pdMaterial.uniforms.radius.value = parameters.radius;
+        }
+        if (parameters.radiusExponent !== void 0 && parameters.radiusExponent !== this.pdRadiusExponent) {
+          this.pdRadiusExponent = parameters.radiusExponent;
+          updateShader = true;
+        }
+        if (parameters.rings !== void 0 && parameters.rings !== this.pdRings) {
+          this.pdRings = parameters.rings;
+          updateShader = true;
+        }
+        if (parameters.samples !== void 0 && parameters.samples !== this.pdSamples) {
+          this.pdSamples = parameters.samples;
+          updateShader = true;
+        }
+        if (updateShader) {
+          this.pdMaterial.defines.SAMPLES = this.pdSamples;
+          this.pdMaterial.defines.SAMPLE_VECTORS = generatePdSamplePointInitializer(this.pdSamples, this.pdRings, this.pdRadiusExponent);
+          this.pdMaterial.needsUpdate = true;
+        }
+      }
+      render(renderer, writeBuffer, readBuffer) {
+        if (this._renderGBuffer) {
+          this.overrideVisibility();
+          this.renderOverride(renderer, this.normalMaterial, this.normalRenderTarget, 7829503, 1);
+          this.restoreVisibility();
+        }
+        this.gtaoMaterial.uniforms.cameraNear.value = this.camera.near;
+        this.gtaoMaterial.uniforms.cameraFar.value = this.camera.far;
+        this.gtaoMaterial.uniforms.cameraProjectionMatrix.value.copy(this.camera.projectionMatrix);
+        this.gtaoMaterial.uniforms.cameraProjectionMatrixInverse.value.copy(this.camera.projectionMatrixInverse);
+        this.gtaoMaterial.uniforms.cameraWorldMatrix.value.copy(this.camera.matrixWorld);
+        this.renderPass(renderer, this.gtaoMaterial, this.gtaoRenderTarget, 16777215, 1);
+        this.pdMaterial.uniforms.cameraProjectionMatrixInverse.value.copy(this.camera.projectionMatrixInverse);
+        this.renderPass(renderer, this.pdMaterial, this.pdRenderTarget, 16777215, 1);
+        switch (this.output) {
+          case _GTAOPass.OUTPUT.Off:
+            break;
+          case _GTAOPass.OUTPUT.Diffuse:
+            this.copyMaterial.uniforms.tDiffuse.value = readBuffer.texture;
+            this.copyMaterial.blending = NoBlending;
+            this.renderPass(renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer);
+            break;
+          case _GTAOPass.OUTPUT.AO:
+            this.copyMaterial.uniforms.tDiffuse.value = this.gtaoRenderTarget.texture;
+            this.copyMaterial.blending = NoBlending;
+            this.renderPass(renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer);
+            break;
+          case _GTAOPass.OUTPUT.Denoise:
+            this.copyMaterial.uniforms.tDiffuse.value = this.pdRenderTarget.texture;
+            this.copyMaterial.blending = NoBlending;
+            this.renderPass(renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer);
+            break;
+          case _GTAOPass.OUTPUT.Depth:
+            this.depthRenderMaterial.uniforms.cameraNear.value = this.camera.near;
+            this.depthRenderMaterial.uniforms.cameraFar.value = this.camera.far;
+            this.renderPass(renderer, this.depthRenderMaterial, this.renderToScreen ? null : writeBuffer);
+            break;
+          case _GTAOPass.OUTPUT.Normal:
+            this.copyMaterial.uniforms.tDiffuse.value = this.normalRenderTarget.texture;
+            this.copyMaterial.blending = NoBlending;
+            this.renderPass(renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer);
+            break;
+          case _GTAOPass.OUTPUT.Default:
+            this.copyMaterial.uniforms.tDiffuse.value = readBuffer.texture;
+            this.copyMaterial.blending = NoBlending;
+            this.renderPass(renderer, this.copyMaterial, this.renderToScreen ? null : writeBuffer);
+            this.blendMaterial.uniforms.intensity.value = this.blendIntensity;
+            this.blendMaterial.uniforms.tDiffuse.value = this.pdRenderTarget.texture;
+            this.renderPass(renderer, this.blendMaterial, this.renderToScreen ? null : writeBuffer);
+            break;
+          default:
+            console.warn("THREE.GTAOPass: Unknown output type.");
+        }
+      }
+      renderPass(renderer, passMaterial, renderTarget, clearColor, clearAlpha) {
+        renderer.getClearColor(this.originalClearColor);
+        const originalClearAlpha = renderer.getClearAlpha();
+        const originalAutoClear = renderer.autoClear;
+        renderer.setRenderTarget(renderTarget);
+        renderer.autoClear = false;
+        if (clearColor !== void 0 && clearColor !== null) {
+          renderer.setClearColor(clearColor);
+          renderer.setClearAlpha(clearAlpha || 0);
+          renderer.clear();
+        }
+        this.fsQuad.material = passMaterial;
+        this.fsQuad.render(renderer);
+        renderer.autoClear = originalAutoClear;
+        renderer.setClearColor(this.originalClearColor);
+        renderer.setClearAlpha(originalClearAlpha);
+      }
+      renderOverride(renderer, overrideMaterial, renderTarget, clearColor, clearAlpha) {
+        renderer.getClearColor(this.originalClearColor);
+        const originalClearAlpha = renderer.getClearAlpha();
+        const originalAutoClear = renderer.autoClear;
+        renderer.setRenderTarget(renderTarget);
+        renderer.autoClear = false;
+        clearColor = overrideMaterial.clearColor || clearColor;
+        clearAlpha = overrideMaterial.clearAlpha || clearAlpha;
+        if (clearColor !== void 0 && clearColor !== null) {
+          renderer.setClearColor(clearColor);
+          renderer.setClearAlpha(clearAlpha || 0);
+          renderer.clear();
+        }
+        this.scene.overrideMaterial = overrideMaterial;
+        renderer.render(this.scene, this.camera);
+        this.scene.overrideMaterial = null;
+        renderer.autoClear = originalAutoClear;
+        renderer.setClearColor(this.originalClearColor);
+        renderer.setClearAlpha(originalClearAlpha);
+      }
+      setSize(width, height) {
+        this.width = width;
+        this.height = height;
+        this.gtaoRenderTarget.setSize(width, height);
+        this.normalRenderTarget.setSize(width, height);
+        this.pdRenderTarget.setSize(width, height);
+        this.gtaoMaterial.uniforms.resolution.value.set(width, height);
+        this.gtaoMaterial.uniforms.cameraProjectionMatrix.value.copy(this.camera.projectionMatrix);
+        this.gtaoMaterial.uniforms.cameraProjectionMatrixInverse.value.copy(this.camera.projectionMatrixInverse);
+        this.pdMaterial.uniforms.resolution.value.set(width, height);
+        this.pdMaterial.uniforms.cameraProjectionMatrixInverse.value.copy(this.camera.projectionMatrixInverse);
+      }
+      overrideVisibility() {
+        const scene = this.scene;
+        const cache = this._visibilityCache;
+        scene.traverse(function(object) {
+          cache.set(object, object.visible);
+          if (object.isPoints || object.isLine) object.visible = false;
+        });
+      }
+      restoreVisibility() {
+        const scene = this.scene;
+        const cache = this._visibilityCache;
+        scene.traverse(function(object) {
+          const visible = cache.get(object);
+          object.visible = visible;
+        });
+        cache.clear();
+      }
+      generateNoise(size = 64) {
+        const simplex = new SimplexNoise();
+        const arraySize = size * size * 4;
+        const data = new Uint8Array(arraySize);
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            const x = i;
+            const y = j;
+            data[(i * size + j) * 4] = (simplex.noise(x, y) * 0.5 + 0.5) * 255;
+            data[(i * size + j) * 4 + 1] = (simplex.noise(x + size, y) * 0.5 + 0.5) * 255;
+            data[(i * size + j) * 4 + 2] = (simplex.noise(x, y + size) * 0.5 + 0.5) * 255;
+            data[(i * size + j) * 4 + 3] = (simplex.noise(x + size, y + size) * 0.5 + 0.5) * 255;
+          }
+        }
+        const noiseTexture = new DataTexture(data, size, size, RGBAFormat, UnsignedByteType);
+        noiseTexture.wrapS = RepeatWrapping;
+        noiseTexture.wrapT = RepeatWrapping;
+        noiseTexture.needsUpdate = true;
+        return noiseTexture;
+      }
+    };
+    GTAOPass.OUTPUT = {
+      "Off": -1,
+      "Default": 0,
+      "Diffuse": 1,
+      "Depth": 2,
+      "Normal": 3,
+      "AO": 4,
+      "Denoise": 5
+    };
+  }
+});
+
+// vendor/three/addons/shaders/LuminosityHighPassShader.js
+var LuminosityHighPassShader;
+var init_LuminosityHighPassShader = __esm({
+  "vendor/three/addons/shaders/LuminosityHighPassShader.js"() {
+    init_three_module();
+    LuminosityHighPassShader = {
+      name: "LuminosityHighPassShader",
+      shaderID: "luminosityHighPass",
+      uniforms: {
+        "tDiffuse": { value: null },
+        "luminosityThreshold": { value: 1 },
+        "smoothWidth": { value: 1 },
+        "defaultColor": { value: new Color(0) },
+        "defaultOpacity": { value: 0 }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+
+		uniform sampler2D tDiffuse;
+		uniform vec3 defaultColor;
+		uniform float defaultOpacity;
+		uniform float luminosityThreshold;
+		uniform float smoothWidth;
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vec4 texel = texture2D( tDiffuse, vUv );
+
+			vec3 luma = vec3( 0.299, 0.587, 0.114 );
+
+			float v = dot( texel.xyz, luma );
+
+			vec4 outputColor = vec4( defaultColor.rgb, defaultOpacity );
+
+			float alpha = smoothstep( luminosityThreshold, luminosityThreshold + smoothWidth, v );
+
+			gl_FragColor = mix( outputColor, texel, alpha );
+
+		}`
+      )
+    };
+  }
+});
+
+// vendor/three/addons/postprocessing/UnrealBloomPass.js
+var UnrealBloomPass;
+var init_UnrealBloomPass = __esm({
+  "vendor/three/addons/postprocessing/UnrealBloomPass.js"() {
+    init_three_module();
+    init_Pass();
+    init_CopyShader();
+    init_LuminosityHighPassShader();
+    UnrealBloomPass = class _UnrealBloomPass extends Pass {
+      constructor(resolution, strength, radius, threshold) {
+        super();
+        this.strength = strength !== void 0 ? strength : 1;
+        this.radius = radius;
+        this.threshold = threshold;
+        this.resolution = resolution !== void 0 ? new Vector2(resolution.x, resolution.y) : new Vector2(256, 256);
+        this.clearColor = new Color(0, 0, 0);
+        this.renderTargetsHorizontal = [];
+        this.renderTargetsVertical = [];
+        this.nMips = 5;
+        let resx = Math.round(this.resolution.x / 2);
+        let resy = Math.round(this.resolution.y / 2);
+        this.renderTargetBright = new WebGLRenderTarget(resx, resy, { type: HalfFloatType });
+        this.renderTargetBright.texture.name = "UnrealBloomPass.bright";
+        this.renderTargetBright.texture.generateMipmaps = false;
+        for (let i = 0; i < this.nMips; i++) {
+          const renderTargetHorizonal = new WebGLRenderTarget(resx, resy, { type: HalfFloatType });
+          renderTargetHorizonal.texture.name = "UnrealBloomPass.h" + i;
+          renderTargetHorizonal.texture.generateMipmaps = false;
+          this.renderTargetsHorizontal.push(renderTargetHorizonal);
+          const renderTargetVertical = new WebGLRenderTarget(resx, resy, { type: HalfFloatType });
+          renderTargetVertical.texture.name = "UnrealBloomPass.v" + i;
+          renderTargetVertical.texture.generateMipmaps = false;
+          this.renderTargetsVertical.push(renderTargetVertical);
+          resx = Math.round(resx / 2);
+          resy = Math.round(resy / 2);
+        }
+        const highPassShader = LuminosityHighPassShader;
+        this.highPassUniforms = UniformsUtils.clone(highPassShader.uniforms);
+        this.highPassUniforms["luminosityThreshold"].value = threshold;
+        this.highPassUniforms["smoothWidth"].value = 0.01;
+        this.materialHighPassFilter = new ShaderMaterial({
+          uniforms: this.highPassUniforms,
+          vertexShader: highPassShader.vertexShader,
+          fragmentShader: highPassShader.fragmentShader
+        });
+        this.separableBlurMaterials = [];
+        const kernelSizeArray = [3, 5, 7, 9, 11];
+        resx = Math.round(this.resolution.x / 2);
+        resy = Math.round(this.resolution.y / 2);
+        for (let i = 0; i < this.nMips; i++) {
+          this.separableBlurMaterials.push(this.getSeperableBlurMaterial(kernelSizeArray[i]));
+          this.separableBlurMaterials[i].uniforms["invSize"].value = new Vector2(1 / resx, 1 / resy);
+          resx = Math.round(resx / 2);
+          resy = Math.round(resy / 2);
+        }
+        this.compositeMaterial = this.getCompositeMaterial(this.nMips);
+        this.compositeMaterial.uniforms["blurTexture1"].value = this.renderTargetsVertical[0].texture;
+        this.compositeMaterial.uniforms["blurTexture2"].value = this.renderTargetsVertical[1].texture;
+        this.compositeMaterial.uniforms["blurTexture3"].value = this.renderTargetsVertical[2].texture;
+        this.compositeMaterial.uniforms["blurTexture4"].value = this.renderTargetsVertical[3].texture;
+        this.compositeMaterial.uniforms["blurTexture5"].value = this.renderTargetsVertical[4].texture;
+        this.compositeMaterial.uniforms["bloomStrength"].value = strength;
+        this.compositeMaterial.uniforms["bloomRadius"].value = 0.1;
+        const bloomFactors = [1, 0.8, 0.6, 0.4, 0.2];
+        this.compositeMaterial.uniforms["bloomFactors"].value = bloomFactors;
+        this.bloomTintColors = [new Vector3(1, 1, 1), new Vector3(1, 1, 1), new Vector3(1, 1, 1), new Vector3(1, 1, 1), new Vector3(1, 1, 1)];
+        this.compositeMaterial.uniforms["bloomTintColors"].value = this.bloomTintColors;
+        const copyShader = CopyShader;
+        this.copyUniforms = UniformsUtils.clone(copyShader.uniforms);
+        this.blendMaterial = new ShaderMaterial({
+          uniforms: this.copyUniforms,
+          vertexShader: copyShader.vertexShader,
+          fragmentShader: copyShader.fragmentShader,
+          blending: AdditiveBlending,
+          depthTest: false,
+          depthWrite: false,
+          transparent: true
+        });
+        this.enabled = true;
+        this.needsSwap = false;
+        this._oldClearColor = new Color();
+        this.oldClearAlpha = 1;
+        this.basic = new MeshBasicMaterial();
+        this.fsQuad = new FullScreenQuad(null);
+      }
+      dispose() {
+        for (let i = 0; i < this.renderTargetsHorizontal.length; i++) {
+          this.renderTargetsHorizontal[i].dispose();
+        }
+        for (let i = 0; i < this.renderTargetsVertical.length; i++) {
+          this.renderTargetsVertical[i].dispose();
+        }
+        this.renderTargetBright.dispose();
+        for (let i = 0; i < this.separableBlurMaterials.length; i++) {
+          this.separableBlurMaterials[i].dispose();
+        }
+        this.compositeMaterial.dispose();
+        this.blendMaterial.dispose();
+        this.basic.dispose();
+        this.fsQuad.dispose();
+      }
+      setSize(width, height) {
+        let resx = Math.round(width / 2);
+        let resy = Math.round(height / 2);
+        this.renderTargetBright.setSize(resx, resy);
+        for (let i = 0; i < this.nMips; i++) {
+          this.renderTargetsHorizontal[i].setSize(resx, resy);
+          this.renderTargetsVertical[i].setSize(resx, resy);
+          this.separableBlurMaterials[i].uniforms["invSize"].value = new Vector2(1 / resx, 1 / resy);
+          resx = Math.round(resx / 2);
+          resy = Math.round(resy / 2);
+        }
+      }
+      render(renderer, writeBuffer, readBuffer, deltaTime, maskActive) {
+        renderer.getClearColor(this._oldClearColor);
+        this.oldClearAlpha = renderer.getClearAlpha();
+        const oldAutoClear = renderer.autoClear;
+        renderer.autoClear = false;
+        renderer.setClearColor(this.clearColor, 0);
+        if (maskActive) renderer.state.buffers.stencil.setTest(false);
+        if (this.renderToScreen) {
+          this.fsQuad.material = this.basic;
+          this.basic.map = readBuffer.texture;
+          renderer.setRenderTarget(null);
+          renderer.clear();
+          this.fsQuad.render(renderer);
+        }
+        this.highPassUniforms["tDiffuse"].value = readBuffer.texture;
+        this.highPassUniforms["luminosityThreshold"].value = this.threshold;
+        this.fsQuad.material = this.materialHighPassFilter;
+        renderer.setRenderTarget(this.renderTargetBright);
+        renderer.clear();
+        this.fsQuad.render(renderer);
+        let inputRenderTarget = this.renderTargetBright;
+        for (let i = 0; i < this.nMips; i++) {
+          this.fsQuad.material = this.separableBlurMaterials[i];
+          this.separableBlurMaterials[i].uniforms["colorTexture"].value = inputRenderTarget.texture;
+          this.separableBlurMaterials[i].uniforms["direction"].value = _UnrealBloomPass.BlurDirectionX;
+          renderer.setRenderTarget(this.renderTargetsHorizontal[i]);
+          renderer.clear();
+          this.fsQuad.render(renderer);
+          this.separableBlurMaterials[i].uniforms["colorTexture"].value = this.renderTargetsHorizontal[i].texture;
+          this.separableBlurMaterials[i].uniforms["direction"].value = _UnrealBloomPass.BlurDirectionY;
+          renderer.setRenderTarget(this.renderTargetsVertical[i]);
+          renderer.clear();
+          this.fsQuad.render(renderer);
+          inputRenderTarget = this.renderTargetsVertical[i];
+        }
+        this.fsQuad.material = this.compositeMaterial;
+        this.compositeMaterial.uniforms["bloomStrength"].value = this.strength;
+        this.compositeMaterial.uniforms["bloomRadius"].value = this.radius;
+        this.compositeMaterial.uniforms["bloomTintColors"].value = this.bloomTintColors;
+        renderer.setRenderTarget(this.renderTargetsHorizontal[0]);
+        renderer.clear();
+        this.fsQuad.render(renderer);
+        this.fsQuad.material = this.blendMaterial;
+        this.copyUniforms["tDiffuse"].value = this.renderTargetsHorizontal[0].texture;
+        if (maskActive) renderer.state.buffers.stencil.setTest(true);
+        if (this.renderToScreen) {
+          renderer.setRenderTarget(null);
+          this.fsQuad.render(renderer);
+        } else {
+          renderer.setRenderTarget(readBuffer);
+          this.fsQuad.render(renderer);
+        }
+        renderer.setClearColor(this._oldClearColor, this.oldClearAlpha);
+        renderer.autoClear = oldAutoClear;
+      }
+      getSeperableBlurMaterial(kernelRadius) {
+        const coefficients = [];
+        for (let i = 0; i < kernelRadius; i++) {
+          coefficients.push(0.39894 * Math.exp(-0.5 * i * i / (kernelRadius * kernelRadius)) / kernelRadius);
+        }
+        return new ShaderMaterial({
+          defines: {
+            "KERNEL_RADIUS": kernelRadius
+          },
+          uniforms: {
+            "colorTexture": { value: null },
+            "invSize": { value: new Vector2(0.5, 0.5) },
+            // inverse texture size
+            "direction": { value: new Vector2(0.5, 0.5) },
+            "gaussianCoefficients": { value: coefficients }
+            // precomputed Gaussian coefficients
+          },
+          vertexShader: `varying vec2 vUv;
+				void main() {
+					vUv = uv;
+					gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+				}`,
+          fragmentShader: `#include <common>
+				varying vec2 vUv;
+				uniform sampler2D colorTexture;
+				uniform vec2 invSize;
+				uniform vec2 direction;
+				uniform float gaussianCoefficients[KERNEL_RADIUS];
+
+				void main() {
+					float weightSum = gaussianCoefficients[0];
+					vec3 diffuseSum = texture2D( colorTexture, vUv ).rgb * weightSum;
+					for( int i = 1; i < KERNEL_RADIUS; i ++ ) {
+						float x = float(i);
+						float w = gaussianCoefficients[i];
+						vec2 uvOffset = direction * invSize * x;
+						vec3 sample1 = texture2D( colorTexture, vUv + uvOffset ).rgb;
+						vec3 sample2 = texture2D( colorTexture, vUv - uvOffset ).rgb;
+						diffuseSum += (sample1 + sample2) * w;
+						weightSum += 2.0 * w;
+					}
+					gl_FragColor = vec4(diffuseSum/weightSum, 1.0);
+				}`
+        });
+      }
+      getCompositeMaterial(nMips) {
+        return new ShaderMaterial({
+          defines: {
+            "NUM_MIPS": nMips
+          },
+          uniforms: {
+            "blurTexture1": { value: null },
+            "blurTexture2": { value: null },
+            "blurTexture3": { value: null },
+            "blurTexture4": { value: null },
+            "blurTexture5": { value: null },
+            "bloomStrength": { value: 1 },
+            "bloomFactors": { value: null },
+            "bloomTintColors": { value: null },
+            "bloomRadius": { value: 0 }
+          },
+          vertexShader: `varying vec2 vUv;
+				void main() {
+					vUv = uv;
+					gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+				}`,
+          fragmentShader: `varying vec2 vUv;
+				uniform sampler2D blurTexture1;
+				uniform sampler2D blurTexture2;
+				uniform sampler2D blurTexture3;
+				uniform sampler2D blurTexture4;
+				uniform sampler2D blurTexture5;
+				uniform float bloomStrength;
+				uniform float bloomRadius;
+				uniform float bloomFactors[NUM_MIPS];
+				uniform vec3 bloomTintColors[NUM_MIPS];
+
+				float lerpBloomFactor(const in float factor) {
+					float mirrorFactor = 1.2 - factor;
+					return mix(factor, mirrorFactor, bloomRadius);
+				}
+
+				void main() {
+					gl_FragColor = bloomStrength * ( lerpBloomFactor(bloomFactors[0]) * vec4(bloomTintColors[0], 1.0) * texture2D(blurTexture1, vUv) +
+						lerpBloomFactor(bloomFactors[1]) * vec4(bloomTintColors[1], 1.0) * texture2D(blurTexture2, vUv) +
+						lerpBloomFactor(bloomFactors[2]) * vec4(bloomTintColors[2], 1.0) * texture2D(blurTexture3, vUv) +
+						lerpBloomFactor(bloomFactors[3]) * vec4(bloomTintColors[3], 1.0) * texture2D(blurTexture4, vUv) +
+						lerpBloomFactor(bloomFactors[4]) * vec4(bloomTintColors[4], 1.0) * texture2D(blurTexture5, vUv) );
+				}`
+        });
+      }
+    };
+    UnrealBloomPass.BlurDirectionX = new Vector2(1, 0);
+    UnrealBloomPass.BlurDirectionY = new Vector2(0, 1);
+  }
+});
+
+// vendor/three/addons/shaders/SMAAShader.js
+var SMAAEdgesShader, SMAAWeightsShader, SMAABlendShader;
+var init_SMAAShader = __esm({
+  "vendor/three/addons/shaders/SMAAShader.js"() {
+    init_three_module();
+    SMAAEdgesShader = {
+      name: "SMAAEdgesShader",
+      defines: {
+        "SMAA_THRESHOLD": "0.1"
+      },
+      uniforms: {
+        "tDiffuse": { value: null },
+        "resolution": { value: new Vector2(1 / 1024, 1 / 512) }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+
+		uniform vec2 resolution;
+
+		varying vec2 vUv;
+		varying vec4 vOffset[ 3 ];
+
+		void SMAAEdgeDetectionVS( vec2 texcoord ) {
+			vOffset[ 0 ] = texcoord.xyxy + resolution.xyxy * vec4( -1.0, 0.0, 0.0,  1.0 ); // WebGL port note: Changed sign in W component
+			vOffset[ 1 ] = texcoord.xyxy + resolution.xyxy * vec4(  1.0, 0.0, 0.0, -1.0 ); // WebGL port note: Changed sign in W component
+			vOffset[ 2 ] = texcoord.xyxy + resolution.xyxy * vec4( -2.0, 0.0, 0.0,  2.0 ); // WebGL port note: Changed sign in W component
+		}
+
+		void main() {
+
+			vUv = uv;
+
+			SMAAEdgeDetectionVS( vUv );
+
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+
+		uniform sampler2D tDiffuse;
+
+		varying vec2 vUv;
+		varying vec4 vOffset[ 3 ];
+
+		vec4 SMAAColorEdgeDetectionPS( vec2 texcoord, vec4 offset[3], sampler2D colorTex ) {
+			vec2 threshold = vec2( SMAA_THRESHOLD, SMAA_THRESHOLD );
+
+			// Calculate color deltas:
+			vec4 delta;
+			vec3 C = texture2D( colorTex, texcoord ).rgb;
+
+			vec3 Cleft = texture2D( colorTex, offset[0].xy ).rgb;
+			vec3 t = abs( C - Cleft );
+			delta.x = max( max( t.r, t.g ), t.b );
+
+			vec3 Ctop = texture2D( colorTex, offset[0].zw ).rgb;
+			t = abs( C - Ctop );
+			delta.y = max( max( t.r, t.g ), t.b );
+
+			// We do the usual threshold:
+			vec2 edges = step( threshold, delta.xy );
+
+			// Then discard if there is no edge:
+			if ( dot( edges, vec2( 1.0, 1.0 ) ) == 0.0 )
+				discard;
+
+			// Calculate right and bottom deltas:
+			vec3 Cright = texture2D( colorTex, offset[1].xy ).rgb;
+			t = abs( C - Cright );
+			delta.z = max( max( t.r, t.g ), t.b );
+
+			vec3 Cbottom  = texture2D( colorTex, offset[1].zw ).rgb;
+			t = abs( C - Cbottom );
+			delta.w = max( max( t.r, t.g ), t.b );
+
+			// Calculate the maximum delta in the direct neighborhood:
+			float maxDelta = max( max( max( delta.x, delta.y ), delta.z ), delta.w );
+
+			// Calculate left-left and top-top deltas:
+			vec3 Cleftleft  = texture2D( colorTex, offset[2].xy ).rgb;
+			t = abs( C - Cleftleft );
+			delta.z = max( max( t.r, t.g ), t.b );
+
+			vec3 Ctoptop = texture2D( colorTex, offset[2].zw ).rgb;
+			t = abs( C - Ctoptop );
+			delta.w = max( max( t.r, t.g ), t.b );
+
+			// Calculate the final maximum delta:
+			maxDelta = max( max( maxDelta, delta.z ), delta.w );
+
+			// Local contrast adaptation in action:
+			edges.xy *= step( 0.5 * maxDelta, delta.xy );
+
+			return vec4( edges, 0.0, 0.0 );
+		}
+
+		void main() {
+
+			gl_FragColor = SMAAColorEdgeDetectionPS( vUv, vOffset, tDiffuse );
+
+		}`
+      )
+    };
+    SMAAWeightsShader = {
+      name: "SMAAWeightsShader",
+      defines: {
+        "SMAA_MAX_SEARCH_STEPS": "8",
+        "SMAA_AREATEX_MAX_DISTANCE": "16",
+        "SMAA_AREATEX_PIXEL_SIZE": "( 1.0 / vec2( 160.0, 560.0 ) )",
+        "SMAA_AREATEX_SUBTEX_SIZE": "( 1.0 / 7.0 )"
+      },
+      uniforms: {
+        "tDiffuse": { value: null },
+        "tArea": { value: null },
+        "tSearch": { value: null },
+        "resolution": { value: new Vector2(1 / 1024, 1 / 512) }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+
+		uniform vec2 resolution;
+
+		varying vec2 vUv;
+		varying vec4 vOffset[ 3 ];
+		varying vec2 vPixcoord;
+
+		void SMAABlendingWeightCalculationVS( vec2 texcoord ) {
+			vPixcoord = texcoord / resolution;
+
+			// We will use these offsets for the searches later on (see @PSEUDO_GATHER4):
+			vOffset[ 0 ] = texcoord.xyxy + resolution.xyxy * vec4( -0.25, 0.125, 1.25, 0.125 ); // WebGL port note: Changed sign in Y and W components
+			vOffset[ 1 ] = texcoord.xyxy + resolution.xyxy * vec4( -0.125, 0.25, -0.125, -1.25 ); // WebGL port note: Changed sign in Y and W components
+
+			// And these for the searches, they indicate the ends of the loops:
+			vOffset[ 2 ] = vec4( vOffset[ 0 ].xz, vOffset[ 1 ].yw ) + vec4( -2.0, 2.0, -2.0, 2.0 ) * resolution.xxyy * float( SMAA_MAX_SEARCH_STEPS );
+
+		}
+
+		void main() {
+
+			vUv = uv;
+
+			SMAABlendingWeightCalculationVS( vUv );
+
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+
+		#define SMAASampleLevelZeroOffset( tex, coord, offset ) texture2D( tex, coord + float( offset ) * resolution, 0.0 )
+
+		uniform sampler2D tDiffuse;
+		uniform sampler2D tArea;
+		uniform sampler2D tSearch;
+		uniform vec2 resolution;
+
+		varying vec2 vUv;
+		varying vec4 vOffset[3];
+		varying vec2 vPixcoord;
+
+		#if __VERSION__ == 100
+		vec2 round( vec2 x ) {
+			return sign( x ) * floor( abs( x ) + 0.5 );
+		}
+		#endif
+
+		float SMAASearchLength( sampler2D searchTex, vec2 e, float bias, float scale ) {
+			// Not required if searchTex accesses are set to point:
+			// float2 SEARCH_TEX_PIXEL_SIZE = 1.0 / float2(66.0, 33.0);
+			// e = float2(bias, 0.0) + 0.5 * SEARCH_TEX_PIXEL_SIZE +
+			//     e * float2(scale, 1.0) * float2(64.0, 32.0) * SEARCH_TEX_PIXEL_SIZE;
+			e.r = bias + e.r * scale;
+			return 255.0 * texture2D( searchTex, e, 0.0 ).r;
+		}
+
+		float SMAASearchXLeft( sampler2D edgesTex, sampler2D searchTex, vec2 texcoord, float end ) {
+			/**
+				* @PSEUDO_GATHER4
+				* This texcoord has been offset by (-0.25, -0.125) in the vertex shader to
+				* sample between edge, thus fetching four edges in a row.
+				* Sampling with different offsets in each direction allows to disambiguate
+				* which edges are active from the four fetched ones.
+				*/
+			vec2 e = vec2( 0.0, 1.0 );
+
+			for ( int i = 0; i < SMAA_MAX_SEARCH_STEPS; i ++ ) { // WebGL port note: Changed while to for
+				e = texture2D( edgesTex, texcoord, 0.0 ).rg;
+				texcoord -= vec2( 2.0, 0.0 ) * resolution;
+				if ( ! ( texcoord.x > end && e.g > 0.8281 && e.r == 0.0 ) ) break;
+			}
+
+			// We correct the previous (-0.25, -0.125) offset we applied:
+			texcoord.x += 0.25 * resolution.x;
+
+			// The searches are bias by 1, so adjust the coords accordingly:
+			texcoord.x += resolution.x;
+
+			// Disambiguate the length added by the last step:
+			texcoord.x += 2.0 * resolution.x; // Undo last step
+			texcoord.x -= resolution.x * SMAASearchLength(searchTex, e, 0.0, 0.5);
+
+			return texcoord.x;
+		}
+
+		float SMAASearchXRight( sampler2D edgesTex, sampler2D searchTex, vec2 texcoord, float end ) {
+			vec2 e = vec2( 0.0, 1.0 );
+
+			for ( int i = 0; i < SMAA_MAX_SEARCH_STEPS; i ++ ) { // WebGL port note: Changed while to for
+				e = texture2D( edgesTex, texcoord, 0.0 ).rg;
+				texcoord += vec2( 2.0, 0.0 ) * resolution;
+				if ( ! ( texcoord.x < end && e.g > 0.8281 && e.r == 0.0 ) ) break;
+			}
+
+			texcoord.x -= 0.25 * resolution.x;
+			texcoord.x -= resolution.x;
+			texcoord.x -= 2.0 * resolution.x;
+			texcoord.x += resolution.x * SMAASearchLength( searchTex, e, 0.5, 0.5 );
+
+			return texcoord.x;
+		}
+
+		float SMAASearchYUp( sampler2D edgesTex, sampler2D searchTex, vec2 texcoord, float end ) {
+			vec2 e = vec2( 1.0, 0.0 );
+
+			for ( int i = 0; i < SMAA_MAX_SEARCH_STEPS; i ++ ) { // WebGL port note: Changed while to for
+				e = texture2D( edgesTex, texcoord, 0.0 ).rg;
+				texcoord += vec2( 0.0, 2.0 ) * resolution; // WebGL port note: Changed sign
+				if ( ! ( texcoord.y > end && e.r > 0.8281 && e.g == 0.0 ) ) break;
+			}
+
+			texcoord.y -= 0.25 * resolution.y; // WebGL port note: Changed sign
+			texcoord.y -= resolution.y; // WebGL port note: Changed sign
+			texcoord.y -= 2.0 * resolution.y; // WebGL port note: Changed sign
+			texcoord.y += resolution.y * SMAASearchLength( searchTex, e.gr, 0.0, 0.5 ); // WebGL port note: Changed sign
+
+			return texcoord.y;
+		}
+
+		float SMAASearchYDown( sampler2D edgesTex, sampler2D searchTex, vec2 texcoord, float end ) {
+			vec2 e = vec2( 1.0, 0.0 );
+
+			for ( int i = 0; i < SMAA_MAX_SEARCH_STEPS; i ++ ) { // WebGL port note: Changed while to for
+				e = texture2D( edgesTex, texcoord, 0.0 ).rg;
+				texcoord -= vec2( 0.0, 2.0 ) * resolution; // WebGL port note: Changed sign
+				if ( ! ( texcoord.y < end && e.r > 0.8281 && e.g == 0.0 ) ) break;
+			}
+
+			texcoord.y += 0.25 * resolution.y; // WebGL port note: Changed sign
+			texcoord.y += resolution.y; // WebGL port note: Changed sign
+			texcoord.y += 2.0 * resolution.y; // WebGL port note: Changed sign
+			texcoord.y -= resolution.y * SMAASearchLength( searchTex, e.gr, 0.5, 0.5 ); // WebGL port note: Changed sign
+
+			return texcoord.y;
+		}
+
+		vec2 SMAAArea( sampler2D areaTex, vec2 dist, float e1, float e2, float offset ) {
+			// Rounding prevents precision errors of bilinear filtering:
+			vec2 texcoord = float( SMAA_AREATEX_MAX_DISTANCE ) * round( 4.0 * vec2( e1, e2 ) ) + dist;
+
+			// We do a scale and bias for mapping to texel space:
+			texcoord = SMAA_AREATEX_PIXEL_SIZE * texcoord + ( 0.5 * SMAA_AREATEX_PIXEL_SIZE );
+
+			// Move to proper place, according to the subpixel offset:
+			texcoord.y += SMAA_AREATEX_SUBTEX_SIZE * offset;
+
+			return texture2D( areaTex, texcoord, 0.0 ).rg;
+		}
+
+		vec4 SMAABlendingWeightCalculationPS( vec2 texcoord, vec2 pixcoord, vec4 offset[ 3 ], sampler2D edgesTex, sampler2D areaTex, sampler2D searchTex, ivec4 subsampleIndices ) {
+			vec4 weights = vec4( 0.0, 0.0, 0.0, 0.0 );
+
+			vec2 e = texture2D( edgesTex, texcoord ).rg;
+
+			if ( e.g > 0.0 ) { // Edge at north
+				vec2 d;
+
+				// Find the distance to the left:
+				vec2 coords;
+				coords.x = SMAASearchXLeft( edgesTex, searchTex, offset[ 0 ].xy, offset[ 2 ].x );
+				coords.y = offset[ 1 ].y; // offset[1].y = texcoord.y - 0.25 * resolution.y (@CROSSING_OFFSET)
+				d.x = coords.x;
+
+				// Now fetch the left crossing edges, two at a time using bilinear
+				// filtering. Sampling at -0.25 (see @CROSSING_OFFSET) enables to
+				// discern what value each edge has:
+				float e1 = texture2D( edgesTex, coords, 0.0 ).r;
+
+				// Find the distance to the right:
+				coords.x = SMAASearchXRight( edgesTex, searchTex, offset[ 0 ].zw, offset[ 2 ].y );
+				d.y = coords.x;
+
+				// We want the distances to be in pixel units (doing this here allow to
+				// better interleave arithmetic and memory accesses):
+				d = d / resolution.x - pixcoord.x;
+
+				// SMAAArea below needs a sqrt, as the areas texture is compressed
+				// quadratically:
+				vec2 sqrt_d = sqrt( abs( d ) );
+
+				// Fetch the right crossing edges:
+				coords.y -= 1.0 * resolution.y; // WebGL port note: Added
+				float e2 = SMAASampleLevelZeroOffset( edgesTex, coords, ivec2( 1, 0 ) ).r;
+
+				// Ok, we know how this pattern looks like, now it is time for getting
+				// the actual area:
+				weights.rg = SMAAArea( areaTex, sqrt_d, e1, e2, float( subsampleIndices.y ) );
+			}
+
+			if ( e.r > 0.0 ) { // Edge at west
+				vec2 d;
+
+				// Find the distance to the top:
+				vec2 coords;
+
+				coords.y = SMAASearchYUp( edgesTex, searchTex, offset[ 1 ].xy, offset[ 2 ].z );
+				coords.x = offset[ 0 ].x; // offset[1].x = texcoord.x - 0.25 * resolution.x;
+				d.x = coords.y;
+
+				// Fetch the top crossing edges:
+				float e1 = texture2D( edgesTex, coords, 0.0 ).g;
+
+				// Find the distance to the bottom:
+				coords.y = SMAASearchYDown( edgesTex, searchTex, offset[ 1 ].zw, offset[ 2 ].w );
+				d.y = coords.y;
+
+				// We want the distances to be in pixel units:
+				d = d / resolution.y - pixcoord.y;
+
+				// SMAAArea below needs a sqrt, as the areas texture is compressed
+				// quadratically:
+				vec2 sqrt_d = sqrt( abs( d ) );
+
+				// Fetch the bottom crossing edges:
+				coords.y -= 1.0 * resolution.y; // WebGL port note: Added
+				float e2 = SMAASampleLevelZeroOffset( edgesTex, coords, ivec2( 0, 1 ) ).g;
+
+				// Get the area for this direction:
+				weights.ba = SMAAArea( areaTex, sqrt_d, e1, e2, float( subsampleIndices.x ) );
+			}
+
+			return weights;
+		}
+
+		void main() {
+
+			gl_FragColor = SMAABlendingWeightCalculationPS( vUv, vPixcoord, vOffset, tDiffuse, tArea, tSearch, ivec4( 0.0 ) );
+
+		}`
+      )
+    };
+    SMAABlendShader = {
+      name: "SMAABlendShader",
+      uniforms: {
+        "tDiffuse": { value: null },
+        "tColor": { value: null },
+        "resolution": { value: new Vector2(1 / 1024, 1 / 512) }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+
+		uniform vec2 resolution;
+
+		varying vec2 vUv;
+		varying vec4 vOffset[ 2 ];
+
+		void SMAANeighborhoodBlendingVS( vec2 texcoord ) {
+			vOffset[ 0 ] = texcoord.xyxy + resolution.xyxy * vec4( -1.0, 0.0, 0.0, 1.0 ); // WebGL port note: Changed sign in W component
+			vOffset[ 1 ] = texcoord.xyxy + resolution.xyxy * vec4( 1.0, 0.0, 0.0, -1.0 ); // WebGL port note: Changed sign in W component
+		}
+
+		void main() {
+
+			vUv = uv;
+
+			SMAANeighborhoodBlendingVS( vUv );
+
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+
+		uniform sampler2D tDiffuse;
+		uniform sampler2D tColor;
+		uniform vec2 resolution;
+
+		varying vec2 vUv;
+		varying vec4 vOffset[ 2 ];
+
+		vec4 SMAANeighborhoodBlendingPS( vec2 texcoord, vec4 offset[ 2 ], sampler2D colorTex, sampler2D blendTex ) {
+			// Fetch the blending weights for current pixel:
+			vec4 a;
+			a.xz = texture2D( blendTex, texcoord ).xz;
+			a.y = texture2D( blendTex, offset[ 1 ].zw ).g;
+			a.w = texture2D( blendTex, offset[ 1 ].xy ).a;
+
+			// Is there any blending weight with a value greater than 0.0?
+			if ( dot(a, vec4( 1.0, 1.0, 1.0, 1.0 )) < 1e-5 ) {
+				return texture2D( colorTex, texcoord, 0.0 );
+			} else {
+				// Up to 4 lines can be crossing a pixel (one through each edge). We
+				// favor blending by choosing the line with the maximum weight for each
+				// direction:
+				vec2 offset;
+				offset.x = a.a > a.b ? a.a : -a.b; // left vs. right
+				offset.y = a.g > a.r ? -a.g : a.r; // top vs. bottom // WebGL port note: Changed signs
+
+				// Then we go in the direction that has the maximum weight:
+				if ( abs( offset.x ) > abs( offset.y )) { // horizontal vs. vertical
+					offset.y = 0.0;
+				} else {
+					offset.x = 0.0;
+				}
+
+				// Fetch the opposite color and lerp by hand:
+				vec4 C = texture2D( colorTex, texcoord, 0.0 );
+				texcoord += sign( offset ) * resolution;
+				vec4 Cop = texture2D( colorTex, texcoord, 0.0 );
+				float s = abs( offset.x ) > abs( offset.y ) ? abs( offset.x ) : abs( offset.y );
+
+				// WebGL port note: Added gamma correction
+				C.xyz = pow(C.xyz, vec3(2.2));
+				Cop.xyz = pow(Cop.xyz, vec3(2.2));
+				vec4 mixed = mix(C, Cop, s);
+				mixed.xyz = pow(mixed.xyz, vec3(1.0 / 2.2));
+
+				return mixed;
+			}
+		}
+
+		void main() {
+
+			gl_FragColor = SMAANeighborhoodBlendingPS( vUv, vOffset, tColor, tDiffuse );
+
+		}`
+      )
+    };
+  }
+});
+
+// vendor/three/addons/postprocessing/SMAAPass.js
+var SMAAPass;
+var init_SMAAPass = __esm({
+  "vendor/three/addons/postprocessing/SMAAPass.js"() {
+    init_three_module();
+    init_Pass();
+    init_SMAAShader();
+    init_SMAAShader();
+    init_SMAAShader();
+    SMAAPass = class extends Pass {
+      constructor(width, height) {
+        super();
+        this.edgesRT = new WebGLRenderTarget(width, height, {
+          depthBuffer: false,
+          type: HalfFloatType
+        });
+        this.edgesRT.texture.name = "SMAAPass.edges";
+        this.weightsRT = new WebGLRenderTarget(width, height, {
+          depthBuffer: false,
+          type: HalfFloatType
+        });
+        this.weightsRT.texture.name = "SMAAPass.weights";
+        const scope = this;
+        const areaTextureImage = new Image();
+        areaTextureImage.src = this.getAreaTexture();
+        areaTextureImage.onload = function() {
+          scope.areaTexture.needsUpdate = true;
+        };
+        this.areaTexture = new Texture();
+        this.areaTexture.name = "SMAAPass.area";
+        this.areaTexture.image = areaTextureImage;
+        this.areaTexture.minFilter = LinearFilter;
+        this.areaTexture.generateMipmaps = false;
+        this.areaTexture.flipY = false;
+        const searchTextureImage = new Image();
+        searchTextureImage.src = this.getSearchTexture();
+        searchTextureImage.onload = function() {
+          scope.searchTexture.needsUpdate = true;
+        };
+        this.searchTexture = new Texture();
+        this.searchTexture.name = "SMAAPass.search";
+        this.searchTexture.image = searchTextureImage;
+        this.searchTexture.magFilter = NearestFilter;
+        this.searchTexture.minFilter = NearestFilter;
+        this.searchTexture.generateMipmaps = false;
+        this.searchTexture.flipY = false;
+        this.uniformsEdges = UniformsUtils.clone(SMAAEdgesShader.uniforms);
+        this.uniformsEdges["resolution"].value.set(1 / width, 1 / height);
+        this.materialEdges = new ShaderMaterial({
+          defines: Object.assign({}, SMAAEdgesShader.defines),
+          uniforms: this.uniformsEdges,
+          vertexShader: SMAAEdgesShader.vertexShader,
+          fragmentShader: SMAAEdgesShader.fragmentShader
+        });
+        this.uniformsWeights = UniformsUtils.clone(SMAAWeightsShader.uniforms);
+        this.uniformsWeights["resolution"].value.set(1 / width, 1 / height);
+        this.uniformsWeights["tDiffuse"].value = this.edgesRT.texture;
+        this.uniformsWeights["tArea"].value = this.areaTexture;
+        this.uniformsWeights["tSearch"].value = this.searchTexture;
+        this.materialWeights = new ShaderMaterial({
+          defines: Object.assign({}, SMAAWeightsShader.defines),
+          uniforms: this.uniformsWeights,
+          vertexShader: SMAAWeightsShader.vertexShader,
+          fragmentShader: SMAAWeightsShader.fragmentShader
+        });
+        this.uniformsBlend = UniformsUtils.clone(SMAABlendShader.uniforms);
+        this.uniformsBlend["resolution"].value.set(1 / width, 1 / height);
+        this.uniformsBlend["tDiffuse"].value = this.weightsRT.texture;
+        this.materialBlend = new ShaderMaterial({
+          uniforms: this.uniformsBlend,
+          vertexShader: SMAABlendShader.vertexShader,
+          fragmentShader: SMAABlendShader.fragmentShader
+        });
+        this.fsQuad = new FullScreenQuad(null);
+      }
+      render(renderer, writeBuffer, readBuffer) {
+        this.uniformsEdges["tDiffuse"].value = readBuffer.texture;
+        this.fsQuad.material = this.materialEdges;
+        renderer.setRenderTarget(this.edgesRT);
+        if (this.clear) renderer.clear();
+        this.fsQuad.render(renderer);
+        this.fsQuad.material = this.materialWeights;
+        renderer.setRenderTarget(this.weightsRT);
+        if (this.clear) renderer.clear();
+        this.fsQuad.render(renderer);
+        this.uniformsBlend["tColor"].value = readBuffer.texture;
+        this.fsQuad.material = this.materialBlend;
+        if (this.renderToScreen) {
+          renderer.setRenderTarget(null);
+          this.fsQuad.render(renderer);
+        } else {
+          renderer.setRenderTarget(writeBuffer);
+          if (this.clear) renderer.clear();
+          this.fsQuad.render(renderer);
+        }
+      }
+      setSize(width, height) {
+        this.edgesRT.setSize(width, height);
+        this.weightsRT.setSize(width, height);
+        this.materialEdges.uniforms["resolution"].value.set(1 / width, 1 / height);
+        this.materialWeights.uniforms["resolution"].value.set(1 / width, 1 / height);
+        this.materialBlend.uniforms["resolution"].value.set(1 / width, 1 / height);
+      }
+      getAreaTexture() {
+        return "data:image/png;base64,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";
+      }
+      getSearchTexture() {
+        return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEIAAAAhCAAAAABIXyLAAAAAOElEQVRIx2NgGAWjYBSMglEwEICREYRgFBZBqDCSLA2MGPUIVQETE9iNUAqLR5gIeoQKRgwXjwAAGn4AtaFeYLEAAAAASUVORK5CYII=";
+      }
+      dispose() {
+        this.edgesRT.dispose();
+        this.weightsRT.dispose();
+        this.areaTexture.dispose();
+        this.searchTexture.dispose();
+        this.materialEdges.dispose();
+        this.materialWeights.dispose();
+        this.materialBlend.dispose();
+        this.fsQuad.dispose();
+      }
+    };
+  }
+});
+
+// vendor/three/addons/shaders/FXAAShader.js
+var FXAAShader;
+var init_FXAAShader = __esm({
+  "vendor/three/addons/shaders/FXAAShader.js"() {
+    init_three_module();
+    FXAAShader = {
+      name: "FXAAShader",
+      uniforms: {
+        "tDiffuse": { value: null },
+        "resolution": { value: new Vector2(1 / 1024, 1 / 512) }
+      },
+      vertexShader: (
+        /* glsl */
+        `
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`
+      ),
+      fragmentShader: (
+        /* glsl */
+        `
+		precision highp float;
+
+		uniform sampler2D tDiffuse;
+
+		uniform vec2 resolution;
+
+		varying vec2 vUv;
+
+		// FXAA 3.11 implementation by NVIDIA, ported to WebGL by Agost Biro (biro@archilogic.com)
+
+		//----------------------------------------------------------------------------------
+		// File:        es3-keplerFXAAassetsshaders/FXAA_DefaultES.frag
+		// SDK Version: v3.00
+		// Email:       gameworks@nvidia.com
+		// Site:        http://developer.nvidia.com/
+		//
+		// Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+		//
+		// Redistribution and use in source and binary forms, with or without
+		// modification, are permitted provided that the following conditions
+		// are met:
+		//  * Redistributions of source code must retain the above copyright
+		//    notice, this list of conditions and the following disclaimer.
+		//  * Redistributions in binary form must reproduce the above copyright
+		//    notice, this list of conditions and the following disclaimer in the
+		//    documentation and/or other materials provided with the distribution.
+		//  * Neither the name of NVIDIA CORPORATION nor the names of its
+		//    contributors may be used to endorse or promote products derived
+		//    from this software without specific prior written permission.
+		//
+		// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ''AS IS'' AND ANY
+		// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+		// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+		// PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+		// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+		// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+		// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+		// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+		// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+		// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+		// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+		//
+		//----------------------------------------------------------------------------------
+
+		#ifndef FXAA_DISCARD
+			//
+			// Only valid for PC OpenGL currently.
+			// Probably will not work when FXAA_GREEN_AS_LUMA = 1.
+			//
+			// 1 = Use discard on pixels which don't need AA.
+			//     For APIs which enable concurrent TEX+ROP from same surface.
+			// 0 = Return unchanged color on pixels which don't need AA.
+			//
+			#define FXAA_DISCARD 0
+		#endif
+
+		/*--------------------------------------------------------------------------*/
+		#define FxaaTexTop(t, p) texture2D(t, p, -100.0)
+		#define FxaaTexOff(t, p, o, r) texture2D(t, p + (o * r), -100.0)
+		/*--------------------------------------------------------------------------*/
+
+		#define NUM_SAMPLES 5
+
+		// assumes colors have premultipliedAlpha, so that the calculated color contrast is scaled by alpha
+		float contrast( vec4 a, vec4 b ) {
+			vec4 diff = abs( a - b );
+			return max( max( max( diff.r, diff.g ), diff.b ), diff.a );
+		}
+
+		/*============================================================================
+
+									FXAA3 QUALITY - PC
+
+		============================================================================*/
+
+		/*--------------------------------------------------------------------------*/
+		vec4 FxaaPixelShader(
+			vec2 posM,
+			sampler2D tex,
+			vec2 fxaaQualityRcpFrame,
+			float fxaaQualityEdgeThreshold,
+			float fxaaQualityinvEdgeThreshold
+		) {
+			vec4 rgbaM = FxaaTexTop(tex, posM);
+			vec4 rgbaS = FxaaTexOff(tex, posM, vec2( 0.0, 1.0), fxaaQualityRcpFrame.xy);
+			vec4 rgbaE = FxaaTexOff(tex, posM, vec2( 1.0, 0.0), fxaaQualityRcpFrame.xy);
+			vec4 rgbaN = FxaaTexOff(tex, posM, vec2( 0.0,-1.0), fxaaQualityRcpFrame.xy);
+			vec4 rgbaW = FxaaTexOff(tex, posM, vec2(-1.0, 0.0), fxaaQualityRcpFrame.xy);
+			// . S .
+			// W M E
+			// . N .
+
+			bool earlyExit = max( max( max(
+					contrast( rgbaM, rgbaN ),
+					contrast( rgbaM, rgbaS ) ),
+					contrast( rgbaM, rgbaE ) ),
+					contrast( rgbaM, rgbaW ) )
+					< fxaaQualityEdgeThreshold;
+			// . 0 .
+			// 0 0 0
+			// . 0 .
+
+			#if (FXAA_DISCARD == 1)
+				if(earlyExit) FxaaDiscard;
+			#else
+				if(earlyExit) return rgbaM;
+			#endif
+
+			float contrastN = contrast( rgbaM, rgbaN );
+			float contrastS = contrast( rgbaM, rgbaS );
+			float contrastE = contrast( rgbaM, rgbaE );
+			float contrastW = contrast( rgbaM, rgbaW );
+
+			float relativeVContrast = ( contrastN + contrastS ) - ( contrastE + contrastW );
+			relativeVContrast *= fxaaQualityinvEdgeThreshold;
+
+			bool horzSpan = relativeVContrast > 0.;
+			// . 1 .
+			// 0 0 0
+			// . 1 .
+
+			// 45 deg edge detection and corners of objects, aka V/H contrast is too similar
+			if( abs( relativeVContrast ) < .3 ) {
+				// locate the edge
+				vec2 dirToEdge;
+				dirToEdge.x = contrastE > contrastW ? 1. : -1.;
+				dirToEdge.y = contrastS > contrastN ? 1. : -1.;
+				// . 2 .      . 1 .
+				// 1 0 2  ~=  0 0 1
+				// . 1 .      . 0 .
+
+				// tap 2 pixels and see which ones are "outside" the edge, to
+				// determine if the edge is vertical or horizontal
+
+				vec4 rgbaAlongH = FxaaTexOff(tex, posM, vec2( dirToEdge.x, -dirToEdge.y ), fxaaQualityRcpFrame.xy);
+				float matchAlongH = contrast( rgbaM, rgbaAlongH );
+				// . 1 .
+				// 0 0 1
+				// . 0 H
+
+				vec4 rgbaAlongV = FxaaTexOff(tex, posM, vec2( -dirToEdge.x, dirToEdge.y ), fxaaQualityRcpFrame.xy);
+				float matchAlongV = contrast( rgbaM, rgbaAlongV );
+				// V 1 .
+				// 0 0 1
+				// . 0 .
+
+				relativeVContrast = matchAlongV - matchAlongH;
+				relativeVContrast *= fxaaQualityinvEdgeThreshold;
+
+				if( abs( relativeVContrast ) < .3 ) { // 45 deg edge
+					// 1 1 .
+					// 0 0 1
+					// . 0 1
+
+					// do a simple blur
+					return mix(
+						rgbaM,
+						(rgbaN + rgbaS + rgbaE + rgbaW) * .25,
+						.4
+					);
+				}
+
+				horzSpan = relativeVContrast > 0.;
+			}
+
+			if(!horzSpan) rgbaN = rgbaW;
+			if(!horzSpan) rgbaS = rgbaE;
+			// . 0 .      1
+			// 1 0 1  ->  0
+			// . 0 .      1
+
+			bool pairN = contrast( rgbaM, rgbaN ) > contrast( rgbaM, rgbaS );
+			if(!pairN) rgbaN = rgbaS;
+
+			vec2 offNP;
+			offNP.x = (!horzSpan) ? 0.0 : fxaaQualityRcpFrame.x;
+			offNP.y = ( horzSpan) ? 0.0 : fxaaQualityRcpFrame.y;
+
+			bool doneN = false;
+			bool doneP = false;
+
+			float nDist = 0.;
+			float pDist = 0.;
+
+			vec2 posN = posM;
+			vec2 posP = posM;
+
+			int iterationsUsed = 0;
+			int iterationsUsedN = 0;
+			int iterationsUsedP = 0;
+			for( int i = 0; i < NUM_SAMPLES; i++ ) {
+				iterationsUsed = i;
+
+				float increment = float(i + 1);
+
+				if(!doneN) {
+					nDist += increment;
+					posN = posM + offNP * nDist;
+					vec4 rgbaEndN = FxaaTexTop(tex, posN.xy);
+					doneN = contrast( rgbaEndN, rgbaM ) > contrast( rgbaEndN, rgbaN );
+					iterationsUsedN = i;
+				}
+
+				if(!doneP) {
+					pDist += increment;
+					posP = posM - offNP * pDist;
+					vec4 rgbaEndP = FxaaTexTop(tex, posP.xy);
+					doneP = contrast( rgbaEndP, rgbaM ) > contrast( rgbaEndP, rgbaN );
+					iterationsUsedP = i;
+				}
+
+				if(doneN || doneP) break;
+			}
+
+
+			if ( !doneP && !doneN ) return rgbaM; // failed to find end of edge
+
+			float dist = min(
+				doneN ? float( iterationsUsedN ) / float( NUM_SAMPLES - 1 ) : 1.,
+				doneP ? float( iterationsUsedP ) / float( NUM_SAMPLES - 1 ) : 1.
+			);
+
+			// hacky way of reduces blurriness of mostly diagonal edges
+			// but reduces AA quality
+			dist = pow(dist, .5);
+
+			dist = 1. - dist;
+
+			return mix(
+				rgbaM,
+				rgbaN,
+				dist * .5
+			);
+		}
+
+		void main() {
+			const float edgeDetectionQuality = .2;
+			const float invEdgeDetectionQuality = 1. / edgeDetectionQuality;
+
+			gl_FragColor = FxaaPixelShader(
+				vUv,
+				tDiffuse,
+				resolution,
+				edgeDetectionQuality, // [0,1] contrast needed, otherwise early discard
+				invEdgeDetectionQuality
+			);
+
+		}
+	`
+      )
+    };
+  }
+});
+
+// vendor/three/addons/environments/RoomEnvironment.js
+function createAreaLightMaterial(intensity) {
+  const material = new MeshBasicMaterial();
+  material.color.setScalar(intensity);
+  return material;
+}
+var RoomEnvironment;
+var init_RoomEnvironment = __esm({
+  "vendor/three/addons/environments/RoomEnvironment.js"() {
+    init_three_module();
+    RoomEnvironment = class extends Scene {
+      constructor(renderer = null) {
+        super();
+        const geometry = new BoxGeometry();
+        geometry.deleteAttribute("uv");
+        const roomMaterial = new MeshStandardMaterial({ side: BackSide });
+        const boxMaterial = new MeshStandardMaterial();
+        let intensity = 5;
+        if (renderer !== null && renderer._useLegacyLights === false) intensity = 900;
+        const mainLight = new PointLight(16777215, intensity, 28, 2);
+        mainLight.position.set(0.418, 16.199, 0.3);
+        this.add(mainLight);
+        const room = new Mesh(geometry, roomMaterial);
+        room.position.set(-0.757, 13.219, 0.717);
+        room.scale.set(31.713, 28.305, 28.591);
+        this.add(room);
+        const box1 = new Mesh(geometry, boxMaterial);
+        box1.position.set(-10.906, 2.009, 1.846);
+        box1.rotation.set(0, -0.195, 0);
+        box1.scale.set(2.328, 7.905, 4.651);
+        this.add(box1);
+        const box2 = new Mesh(geometry, boxMaterial);
+        box2.position.set(-5.607, -0.754, -0.758);
+        box2.rotation.set(0, 0.994, 0);
+        box2.scale.set(1.97, 1.534, 3.955);
+        this.add(box2);
+        const box3 = new Mesh(geometry, boxMaterial);
+        box3.position.set(6.167, 0.857, 7.803);
+        box3.rotation.set(0, 0.561, 0);
+        box3.scale.set(3.927, 6.285, 3.687);
+        this.add(box3);
+        const box4 = new Mesh(geometry, boxMaterial);
+        box4.position.set(-2.017, 0.018, 6.124);
+        box4.rotation.set(0, 0.333, 0);
+        box4.scale.set(2.002, 4.566, 2.064);
+        this.add(box4);
+        const box5 = new Mesh(geometry, boxMaterial);
+        box5.position.set(2.291, -0.756, -2.621);
+        box5.rotation.set(0, -0.286, 0);
+        box5.scale.set(1.546, 1.552, 1.496);
+        this.add(box5);
+        const box6 = new Mesh(geometry, boxMaterial);
+        box6.position.set(-2.193, -0.369, -5.547);
+        box6.rotation.set(0, 0.516, 0);
+        box6.scale.set(3.875, 3.487, 2.986);
+        this.add(box6);
+        const light1 = new Mesh(geometry, createAreaLightMaterial(50));
+        light1.position.set(-16.116, 14.37, 8.208);
+        light1.scale.set(0.1, 2.428, 2.739);
+        this.add(light1);
+        const light2 = new Mesh(geometry, createAreaLightMaterial(50));
+        light2.position.set(-16.109, 18.021, -8.207);
+        light2.scale.set(0.1, 2.425, 2.751);
+        this.add(light2);
+        const light3 = new Mesh(geometry, createAreaLightMaterial(17));
+        light3.position.set(14.904, 12.198, -1.832);
+        light3.scale.set(0.15, 4.265, 6.331);
+        this.add(light3);
+        const light4 = new Mesh(geometry, createAreaLightMaterial(43));
+        light4.position.set(-0.462, 8.89, 14.52);
+        light4.scale.set(4.38, 5.441, 0.088);
+        this.add(light4);
+        const light5 = new Mesh(geometry, createAreaLightMaterial(20));
+        light5.position.set(3.235, 11.486, -12.541);
+        light5.scale.set(2.5, 2, 0.1);
+        this.add(light5);
+        const light6 = new Mesh(geometry, createAreaLightMaterial(100));
+        light6.position.set(0, 20, 0);
+        light6.scale.set(1, 0.1, 1);
+        this.add(light6);
+      }
+      dispose() {
+        const resources = /* @__PURE__ */ new Set();
+        this.traverse((object) => {
+          if (object.isMesh) {
+            resources.add(object.geometry);
+            resources.add(object.material);
+          }
+        });
+        for (const resource of resources) {
+          resource.dispose();
+        }
+      }
+    };
+  }
+});
+
 // src/render.js
 var render_exports = {};
 __export(render_exports, {
@@ -20049,10 +23728,161 @@ function makeChevronTexture() {
   tex.wrapT = RepeatWrapping;
   return tex;
 }
-function initRenderer(canvas, { onPick } = {}) {
-  const renderer = new WebGLRenderer({ canvas, antialias: true });
+function hashNoise(seed) {
+  const rng = makeRng(seed >>> 0);
+  return () => rng.next();
+}
+function canvasTexture(c, srgb = true) {
+  const tex = new CanvasTexture(c);
+  if (srgb) tex.colorSpace = SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+function makePanelTexture() {
+  const W2 = 1024, H2 = 683;
+  const c = document.createElement("canvas");
+  c.width = W2;
+  c.height = H2;
+  const g = c.getContext("2d");
+  const rnd = hashNoise(24301);
+  const pw = W2 / 5, ph = H2 / 3;
+  for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) {
+    const t = 40 + Math.floor(rnd() * 12);
+    g.fillStyle = `rgb(${t},${t + 4},${t + 14})`;
+    g.fillRect(i * pw, j * ph, pw, ph);
+    for (let k = 0; k < 60; k++) {
+      const y = j * ph + rnd() * ph;
+      const a = 0.015 + rnd() * 0.025;
+      g.fillStyle = rnd() < 0.5 ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${a})`;
+      g.fillRect(i * pw + rnd() * pw * 0.3, y, pw * (0.4 + rnd() * 0.6), 1 + rnd() * 1.5);
+    }
+    g.fillStyle = "rgba(255,255,255,0.08)";
+    g.fillRect(i * pw + 3, j * ph + 3, pw - 6, 3);
+    g.fillRect(i * pw + 3, j * ph + 3, 3, ph - 6);
+    g.fillStyle = "rgba(0,0,0,0.25)";
+    g.fillRect(i * pw + 3, (j + 1) * ph - 6, pw - 6, 3);
+    g.fillRect((i + 1) * pw - 6, j * ph + 3, 3, ph - 6);
+  }
+  const grime = g.createLinearGradient(0, H2 * 0.55, 0, H2);
+  grime.addColorStop(0, "rgba(10,8,6,0)");
+  grime.addColorStop(1, "rgba(10,8,6,0.45)");
+  g.fillStyle = grime;
+  g.fillRect(0, 0, W2, H2);
+  for (let k = 0; k < 260; k++) {
+    const x = rnd() * W2, y = H2 * 0.4 + rnd() * H2 * 0.6, r = 2 + rnd() * 14;
+    g.fillStyle = `rgba(8,6,4,${0.04 + rnd() * 0.06})`;
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.font = "bold 34px monospace";
+  g.textBaseline = "top";
+  g.fillStyle = "rgba(255,170,90,0.22)";
+  g.fillText("BAY 07", pw * 0 + 18, 16);
+  g.fillText("LOAD 4T", pw * 4 + 18, ph * 1 + 16);
+  g.fillStyle = "rgba(220,230,255,0.13)";
+  g.fillText("PF-68", pw * 2 + 18, 16);
+  return canvasTexture(c);
+}
+function makeTreadTexture() {
+  const c = document.createElement("canvas");
+  c.width = 64;
+  c.height = 64;
+  const g = c.getContext("2d");
+  g.fillStyle = "#8a8f99";
+  g.fillRect(0, 0, 64, 64);
+  const lug = (x, y, a) => {
+    g.save();
+    g.translate(x, y);
+    g.rotate(a);
+    g.fillStyle = "#c4c9d2";
+    g.fillRect(-10, -2.5, 20, 5);
+    g.fillStyle = "#5a5f69";
+    g.fillRect(-10, 1.5, 20, 1.5);
+    g.restore();
+  };
+  lug(16, 16, Math.PI / 4);
+  lug(48, 48, Math.PI / 4);
+  lug(48, 16, -Math.PI / 4);
+  lug(16, 48, -Math.PI / 4);
+  const tex = canvasTexture(c);
+  tex.wrapS = tex.wrapT = RepeatWrapping;
+  return tex;
+}
+function makeBodyTexture(kind) {
+  const c = document.createElement("canvas");
+  c.width = 256;
+  c.height = 128;
+  const g = c.getContext("2d");
+  const rnd = hashNoise(kind.length * 977 + kind.charCodeAt(0));
+  g.fillStyle = "#ffffff";
+  g.fillRect(0, 0, 256, 128);
+  if (kind === "wood") {
+    for (let y = 0; y < 128; y += 2) {
+      const a = 0.08 + 0.1 * Math.abs(Math.sin(y * 0.21 + Math.sin(y * 0.05) * 3));
+      g.fillStyle = `rgba(70,35,10,${a})`;
+      g.fillRect(0, y, 256, 2);
+    }
+    for (let k = 0; k < 3; k++) {
+      g.strokeStyle = "rgba(60,28,8,0.35)";
+      g.lineWidth = 2;
+      g.beginPath();
+      g.ellipse(40 + rnd() * 180, 20 + rnd() * 90, 10, 4, 0, 0, Math.PI * 2);
+      g.stroke();
+    }
+  } else if (kind === "steel") {
+    for (let k = 0; k < 400; k++) {
+      g.fillStyle = `rgba(0,0,0,${0.03 + rnd() * 0.06})`;
+      g.fillRect(rnd() * 256, rnd() * 128, 30 + rnd() * 80, 1);
+    }
+    g.fillStyle = "rgba(40,45,55,0.55)";
+    g.fillRect(0, 62, 256, 4);
+    for (let x = 8; x < 256; x += 32) {
+      g.beginPath();
+      g.arc(x, 56, 3, 0, Math.PI * 2);
+      g.fill();
+    }
+  } else if (kind === "rubber") {
+    for (let x = 0; x < 256; x += 16) {
+      g.fillStyle = "rgba(0,0,0,0.28)";
+      g.fillRect(x, 54, 8, 20);
+    }
+  } else if (kind === "glass") {
+    g.fillStyle = "rgba(255,255,255,1)";
+  }
+  return canvasTexture(c);
+}
+function makeSoftSprite() {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d");
+  const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, "rgba(255,255,255,1)");
+  grd.addColorStop(0.35, "rgba(255,255,255,0.6)");
+  grd.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 64, 64);
+  return canvasTexture(c);
+}
+function makeLightPool() {
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 256;
+  const g = c.getContext("2d");
+  g.setTransform(1, 0, 0, 4, 0, 0);
+  const grd = g.createRadialGradient(64, 0, 2, 64, 0, 62);
+  grd.addColorStop(0, "rgba(255,210,150,0.9)");
+  grd.addColorStop(0.35, "rgba(255,180,110,0.3)");
+  grd.addColorStop(1, "rgba(255,160,90,0)");
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 128, 64);
+  return canvasTexture(c);
+}
+function initRenderer(canvas, { onPick, graphics, detected } = {}) {
+  const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.type = PCFSoftShadowMap;
   const scene = new Scene();
   scene.background = new Color(DEFAULT_PALETTE.background);
@@ -20065,13 +23895,41 @@ function initRenderer(canvas, { onPick } = {}) {
   key.position.set(6, 10, 14);
   key.castShadow = true;
   key.shadow.mapSize.set(1024, 1024);
-  key.shadow.camera.left = -14;
-  key.shadow.camera.right = 14;
-  key.shadow.camera.top = 10;
-  key.shadow.camera.bottom = -10;
+  key.shadow.bias = -4e-4;
+  key.shadow.normalBias = 0.02;
   scene.add(key);
   const fill = new HemisphereLight(10335448, 2760728, 0.5);
   scene.add(fill);
+  {
+    const sc = key.shadow.camera;
+    key.updateMatrixWorld();
+    sc.position.copy(key.position);
+    sc.lookAt(key.target.position);
+    sc.updateMatrixWorld();
+    const inv = sc.matrixWorldInverse;
+    const bb = new Box3();
+    const hw = (CH_W + 4) / 2, hh = (CH_H + 4) / 2;
+    for (const x of [-hw, hw]) for (const y of [-hh, hh]) for (const z of [-1.4, 1.2]) {
+      bb.expandByPoint(new Vector3(x, y, z).applyMatrix4(inv));
+    }
+    sc.left = bb.min.x - 0.25;
+    sc.right = bb.max.x + 0.25;
+    sc.bottom = bb.min.y - 0.25;
+    sc.top = bb.max.y + 0.25;
+    sc.near = Math.max(0.1, -bb.max.z - 1);
+    sc.far = -bb.min.z + 1;
+    sc.updateProjectionMatrix();
+  }
+  let envTex = null;
+  function ensureEnv() {
+    if (envTex) return envTex;
+    const pmrem = new PMREMGenerator(renderer);
+    const room = new RoomEnvironment(renderer);
+    envTex = pmrem.fromScene(room, 0.04).texture;
+    room.dispose();
+    pmrem.dispose();
+    return envTex;
+  }
   const envGroup = new Group();
   const levelGroup = new Group();
   const bodyGroup = new Group();
@@ -20113,16 +23971,38 @@ function initRenderer(canvas, { onPick } = {}) {
     selectionRing: new MeshBasicMaterial({ color: 16769162, transparent: true, opacity: 0.9, side: DoubleSide }),
     pin: new MeshStandardMaterial({ color: 15909198, roughness: 0.4, metalness: 0.5 }),
     spring: new MeshStandardMaterial({ color: 7328767, roughness: 0.4, metalness: 0.3 }),
-    cursor: new MeshBasicMaterial({ color: 16777215, transparent: true, opacity: 0.8 })
+    cursor: new MeshBasicMaterial({ color: 16777215, transparent: true, opacity: 0.8 }),
+    targetGlow: new MeshBasicMaterial({
+      color: palette.accent,
+      map: makeSoftSprite(),
+      transparent: true,
+      opacity: 0.22,
+      blending: AdditiveBlending,
+      depthWrite: false
+    }),
+    payloadRing: new MeshBasicMaterial({ color: palette.accent })
+  };
+  for (const k of ["floor", "wall", "panel", "obstacle", "pin", "spring"]) mats[k].envMapIntensity = 0.35;
+  mats.obstacle.envMapIntensity = 0.6;
+  mats.cursor.depthTest = false;
+  const BODY_LOOK = {
+    steel: { roughness: 0.32, metalness: 0.85, clearcoat: 0.3, env: 1 },
+    wood: { roughness: 0.55, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.35, env: 0.6 },
+    glass: { roughness: 0.06, metalness: 0, clearcoat: 1, env: 1.4, opacity: 0.78 },
+    rubber: { roughness: 0.8, metalness: 0, clearcoat: 0.15, env: 0.4 }
   };
   const bodyMats = {};
   for (const [id, m] of Object.entries(MATERIALS)) {
-    bodyMats[id] = new MeshStandardMaterial({
+    const look = BODY_LOOK[id] || { roughness: 0.45, metalness: 0.05, clearcoat: 0.4, env: 0.7 };
+    bodyMats[id] = new MeshPhysicalMaterial({
       color: new Color(m.color),
-      roughness: id === "glass" ? 0.15 : 0.45,
-      metalness: id === "steel" ? 0.8 : 0.05,
+      roughness: look.roughness,
+      metalness: look.metalness,
+      clearcoat: look.clearcoat,
+      clearcoatRoughness: look.clearcoatRoughness ?? 0.12,
+      envMapIntensity: look.env,
       transparent: id === "glass",
-      opacity: id === "glass" ? 0.85 : 1
+      opacity: look.opacity ?? 1
     });
   }
   function buildChamber() {
@@ -20164,10 +24044,61 @@ function initRenderer(canvas, { onPick } = {}) {
     const strip = new Mesh(new BoxGeometry(CH_W, 0.12, 0.02), mats.hazard);
     strip.position.set(0, -CH_CY + 0.06, 0.02);
     envGroup.add(strip);
+    for (const m of [floor, ceil]) worldUv(m);
+    for (const c of envGroup.children) if (c.material === mats.wall) worldUv(c);
+  }
+  function worldUv(mesh, scale = 1 / 0.6) {
+    const pos = mesh.geometry.attributes.position, uv = mesh.geometry.attributes.uv;
+    for (let i = 0; i < pos.count; i++) {
+      uv.setXY(i, (pos.getX(i) + mesh.position.x) * scale, (pos.getY(i) + mesh.position.y) * scale);
+    }
+    uv.needsUpdate = true;
+  }
+  const detailGroup = new Group();
+  const lampMats = [];
+  const poolMats = [];
+  function buildDetail() {
+    const housingMat = new MeshStandardMaterial({ color: 2303534, roughness: 0.5, metalness: 0.7, envMapIntensity: 0.5 });
+    const poolTex = makeLightPool();
+    for (const x of [-6.5, 0, 6.5]) {
+      const housing = new Mesh(new BoxGeometry(1.8, 0.28, 0.34), housingMat);
+      housing.position.set(x, CH_CY - 0.14, -0.82);
+      detailGroup.add(housing);
+      const lm = new MeshStandardMaterial({ color: 2759178, emissive: 16761994, emissiveIntensity: 2.6 });
+      lampMats.push(lm);
+      const tube = new Mesh(new BoxGeometry(1.5, 0.07, 0.08), lm);
+      tube.position.set(x, CH_CY - 0.31, -0.7);
+      detailGroup.add(tube);
+      const pm = new MeshBasicMaterial({
+        map: poolTex,
+        transparent: true,
+        opacity: 0.16,
+        blending: AdditiveBlending,
+        depthWrite: false
+      });
+      poolMats.push(pm);
+      const pool2 = new Mesh(new PlaneGeometry(5, 8), pm);
+      pool2.position.set(x, CH_CY - 0.3 - 4, -0.9);
+      detailGroup.add(pool2);
+    }
+    const dial = new Mesh(new CircleGeometry(0.42, 32), new MeshStandardMaterial({ color: 7828330, roughness: 0.85, envMapIntensity: 0.2 }));
+    dial.position.set(CH_CX + 1.2, CH_CY - 1.8, -0.9);
+    const bezel = new Mesh(new TorusGeometry(0.44, 0.06, 8, 32), new MeshStandardMaterial({ color: 10134200, roughness: 0.3, metalness: 0.9 }));
+    bezel.position.copy(dial.position);
+    const needle = new Mesh(new PlaneGeometry(0.04, 0.34), new MeshBasicMaterial({ color: 12597547 }));
+    needle.position.set(dial.position.x, dial.position.y, -0.88);
+    needle.geometry.translate(0, 0.14, 0);
+    needle.rotation.z = -0.9;
+    detailGroup.add(dial, bezel, needle);
+    detailGroup.userData.needle = needle;
+    detailGroup.visible = false;
+    envGroup.add(detailGroup);
   }
   function buildDecor(seed) {
     const rng = makeRng((seed ^ 2654435769) >>> 0);
-    const crateMat = new MeshStandardMaterial({ color: 5917240, roughness: 0.8 });
+    const crateMat = new MeshStandardMaterial({ color: 5917240, roughness: 0.8, envMapIntensity: 0.3 });
+    decorMats.push(crateMat);
+    if (gfx && gfx.detail === "detailed") crateMat.map = texture("wood");
     const pipeMat = new MeshStandardMaterial({ color: 4016725, roughness: 0.5, metalness: 0.6 });
     const n = 2 + rng.int(0, 3);
     for (let i = 0; i < n; i++) {
@@ -20186,14 +24117,19 @@ function initRenderer(canvas, { onPick } = {}) {
     }
   }
   buildChamber();
+  buildDetail();
   const targetRings = [];
+  const targetGlows = [];
   const hazardMeshes = [];
+  const decorMats = [];
   let builtLevelId = null;
   function buildLevel(level) {
     if (builtLevelId === level.id) return;
     if (builtLevelId !== null) disposeGroup(levelGroup);
     builtLevelId = level.id;
+    decorMats.length = 0;
     targetRings.length = 0;
+    targetGlows.length = 0;
     hazardMeshes.length = 0;
     for (const o of level.obstacles || []) {
       const mesh = new Mesh(new BoxGeometry(o.w, o.h, 1.2), mats.obstacle);
@@ -20226,6 +24162,11 @@ function initRenderer(canvas, { onPick } = {}) {
       inner.position.copy(ring.position);
       levelGroup.add(inner);
       targetRings.push(ring, inner);
+      const glow = new Mesh(new PlaneGeometry(t.r * 3, t.r * 3), mats.targetGlow);
+      glow.position.set(t.x - CH_CX, t.y - CH_CY, -0.05);
+      glow.visible = !!gfx && gfx.detail === "detailed";
+      levelGroup.add(glow);
+      targetGlows.push(glow);
     }
     buildDecor(level.seed || 1);
     track(levelGroup);
@@ -20235,12 +24176,24 @@ function initRenderer(canvas, { onPick } = {}) {
   const interactive = [];
   const bodyGeo = new CylinderGeometry(0.5, 0.5, 0.6, 28);
   bodyGeo.rotateX(Math.PI / 2);
+  const sphereGeo = new SphereGeometry(0.5, 40, 28);
+  sphereGeo.rotateX(Math.PI / 2);
+  const payloadRingGeo = new TorusGeometry(0.6, 0.045, 8, 40);
+  const currentBodyGeo = () => gfx && gfx.detail === "detailed" ? sphereGeo : bodyGeo;
   function getBodyView(b) {
     let v = bodyViews.get(b.id);
     if (!v) {
-      const mesh = new Mesh(bodyGeo, bodyMats[b.material].clone());
+      const mat = bodyMats[b.material].clone();
+      if (gfx && gfx.detail === "detailed") mat.map = texture(b.material);
+      const mesh = new Mesh(currentBodyGeo(), mat);
       mesh.castShadow = true;
-      mesh.userData = { kind: "body", id: b.id };
+      mesh.receiveShadow = true;
+      mesh.userData = { kind: "body", id: b.id, material: b.material };
+      if (b.kind === "payload") {
+        const pr = new Mesh(payloadRingGeo, mats.payloadRing);
+        pr.position.z = 0.05;
+        mesh.add(pr);
+      }
       const rim = new Mesh(
         new TorusGeometry(0.52, 0.035, 8, 32),
         new MeshBasicMaterial({ color: 16769162, transparent: true, opacity: 0 })
@@ -20273,7 +24226,9 @@ function initRenderer(canvas, { onPick } = {}) {
     }
     return v;
   }
-  const ghost = new Mesh(bodyGeo.clone(), mats.ghostOk);
+  const ghostCyl = bodyGeo.clone();
+  const ghostSphere = sphereGeo.clone();
+  const ghost = new Mesh(ghostCyl, mats.ghostOk);
   ghost.visible = false;
   overlayGroup.add(ghost);
   const selRing = new Mesh(new RingGeometry(0.62, 0.74, 40), mats.selectionRing);
@@ -20287,12 +24242,15 @@ function initRenderer(canvas, { onPick } = {}) {
   }
   cursorGroup.position.z = 0.5;
   overlayGroup.add(cursorGroup);
-  let particleCap = QUALITY.high.particleCap;
+  const MAX_PARTICLES = PARTICLE_CAP.high;
+  let particleCap = PARTICLE_CAP.high;
+  let particleBoost = 1;
   const pGeo = new BufferGeometry();
-  const pPos = new Float32Array(QUALITY.high.particleCap * 3);
-  const pCol = new Float32Array(QUALITY.high.particleCap * 3);
+  const pPos = new Float32Array(MAX_PARTICLES * 3);
+  const pCol = new Float32Array(MAX_PARTICLES * 3);
   pGeo.setAttribute("position", new BufferAttribute(pPos, 3));
   pGeo.setAttribute("color", new BufferAttribute(pCol, 3));
+  const softSprite = makeSoftSprite();
   const pMat = new PointsMaterial({ size: 0.14, vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false });
   const points = new Points(pGeo, pMat);
   points.layers.set(LAYER_FX);
@@ -20337,8 +24295,8 @@ function initRenderer(canvas, { onPick } = {}) {
       if (n >= particleCap) break;
       pPos[n * 3] = p.x;
       pPos[n * 3 + 1] = p.y;
-      pPos[n * 3 + 2] = 0.6;
-      const fade = 1 - p.life / p.ttl;
+      pPos[n * 3 + 2] = 0.7;
+      const fade = (1 - p.life / p.ttl) * particleBoost;
       pCol[n * 3] = p.r * fade;
       pCol[n * 3 + 1] = p.g * fade;
       pCol[n * 3 + 2] = p.b * fade;
@@ -20348,8 +24306,45 @@ function initRenderer(canvas, { onPick } = {}) {
     pGeo.attributes.position.needsUpdate = true;
     pGeo.attributes.color.needsUpdate = true;
   }
-  let paletteTheme = DEFAULT_PALETTE;
-  let quality = "high";
+  const DUST = 140;
+  const dGeo = new BufferGeometry();
+  const dPos = new Float32Array(DUST * 3);
+  const dSeed = new Float32Array(DUST * 2);
+  {
+    const r = makeRng(53335);
+    for (let i = 0; i < DUST; i++) {
+      dPos[i * 3] = (r.next() - 0.5) * CH_W;
+      dPos[i * 3 + 1] = (r.next() - 0.5) * CH_H;
+      dPos[i * 3 + 2] = -0.6 + r.next() * 0.3;
+      dSeed[i * 2] = r.next() * Math.PI * 2;
+      dSeed[i * 2 + 1] = 0.08 + r.next() * 0.18;
+    }
+  }
+  dGeo.setAttribute("position", new BufferAttribute(dPos, 3));
+  const dMat = new PointsMaterial({
+    size: 0.09,
+    map: softSprite,
+    color: 16767400,
+    transparent: true,
+    opacity: 0.35,
+    blending: AdditiveBlending,
+    depthWrite: false
+  });
+  const dust = new Points(dGeo, dMat);
+  dust.layers.set(LAYER_FX);
+  dust.frustumCulled = false;
+  dust.visible = false;
+  scene.add(dust);
+  function updateDust(dt) {
+    for (let i = 0; i < DUST; i++) {
+      const ph = dSeed[i * 2], sp = dSeed[i * 2 + 1];
+      let y = dPos[i * 3 + 1] + sp * dt;
+      if (y > CH_CY) y -= CH_H;
+      dPos[i * 3 + 1] = y;
+      dPos[i * 3] += Math.sin(elapsed * 0.5 + ph) * 0.05 * dt;
+    }
+    dGeo.attributes.position.needsUpdate = true;
+  }
   let reducedMotion = false;
   let paused = false;
   let prevSnap = null;
@@ -20359,23 +24354,201 @@ function initRenderer(canvas, { onPick } = {}) {
   let shakeAmp = 0;
   const shakeOffset = new Vector3();
   let elapsed = 0;
-  function applyQuality(tier) {
-    quality = QUALITY[tier] ? tier : "high";
-    const q = QUALITY[quality];
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatio));
-    renderer.shadowMap.enabled = q.shadows;
-    key.castShadow = q.shadows;
-    particleCap = q.particleCap;
+  let gfx = null;
+  let gfxSaved = null;
+  let detectedPreset = "balanced";
+  let composer = null;
+  let postKey = null;
+  let postFailed = false;
+  let gradePass = null;
+  let adaptiveScale = 1;
+  let frameTimes = [];
+  let fps = 0;
+  let pixelRatio = 0;
+  let sizePx = [0, 0];
+  let sizeDirty = true;
+  let fpsEl = null;
+  const texCache = {};
+  function texture(name) {
+    if (texCache[name]) return texCache[name];
+    let t;
+    if (name === "panel") t = makePanelTexture();
+    else if (name === "tread") t = makeTreadTexture();
+    else t = makeBodyTexture(name);
+    if (name === "wood") {
+      t.wrapS = t.wrapT = RepeatWrapping;
+    }
+    texCache[name] = t;
+    return t;
+  }
+  function setMap(mat, map, bump = null, bumpScale = 1) {
+    if (mat.map === map && mat.bumpMap === bump) return;
+    mat.map = map;
+    mat.bumpMap = bump;
+    mat.bumpScale = bumpScale;
+    mat.needsUpdate = true;
+  }
+  function applyDetail(on) {
+    detailGroup.visible = on;
+    setMap(mats.panel, on ? texture("panel") : null, on ? texture("panel") : null, 1.5);
+    mats.panel.color.set(on ? 16777215 : 2764346);
+    const tread = on ? texture("tread") : null;
+    setMap(mats.floor, tread, tread, 1.2);
+    setMap(mats.wall, tread, tread, 0.8);
+    for (const m of decorMats) setMap(m, on ? texture("wood") : null);
+    for (const g of targetGlows) g.visible = on;
+    for (const v of bodyViews.values()) {
+      v.mesh.geometry = on ? sphereGeo : bodyGeo;
+      setMap(v.mesh.material, on ? texture(v.mesh.userData.material) : null);
+    }
+    ghost.geometry = on ? ghostSphere : ghostCyl;
+  }
+  function applyEmissiveBoost() {
+    const boost = gfx.bloom === "on" ? 2.2 : 1;
+    mats.target.color.set(palette.accent).multiplyScalar(boost);
+    mats.payloadRing.color.set(palette.accent).multiplyScalar(boost === 1 ? 1 : 1.6);
+    mats.targetGlow.color.set(palette.accent);
+    for (const lm of lampMats) lm.emissiveIntensity = gfx.bloom === "on" ? 2.6 : 1.2;
+    particleBoost = gfx.particles === "high" ? gfx.bloom === "on" ? 2.2 : 1.3 : 1;
+  }
+  function applyBackground() {
+    const c = new Color(palette.background);
+    if (gfx && gfx.post) c.multiplyScalar(2.4);
+    scene.background = c;
+  }
+  function setGraphics(saved, detected2) {
+    gfxSaved = saved || {};
+    if (detected2) detectedPreset = detected2;
+    gfx = resolve(gfxSaved, detectedPreset);
+    canvas.dataset.gfxPreset = gfx.preset;
+    const size = SHADOW_MAP[gfx.shadows];
+    renderer.shadowMap.enabled = size > 0;
+    key.castShadow = size > 0;
+    if (size > 0 && key.shadow.mapSize.x !== size) {
+      key.shadow.mapSize.set(size, size);
+      if (key.shadow.map) {
+        key.shadow.map.dispose();
+        key.shadow.map = null;
+      }
+    }
+    const refl = gfx.reflections === "on";
+    scene.environment = refl ? ensureEnv() : null;
+    ambient.intensity = refl ? 0.18 : 0.45;
+    fill.intensity = refl ? 0.4 : 0.5;
+    particleCap = PARTICLE_CAP[gfx.particles];
+    if (pool.length > particleCap) pool.splice(0, pool.length - particleCap);
+    if (gfx.particles === "high") {
+      pMat.map = softSprite;
+      pMat.size = 0.2;
+      pMat.blending = AdditiveBlending;
+    } else {
+      pMat.map = null;
+      pMat.size = 0.14;
+      pMat.blending = NormalBlending;
+    }
+    pMat.needsUpdate = true;
+    dust.visible = gfx.background === "animated";
+    applyBackground();
+    applyDetail(gfx.detail === "detailed");
+    applyEmissiveBoost();
+    adaptiveScale = 1;
+    frameTimes = [];
+    postKey = null;
+    sizeDirty = true;
+    showFpsMeter(gfx.showFps);
     scene.traverse((n) => {
-      if (n.material) n.material.needsUpdate = true;
+      if (n.material) for (const m of [].concat(n.material)) m.needsUpdate = true;
     });
-    resize();
+    for (const v of bodyViews.values()) v.mesh.material.needsUpdate = true;
+  }
+  function applyQuality(tier) {
+    setGraphics({ ...gfxSaved || {}, preset: LEGACY_TIER[tier] || tier }, detectedPreset);
+  }
+  function showFpsMeter(on) {
+    if (on && !fpsEl) {
+      fpsEl = document.createElement("div");
+      fpsEl.id = "pf-fps";
+      fpsEl.className = "pf-fps";
+      fpsEl.setAttribute("aria-hidden", "true");
+      document.body.append(fpsEl);
+    }
+    if (fpsEl) fpsEl.hidden = !on;
+  }
+  function buildPost(w, h) {
+    if (composer) {
+      composer.dispose();
+      composer = null;
+    }
+    gradePass = null;
+    if (!gfx.post || postFailed) return;
+    try {
+      const pw = Math.max(1, Math.round(w * pixelRatio)), ph = Math.max(1, Math.round(h * pixelRatio));
+      const target = new WebGLRenderTarget(pw, ph, {
+        type: HalfFloatType,
+        samples: gfx.antialias === "msaa" ? 4 : 0
+      });
+      const c = new EffectComposer(renderer, target);
+      c.setPixelRatio(pixelRatio);
+      c.setSize(w, h);
+      c.addPass(new RenderPass(scene, camera));
+      if (gfx.ao !== "off") {
+        const ao = new GTAOPass(scene, camera, pw, ph);
+        ao.output = GTAOPass.OUTPUT.Default;
+        ao.blendIntensity = 0.7;
+        const hi = gfx.ao === "high";
+        ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 1.4, thickness: 1.5, scale: 1, samples: hi ? 16 : 8 });
+        ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: hi ? 6 : 4, rings: 2, samples: hi ? 16 : 8 });
+        c.addPass(ao);
+      }
+      if (gfx.bloom === "on") {
+        c.addPass(new UnrealBloomPass(new Vector2(w, h), 0.6, 0.5, 0.88));
+      }
+      if (gfx.grade === "on") {
+        gradePass = new ShaderPass(GradeShader);
+        c.addPass(gradePass);
+      }
+      c.addPass(new OutputPass());
+      if (gfx.antialias === "smaa") c.addPass(new SMAAPass(pw, ph));
+      if (gfx.antialias === "fxaa") {
+        const fxaa = new ShaderPass(FXAAShader);
+        fxaa.material.uniforms.resolution.value.set(1 / pw, 1 / ph);
+        c.addPass(fxaa);
+      }
+      composer = c;
+    } catch {
+      postFailed = true;
+      composer = null;
+    }
+  }
+  function adapt(dtMs) {
+    frameTimes.push(dtMs);
+    if (frameTimes.length < 90) return false;
+    const avg = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length;
+    frameTimes.length = 0;
+    fps = 1e3 / avg;
+    if (fpsEl && !fpsEl.hidden) fpsEl.textContent = `${Math.round(fps)} fps \xB7 ${Math.round(pixelRatio * 100) / 100}\xD7`;
+    if (!gfx.adaptive) return false;
+    const before = adaptiveScale;
+    if (avg > 26) adaptiveScale = Math.max(0.6, adaptiveScale - 0.1);
+    else if (avg < 14 && adaptiveScale < 1) adaptiveScale = Math.min(1, adaptiveScale + 0.05);
+    return before !== adaptiveScale;
+  }
+  function graphicsInfo() {
+    return {
+      preset: gfx.preset,
+      resolved: gfx,
+      summary: describe(gfx, [Math.round(sizePx[0] * pixelRatio), Math.round(sizePx[1] * pixelRatio)]),
+      pixels: [Math.round(sizePx[0] * pixelRatio), Math.round(sizePx[1] * pixelRatio)],
+      fps: Math.round(fps),
+      adaptiveScale: Math.round(adaptiveScale * 100) / 100,
+      postFailed
+    };
   }
   let framingMargin = FRAMING.margin;
   function resize() {
     const wpx = canvas.clientWidth || 640;
     const hpx = canvas.clientHeight || 400;
-    renderer.setSize(wpx, hpx, false);
+    sizeDirty = true;
     const aspect2 = wpx / Math.max(1, hpx);
     const m = framingMargin;
     const needW = CH_W * (1 + 2 * m) / 2;
@@ -20551,9 +24724,22 @@ function initRenderer(canvas, { onPick } = {}) {
         const s = 1 + Math.sin(elapsed * 2.4 + ring.position.x) * 0.07;
         ring.scale.set(s, s, 1);
       }
+      const hb = gfx.bloom === "on" ? 1.6 : 1;
       for (const hm of hazardMeshes) {
-        hm.material.emissiveIntensity = 0.45 + Math.sin(elapsed * 3.5) * 0.3;
+        hm.material.emissiveIntensity = (0.45 + Math.sin(elapsed * 3.5) * 0.3) * hb;
       }
+    }
+    if (gfx.background === "animated" && !reducedMotion && !paused) {
+      updateDust(dt);
+      const base = gfx.bloom === "on" ? 2.6 : 1.2;
+      lampMats.forEach((lm, i) => {
+        const flick = i === 1 && Math.sin(elapsed * 0.7) > 0.985 ? 0.55 : 1;
+        lm.emissiveIntensity = base * (0.94 + Math.sin(elapsed * (1.3 + i * 0.4) + i) * 0.06) * flick;
+      });
+      poolMats.forEach((pm, i) => {
+        pm.opacity = 0.16 * (0.92 + Math.sin(elapsed * (1.3 + i * 0.4) + i) * 0.08);
+      });
+      if (detailGroup.userData.needle) detailGroup.userData.needle.rotation.z = -0.9 + Math.sin(elapsed * 0.9) * 0.08 + Math.sin(elapsed * 7.1) * 0.015;
     }
     updateParticles(paused ? 0 : dt);
     if (shakeAmp > 1e-3 && !reducedMotion) {
@@ -20564,7 +24750,36 @@ function initRenderer(canvas, { onPick } = {}) {
       shakeAmp = Math.max(0, shakeAmp - dt);
     }
     camera.position.set(shakeOffset.x, shakeOffset.y, 20);
-    renderer.render(scene, camera);
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (w > 0 && h > 0) {
+      const rescale = adapt(dt * 1e3);
+      const ratio = Math.min(window.devicePixelRatio || 1, gfx.dprCap) * gfx.scale * adaptiveScale;
+      if (sizeDirty || rescale || w !== sizePx[0] || h !== sizePx[1] || ratio !== pixelRatio) {
+        sizeDirty = false;
+        sizePx = [w, h];
+        pixelRatio = ratio;
+        renderer.setPixelRatio(ratio);
+        renderer.setSize(w, h, false);
+      }
+      const k = gfx.post && !postFailed ? [gfx.ao, gfx.bloom, gfx.grade, gfx.antialias, w, h, pixelRatio].join("|") : "none";
+      if (k !== postKey) {
+        postKey = k;
+        buildPost(w, h);
+      }
+      if (composer) {
+        try {
+          composer.render(dt);
+        } catch {
+          postFailed = true;
+          postKey = null;
+          composer = null;
+          renderer.setRenderTarget(null);
+          renderer.render(scene, camera);
+        }
+      } else {
+        renderer.render(scene, camera);
+      }
+    }
     raf = requestAnimationFrame(draw);
   }
   function startLoop() {
@@ -20582,6 +24797,7 @@ function initRenderer(canvas, { onPick } = {}) {
     else startLoop();
   };
   document.addEventListener("visibilitychange", onVis);
+  setGraphics(graphics || { preset: "low" }, detected);
   startLoop();
   return {
     FRAMING,
@@ -20595,14 +24811,16 @@ function initRenderer(canvas, { onPick } = {}) {
     },
     setTheme(theme) {
       if (!theme || !theme.palette) return;
-      paletteTheme = theme.palette;
       Object.assign(palette, theme.palette);
-      scene.background = new Color(palette.background);
+      applyBackground();
       mats.floor.color.set(palette.floor);
       mats.wall.color.set(palette.wall);
       mats.target.color.set(palette.accent);
+      if (gfx) applyEmissiveBoost();
     },
     setQuality: applyQuality,
+    setGraphics,
+    graphicsInfo,
     setReducedMotion(v) {
       reducedMotion = !!v;
       if (reducedMotion) {
@@ -20656,8 +24874,19 @@ function initRenderer(canvas, { onPick } = {}) {
       }
       for (const m of Object.values(bodyMats)) m.dispose();
       bodyGeo.dispose();
+      sphereGeo.dispose();
+      payloadRingGeo.dispose();
+      ghostCyl.dispose();
+      ghostSphere.dispose();
       pGeo.dispose();
       pMat.dispose();
+      dGeo.dispose();
+      dMat.dispose();
+      softSprite.dispose();
+      for (const t of Object.values(texCache)) t.dispose();
+      if (envTex) envTex.dispose();
+      if (composer) composer.dispose();
+      if (fpsEl) fpsEl.remove();
       for (const d of disposables) {
         try {
           d.dispose();
@@ -20668,21 +24897,27 @@ function initRenderer(canvas, { onPick } = {}) {
     }
   };
 }
-var FRAMING, CH_W, CH_H, CH_CX, CH_CY, QUALITY, LAYER_FX, DEFAULT_PALETTE, render_default;
+var FRAMING, CH_W, CH_H, CH_CX, CH_CY, LEGACY_TIER, LAYER_FX, DEFAULT_PALETTE, GradeShader, render_default;
 var init_render = __esm({
   "src/render.js"() {
     init_three_module();
+    init_EffectComposer();
+    init_RenderPass();
+    init_ShaderPass();
+    init_OutputPass();
+    init_GTAOPass();
+    init_UnrealBloomPass();
+    init_SMAAPass();
+    init_FXAAShader();
+    init_RoomEnvironment();
     init_rules();
+    init_gfx();
     FRAMING = Object.freeze({ margin: 0.1 });
     CH_W = CHAMBER.w;
     CH_H = CHAMBER.h;
     CH_CX = CH_W / 2;
     CH_CY = CH_H / 2;
-    QUALITY = {
-      low: { pixelRatio: 1, shadows: false, particleCap: 200 },
-      medium: { pixelRatio: 1.5, shadows: true, particleCap: 800 },
-      high: { pixelRatio: 2, shadows: true, particleCap: 2e3 }
-    };
+    LEGACY_TIER = { low: "low", medium: "balanced", high: "high" };
     LAYER_FX = 1;
     DEFAULT_PALETTE = {
       background: "#14161c",
@@ -20690,6 +24925,27 @@ var init_render = __esm({
       wall: "#565d70",
       accent: "#ff8a3d",
       uiAccent: "#ffb066"
+    };
+    GradeShader = {
+      uniforms: { tDiffuse: { value: null }, uAmount: { value: 1 }, uVignette: { value: 0.2 } },
+      vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+      fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uAmount; uniform float uVignette;
+    varying vec2 vUv;
+    void main() {
+      vec4 src = texture2D(tDiffuse, vUv);
+      vec3 c = src.rgb;
+      vec3 lc = clamp(c, 0.0, 1.0);
+      // gentle S-curve, a touch more saturation, warm highlights / cool shadows
+      vec3 s = mix(lc, lc * lc * (3.0 - 2.0 * lc), 0.18);
+      float l = dot(s, vec3(0.299, 0.587, 0.114));
+      s = mix(vec3(l), s, 1.1);
+      s *= mix(vec3(0.95, 0.98, 1.06), vec3(1.05, 1.0, 0.95), smoothstep(0.15, 0.7, l));
+      c = mix(c, s + max(c - 1.0, 0.0), uAmount);
+      float d = length((vUv - 0.5) * vec2(1.0, 0.8));
+      c *= 1.0 - uVignette * smoothstep(0.3, 0.8, d);
+      gl_FragColor = vec4(c, src.a);
+    }`
     };
     render_default = initRenderer;
   }
@@ -21013,379 +25269,164 @@ function startMusic() {
 // src/platform.js
 var platform_exports = {};
 __export(platform_exports, {
-  base64ToBytes: () => base64ToBytes,
-  bytesToBase64: () => bytesToBase64,
+  canSignIn: () => canSignIn,
   cloudLoad: () => cloudLoad,
   cloudSave: () => cloudSave,
   fetchProfile: () => fetchProfile,
+  flushCloudSave: () => flushCloudSave,
   getDaily: () => getDaily,
   getGameScope: () => getGameScope,
   getLeaderboard: () => getLeaderboard,
   getNickname: () => getNickname,
-  getServerTime: () => getServerTime,
   getSyncStatus: () => getSyncStatus,
+  getUserId: () => getUserId,
   handshake: () => handshake,
+  inviteLink: () => inviteLink,
   isHosted: () => isHosted,
   isOffline: () => isOffline,
-  submitScore: () => submitScore,
-  unlockAchievement: () => unlockAchievement,
-  unzipFirstEntry: () => unzipFirstEntry,
-  zipStore: () => zipStore
+  loadBindings: () => loadBindings,
+  loadRemoteSettings: () => loadRemoteSettings,
+  onAuthChange: () => onAuthChange,
+  signIn: () => signIn,
+  syncSettings: () => syncSettings
 });
 init_rules();
-var TIMEOUT_MS = 5e3;
-var REFRESH_MS = 45 * 60 * 1e3;
-var REFRESH_RETRY_MS = 60 * 1e3;
-var launchToken = "";
-var fromFragment = false;
-var userSub = "";
-var gameScope = "";
+var SAVE_DEBOUNCE_MS = 2e3;
 var nickname = "";
-var offline = false;
 var syncState = "offline";
-var refreshTimer = 0;
-var saveTimer = 0;
-var pendingDoc = null;
-var nickCache = /* @__PURE__ */ new Map();
+var sentSettings = {};
+var settingsLoaded = false;
+var authListeners = /* @__PURE__ */ new Set();
+function sdk() {
+  return globalThis.StarHermit || null;
+}
 function isOffline() {
-  return offline;
+  return !isHosted();
 }
 function isHosted() {
-  return fromFragment;
+  return !!(sdk() && sdk().signedIn);
 }
 function getGameScope() {
-  return gameScope;
+  return isHosted() && sdk().slug || "";
 }
 function getNickname() {
-  return nickname;
+  return isHosted() ? nickname : "";
 }
 function getSyncStatus() {
   return syncState;
 }
-function decodeJwtPayload(t) {
-  try {
-    const seg = String(t).split(".")[1];
-    if (!seg) return null;
-    const b64 = seg.replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(atob(b64 + "=".repeat((4 - b64.length % 4) % 4)));
-  } catch {
-    return null;
-  }
+function getUserId() {
+  return isHosted() ? sdk().userId : "";
 }
-function acceptToken(t, fragment2) {
-  launchToken = t || "";
-  fromFragment = !!(fragment2 && launchToken);
-  const claims = decodeJwtPayload(launchToken);
-  userSub = claims && typeof claims.sub === "string" ? claims.sub : "";
-  gameScope = claims && typeof claims.game_scope === "string" ? claims.game_scope : "";
-  if (userSub && !nickname) nickname = "Player " + userSub.slice(0, 8);
-  scheduleRefresh();
+function onAuthChange(fn) {
+  authListeners.add(fn);
 }
+var wired = false;
 function handshake() {
-  try {
-    const u = new URL(window.location.href);
-    if (u.hash.length > 1) {
-      const frag = new URLSearchParams(u.hash.slice(1));
-      const t2 = frag.get("game_token");
-      if (t2) {
-        acceptToken(t2, true);
-        window.history.replaceState({}, "", u.pathname + u.search);
-        return;
-      }
+  const sh = sdk();
+  if (!sh) return;
+  if (!sh.signedIn) sh.init();
+  if (wired) return;
+  wired = true;
+  if (sh.userId && !nickname) nickname = "Player " + String(sh.userId).slice(0, 6);
+  if (isHosted()) syncState = "synced";
+  sh.on("saved", (ok2) => {
+    syncState = ok2 ? "synced" : "offline";
+  });
+  sh.on("auth", (a) => {
+    if (!a.signedIn) {
+      nickname = "";
+      syncState = "offline";
     }
-    const host = u.hostname;
-    if (host !== "localhost" && host !== "127.0.0.1" && host !== "[::1]") return;
-    const t = u.searchParams.get("game_token") || u.searchParams.get("token") || u.searchParams.get("launch");
-    if (t) {
-      acceptToken(t, false);
-      window.history.replaceState({}, "", u.pathname + u.search);
-    }
-  } catch {
-  }
-}
-function authHeaders(extra) {
-  const h = { ...extra || {} };
-  if (launchToken) h.Authorization = "Bearer " + launchToken;
-  return h;
-}
-async function request(path, opts = {}) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(path, {
-      ...opts,
-      headers: authHeaders({ "content-type": "application/json", ...opts.headers || {} }),
-      signal: ctrl.signal
+    for (const fn of authListeners) fn({ signedIn: !!a.signedIn });
+  });
+  if (typeof window !== "undefined" && window.addEventListener) {
+    window.addEventListener("pagehide", () => {
+      flushCloudSave();
     });
-    if (res.status === 429) return { error: "rate-limited" };
-    let data = null;
-    try {
-      data = await res.json();
-    } catch {
-      data = null;
-    }
-    if (!res.ok) return { error: data && data.error || "http-" + res.status };
-    if (data && typeof data === "object" && data.error) return { error: data.error };
-    offline = false;
-    return data;
-  } catch {
-    offline = true;
-    return { error: "offline" };
-  } finally {
-    clearTimeout(timer);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) flushCloudSave();
+    });
   }
 }
-function post(payload) {
-  return { method: "POST", body: JSON.stringify(payload) };
+function canSignIn() {
+  return !!(sdk() && sdk().canSignIn());
 }
-function scheduleRefresh(ms) {
-  clearTimeout(refreshTimer);
-  refreshTimer = 0;
-  if (!isHosted() || !gameScope || !launchToken) return;
-  refreshTimer = setTimeout(refreshToken, ms || REFRESH_MS);
+function signIn() {
+  return !!(sdk() && sdk().signIn());
 }
-async function refreshToken() {
-  const r = await request("/api/v1/games/" + encodeURIComponent(gameScope) + "/launch-token", post({}));
-  const t = r && (r.token || r.launchToken);
-  if (typeof t === "string" && t) launchToken = t;
-  scheduleRefresh(t ? REFRESH_MS : REFRESH_RETRY_MS);
-}
-var CRC_TABLE = (() => {
-  const t = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
-    t[n] = c >>> 0;
-  }
-  return t;
-})();
-function crc32(bytes) {
-  let c = 4294967295;
-  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 255] ^ c >>> 8;
-  return (c ^ 4294967295) >>> 0;
-}
-function zipStore(name, dataBytes) {
-  const enc = new TextEncoder();
-  const nameB = enc.encode(name);
-  const crc = crc32(dataBytes);
-  const out = [];
-  const u16 = (v) => out.push(v & 255, v >> 8 & 255);
-  const u32 = (v) => out.push(v & 255, v >> 8 & 255, v >> 16 & 255, v >>> 24 & 255);
-  u32(67324752);
-  u16(20);
-  u16(0);
-  u16(0);
-  u16(0);
-  u16(0);
-  u32(crc);
-  u32(dataBytes.length);
-  u32(dataBytes.length);
-  u16(nameB.length);
-  u16(0);
-  const local = out.length;
-  const head = new Uint8Array(out);
-  const cd = [];
-  const c16 = (v) => cd.push(v & 255, v >> 8 & 255);
-  const c32 = (v) => cd.push(v & 255, v >> 8 & 255, v >> 16 & 255, v >>> 24 & 255);
-  c32(33639248);
-  c16(20);
-  c16(20);
-  c16(0);
-  c16(0);
-  c16(0);
-  c16(0);
-  c32(crc);
-  c32(dataBytes.length);
-  c32(dataBytes.length);
-  c16(nameB.length);
-  c16(0);
-  c16(0);
-  c16(0);
-  c16(0);
-  c32(0);
-  c32(0);
-  const cdHead = new Uint8Array(cd);
-  const cdOff = head.length + nameB.length + dataBytes.length;
-  const parts = [head, nameB, dataBytes, cdHead, nameB];
-  const eocd = [];
-  const e32 = (v) => eocd.push(v & 255, v >> 8 & 255, v >> 16 & 255, v >>> 24 & 255);
-  const e16 = (v) => eocd.push(v & 255, v >> 8 & 255);
-  e32(101010256);
-  e16(0);
-  e16(0);
-  e16(1);
-  e16(1);
-  e32(cdHead.length + nameB.length);
-  e32(cdOff);
-  e16(0);
-  parts.push(new Uint8Array(eocd));
-  const total = parts.reduce((n, p) => n + p.length, 0);
-  const buf = new Uint8Array(total);
-  let o = 0;
-  for (const p of parts) {
-    buf.set(p, o);
-    o += p.length;
-  }
-  return buf;
-}
-function unzipFirstEntry(zipBytes) {
-  const dv = new DataView(zipBytes.buffer, zipBytes.byteOffset, zipBytes.byteLength);
-  let off = 0;
-  while (off + 30 <= zipBytes.length && dv.getUint32(off, true) === 67324752) {
-    const method = dv.getUint16(off + 8, true);
-    const size = dv.getUint32(off + 18, true);
-    const nameLen = dv.getUint16(off + 26, true);
-    const extraLen = dv.getUint16(off + 28, true);
-    const dataOff = off + 30 + nameLen + extraLen;
-    if (method !== 0) throw new Error("unsupported zip entry");
-    return zipBytes.slice(dataOff, dataOff + size);
-  }
-  throw new Error("bad zip");
-}
-function bytesToBase64(bytes) {
-  let s = "";
-  for (let i = 0; i < bytes.length; i += 32768)
-    s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
-  return btoa(s);
-}
-function base64ToBytes(b64) {
-  const s = atob(b64);
-  const b = new Uint8Array(s.length);
-  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
-  return b;
+function inviteLink() {
+  return isHosted() ? sdk().inviteLink() : null;
 }
 async function cloudLoad() {
-  if (!isHosted() || !gameScope) return null;
-  try {
-    const res = await fetch("/api/v1/me/cloud-saves/" + encodeURIComponent(gameScope), { headers: authHeaders() });
-    if (!res.ok) {
-      syncState = res.status === 404 ? "synced" : "offline";
-      return null;
-    }
-    const doc = JSON.parse(new TextDecoder().decode(unzipFirstEntry(new Uint8Array(await res.arrayBuffer()))));
-    syncState = "synced";
-    return doc;
-  } catch {
-    syncState = "offline";
-    return null;
-  }
+  if (!isHosted()) return null;
+  const doc = await sdk().loadJSON();
+  syncState = "synced";
+  return doc && typeof doc === "object" ? doc : null;
 }
 function cloudSave(doc) {
-  if (!isHosted() || !gameScope || !doc) return;
-  pendingDoc = doc;
+  if (!isHosted() || !doc) return;
   syncState = "saving";
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(flushCloudSave, 2e3);
+  sdk().saveJSON(doc, SAVE_DEBOUNCE_MS);
 }
-async function flushCloudSave() {
-  clearTimeout(saveTimer);
-  saveTimer = 0;
-  const doc = pendingDoc;
-  pendingDoc = null;
-  if (!doc || !isHosted() || !gameScope) return;
-  try {
-    const zip = zipStore("save.json", new TextEncoder().encode(JSON.stringify(doc)));
-    const res = await fetch("/api/v1/me/cloud-saves/" + encodeURIComponent(gameScope), {
-      method: "PUT",
-      headers: authHeaders({ "content-type": "application/json" }),
-      body: JSON.stringify({ dataBase64: bytesToBase64(zip) })
-    });
-    syncState = res.ok ? "synced" : "offline";
-  } catch {
-    syncState = "offline";
+function flushCloudSave() {
+  if (!isHosted()) return Promise.resolve(false);
+  return sdk().flushSave(true);
+}
+async function loadRemoteSettings() {
+  if (!isHosted()) return {};
+  const s = await sdk().getSettings() || {};
+  settingsLoaded = true;
+  for (const [k, v] of Object.entries(s)) sentSettings[k] = JSON.stringify(v);
+  return s;
+}
+function syncSettings(prefs) {
+  if (!isHosted() || !settingsLoaded) return Promise.resolve(null);
+  const patch = {};
+  for (const [k, v] of Object.entries(prefs || {})) {
+    if (k === "version") continue;
+    const json = JSON.stringify(v);
+    if (sentSettings[k] !== json) {
+      patch[k] = v;
+      sentSettings[k] = json;
+    }
   }
+  return Object.keys(patch).length ? sdk().patchSettings(patch) : Promise.resolve(null);
 }
-if (typeof window !== "undefined") {
-  window.addEventListener("pagehide", () => {
-    if (saveTimer) flushCloudSave();
-  });
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden && saveTimer) flushCloudSave();
-  });
+function loadBindings(defaults) {
+  const copy = () => Object.fromEntries(Object.entries(defaults).map(([k, v]) => [k, v.slice()]));
+  if (!isHosted()) return Promise.resolve(copy());
+  return sdk().loadBindings(defaults).catch(copy);
 }
 async function fetchProfile() {
-  if (!isHosted() || !userSub) return false;
-  const r = await request("/api/v1/users/" + encodeURIComponent(userSub) + "/profile");
-  if (r && !r.error) {
-    const n = typeof r.nickname === "string" ? r.nickname.trim() : "";
-    nickname = n || "Player " + String(r.id || userSub).slice(0, 8);
-    nickCache.set(userSub, nickname);
-    return true;
-  }
-  if (!nickname) nickname = "Player " + userSub.slice(0, 8);
-  return false;
+  if (!isHosted()) return false;
+  const p = await sdk().profile();
+  if (p) nickname = p.displayName;
+  return !!(p && p.nickname);
 }
 async function resolveNickname(userId) {
   const id = String(userId || "");
   if (!id) return "";
-  if (nickCache.has(id)) return nickCache.get(id);
-  let name = "Player " + id.slice(0, 8);
-  const r = await request("/api/v1/users/" + encodeURIComponent(id) + "/profile");
-  if (r && !r.error) {
-    const n = typeof r.nickname === "string" ? r.nickname.trim() : "";
-    if (n) name = n;
-  }
-  nickCache.set(id, name);
-  return name;
-}
-async function getServerTime() {
-  if (!isHosted()) {
-    const t0 = Date.now();
-    const r = await request("/api/v1/time");
-    const t1 = Date.now();
-    if (!r.error) {
-      const serverMs = Number(r.now ?? r.serverTime ?? r.epochMs);
-      if (!Number.isFinite(serverMs)) return { error: "time-shape", now: t1, offset: 0 };
-      const adjusted = serverMs + (t1 - t0) / 2;
-      return { now: adjusted, offset: adjusted - t1 };
-    }
-    return { error: r.error, now: t1, offset: 0 };
-  }
-  return { now: Date.now(), offset: 0 };
+  const p = await sdk().profile(id);
+  return p ? p.displayName : "Player " + id.slice(0, 6);
 }
 async function getDaily() {
-  if (!isHosted()) {
-    const r = await request("/api/v1/daily");
-    if (!r.error) return r;
-  }
   const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   return { date, seed: dailySeed(date), local: true };
 }
-async function getLeaderboard(board = "global", opts = {}) {
-  if (isHosted()) {
-    const g = await request("/api/v1/games/" + encodeURIComponent(gameScope));
-    const leaderboardId = g && !g.error ? g.leaderboardId : null;
-    if (!leaderboardId) return { error: g && g.error || "no-board" };
-    const e = await request("/api/v1/leaderboards/" + encodeURIComponent(leaderboardId) + "/entries?pageSize=20");
-    if (!e || e.error || !Array.isArray(e.entries)) return { error: e && e.error || "board-error" };
-    return {
-      hosted: true,
-      entries: await Promise.all(e.entries.slice(0, 20).map(async (en) => ({
-        name: await resolveNickname(en.userId != null ? en.userId : en.user),
-        score: en.score | 0,
-        goal: en.components && en.components.goal != null ? en.components.goal : 0
-      })))
-    };
-  }
-  let url = "/api/v1/leaderboard?board=" + encodeURIComponent(board);
-  if (opts.date) url += "&date=" + encodeURIComponent(opts.date);
-  const r = await request(url);
-  if (r.error) return r;
+async function getLeaderboard() {
+  if (!isHosted()) return { error: "local" };
+  const r = await sdk().leaderboard(null, { pageSize: 20 });
+  if (!r || !r.board) return { error: "no-board" };
   return {
-    entries: (r.entries || []).slice(0, 20).map((en) => ({
-      name: en.name,
-      score: en.score,
+    hosted: true,
+    title: r.board.name || r.board.key || "",
+    entries: await Promise.all((r.items || []).slice(0, 20).map(async (en) => ({
+      name: await resolveNickname(en.userId),
+      score: en.score | 0,
       goal: en.components && en.components.goal != null ? en.components.goal : 0
-    }))
+    })))
   };
-}
-async function submitScore(payload) {
-  if (isHosted()) return { error: "read-only" };
-  return request("/api/v1/leaderboard/submit", post(payload));
-}
-async function unlockAchievement(key, playerId) {
-  if (isHosted()) return { ok: true };
-  return request("/api/v1/achievements", post({ key, playerId }));
 }
 
 // src/ui.js
@@ -22397,6 +26438,425 @@ function createGameSession({ level, seed, mode }) {
 }
 
 // src/ui.js
+init_gfx();
+
+// src/gfx-i18n.js
+var EN = {
+  graphics: "Graphics",
+  quality: "Quality",
+  auto: "Auto (detected: {tier})",
+  low: "Low",
+  balanced: "Balanced",
+  high: "High",
+  ultra: "Ultra",
+  renderScale: "Render scale",
+  fromPreset: "From preset ({tier})",
+  adaptive: "Adaptive resolution",
+  showFps: "Show frame rate",
+  postFailed: "Post-processing is unavailable on this device; the chamber renders without it.",
+  unknownGpu: "unknown GPU",
+  cat_shadows: "Shadows",
+  cat_ao: "Ambient occlusion",
+  cat_bloom: "Bloom",
+  cat_grade: "Color grade",
+  cat_antialias: "Anti-aliasing",
+  cat_reflections: "Reflections",
+  cat_particles: "Particles",
+  cat_background: "Background motion",
+  cat_detail: "Surface detail",
+  t_off: "Off",
+  t_on: "On",
+  t_low: "Low",
+  t_medium: "Medium",
+  t_high: "High",
+  t_fxaa: "FXAA",
+  t_smaa: "SMAA",
+  t_msaa: "MSAA",
+  t_static: "Static",
+  t_animated: "Animated",
+  t_plain: "Plain",
+  t_detailed: "Detailed",
+  d_noShadows: "no shadows",
+  d_shadows: "{n}\xB2 shadows",
+  d_ao: "ambient occlusion",
+  d_aoHigh: "full ambient occlusion",
+  d_bloom: "bloom",
+  d_reflections: "reflections",
+  d_noAa: "no anti-aliasing"
+};
+var ES = {
+  graphics: "Gr\xE1ficos",
+  quality: "Calidad",
+  auto: "Autom\xE1tica (detectada: {tier})",
+  low: "Baja",
+  balanced: "Equilibrada",
+  high: "Alta",
+  ultra: "Ultra",
+  renderScale: "Escala de renderizado",
+  fromPreset: "Seg\xFAn preajuste ({tier})",
+  adaptive: "Resoluci\xF3n adaptativa",
+  showFps: "Mostrar fotogramas por segundo",
+  postFailed: "El posprocesado no est\xE1 disponible en este dispositivo; la c\xE1mara se dibuja sin \xE9l.",
+  unknownGpu: "GPU desconocida",
+  cat_shadows: "Sombras",
+  cat_ao: "Oclusi\xF3n ambiental",
+  cat_bloom: "Resplandor",
+  cat_grade: "Correcci\xF3n de color",
+  cat_antialias: "Suavizado",
+  cat_reflections: "Reflejos",
+  cat_particles: "Part\xEDculas",
+  cat_background: "Movimiento de fondo",
+  cat_detail: "Detalle de superficies",
+  t_off: "Desactivado",
+  t_on: "Activado",
+  t_low: "Bajo",
+  t_medium: "Medio",
+  t_high: "Alto",
+  t_fxaa: "FXAA",
+  t_smaa: "SMAA",
+  t_msaa: "MSAA",
+  t_static: "Est\xE1tico",
+  t_animated: "Animado",
+  t_plain: "Simple",
+  t_detailed: "Detallado",
+  d_noShadows: "sin sombras",
+  d_shadows: "sombras {n}\xB2",
+  d_ao: "oclusi\xF3n ambiental",
+  d_aoHigh: "oclusi\xF3n ambiental completa",
+  d_bloom: "resplandor",
+  d_reflections: "reflejos",
+  d_noAa: "sin suavizado"
+};
+var DE = {
+  graphics: "Grafik",
+  quality: "Qualit\xE4t",
+  auto: "Automatisch (erkannt: {tier})",
+  low: "Niedrig",
+  balanced: "Ausgewogen",
+  high: "Hoch",
+  ultra: "Ultra",
+  renderScale: "Renderskalierung",
+  fromPreset: "Laut Voreinstellung ({tier})",
+  adaptive: "Adaptive Aufl\xF6sung",
+  showFps: "Bildrate anzeigen",
+  postFailed: "Nachbearbeitung ist auf diesem Ger\xE4t nicht verf\xFCgbar; die Kammer wird ohne sie dargestellt.",
+  unknownGpu: "unbekannte GPU",
+  cat_shadows: "Schatten",
+  cat_ao: "Umgebungsverdeckung",
+  cat_bloom: "Leuchten",
+  cat_grade: "Farbkorrektur",
+  cat_antialias: "Kantengl\xE4ttung",
+  cat_reflections: "Reflexionen",
+  cat_particles: "Partikel",
+  cat_background: "Hintergrundbewegung",
+  cat_detail: "Oberfl\xE4chendetails",
+  t_off: "Aus",
+  t_on: "An",
+  t_low: "Niedrig",
+  t_medium: "Mittel",
+  t_high: "Hoch",
+  t_fxaa: "FXAA",
+  t_smaa: "SMAA",
+  t_msaa: "MSAA",
+  t_static: "Statisch",
+  t_animated: "Animiert",
+  t_plain: "Schlicht",
+  t_detailed: "Detailliert",
+  d_noShadows: "keine Schatten",
+  d_shadows: "{n}\xB2-Schatten",
+  d_ao: "Umgebungsverdeckung",
+  d_aoHigh: "volle Umgebungsverdeckung",
+  d_bloom: "Leuchten",
+  d_reflections: "Reflexionen",
+  d_noAa: "keine Kantengl\xE4ttung"
+};
+var FR = {
+  graphics: "Graphismes",
+  quality: "Qualit\xE9",
+  auto: "Automatique (d\xE9tect\xE9e : {tier})",
+  low: "Basse",
+  balanced: "\xC9quilibr\xE9e",
+  high: "Haute",
+  ultra: "Ultra",
+  renderScale: "\xC9chelle de rendu",
+  fromPreset: "Selon le pr\xE9r\xE9glage ({tier})",
+  adaptive: "R\xE9solution adaptative",
+  showFps: "Afficher la fr\xE9quence d\u2019images",
+  postFailed: "Le post-traitement n\u2019est pas disponible sur cet appareil ; la chambre est affich\xE9e sans lui.",
+  unknownGpu: "GPU inconnu",
+  cat_shadows: "Ombres",
+  cat_ao: "Occlusion ambiante",
+  cat_bloom: "Halo lumineux",
+  cat_grade: "\xC9talonnage des couleurs",
+  cat_antialias: "Anticr\xE9nelage",
+  cat_reflections: "Reflets",
+  cat_particles: "Particules",
+  cat_background: "Animation d\u2019arri\xE8re-plan",
+  cat_detail: "D\xE9tail des surfaces",
+  t_off: "D\xE9sactiv\xE9",
+  t_on: "Activ\xE9",
+  t_low: "Bas",
+  t_medium: "Moyen",
+  t_high: "\xC9lev\xE9",
+  t_fxaa: "FXAA",
+  t_smaa: "SMAA",
+  t_msaa: "MSAA",
+  t_static: "Statique",
+  t_animated: "Anim\xE9",
+  t_plain: "Simple",
+  t_detailed: "D\xE9taill\xE9",
+  d_noShadows: "sans ombres",
+  d_shadows: "ombres {n}\xB2",
+  d_ao: "occlusion ambiante",
+  d_aoHigh: "occlusion ambiante compl\xE8te",
+  d_bloom: "halo",
+  d_reflections: "reflets",
+  d_noAa: "sans anticr\xE9nelage"
+};
+var PT = {
+  graphics: "Gr\xE1ficos",
+  quality: "Qualidade",
+  auto: "Autom\xE1tica (detectada: {tier})",
+  low: "Baixa",
+  balanced: "Equilibrada",
+  high: "Alta",
+  ultra: "Ultra",
+  renderScale: "Escala de renderiza\xE7\xE3o",
+  fromPreset: "Do predefinido ({tier})",
+  adaptive: "Resolu\xE7\xE3o adapt\xE1vel",
+  showFps: "Mostrar taxa de quadros",
+  postFailed: "O p\xF3s-processamento n\xE3o est\xE1 dispon\xEDvel neste dispositivo; a c\xE2mara \xE9 exibida sem ele.",
+  unknownGpu: "GPU desconhecida",
+  cat_shadows: "Sombras",
+  cat_ao: "Oclus\xE3o ambiente",
+  cat_bloom: "Brilho",
+  cat_grade: "Corre\xE7\xE3o de cor",
+  cat_antialias: "Antisserrilhado",
+  cat_reflections: "Reflexos",
+  cat_particles: "Part\xEDculas",
+  cat_background: "Movimento de fundo",
+  cat_detail: "Detalhe das superf\xEDcies",
+  t_off: "Desligado",
+  t_on: "Ligado",
+  t_low: "Baixo",
+  t_medium: "M\xE9dio",
+  t_high: "Alto",
+  t_fxaa: "FXAA",
+  t_smaa: "SMAA",
+  t_msaa: "MSAA",
+  t_static: "Est\xE1tico",
+  t_animated: "Animado",
+  t_plain: "Simples",
+  t_detailed: "Detalhado",
+  d_noShadows: "sem sombras",
+  d_shadows: "sombras {n}\xB2",
+  d_ao: "oclus\xE3o ambiente",
+  d_aoHigh: "oclus\xE3o ambiente completa",
+  d_bloom: "brilho",
+  d_reflections: "reflexos",
+  d_noAa: "sem antisserrilhado"
+};
+var IT = {
+  graphics: "Grafica",
+  quality: "Qualit\xE0",
+  auto: "Automatica (rilevata: {tier})",
+  low: "Bassa",
+  balanced: "Bilanciata",
+  high: "Alta",
+  ultra: "Ultra",
+  renderScale: "Scala di rendering",
+  fromPreset: "Da preimpostazione ({tier})",
+  adaptive: "Risoluzione adattiva",
+  showFps: "Mostra frequenza fotogrammi",
+  postFailed: "La post-elaborazione non \xE8 disponibile su questo dispositivo; la camera viene mostrata senza.",
+  unknownGpu: "GPU sconosciuta",
+  cat_shadows: "Ombre",
+  cat_ao: "Occlusione ambientale",
+  cat_bloom: "Bagliore",
+  cat_grade: "Correzione colore",
+  cat_antialias: "Antialiasing",
+  cat_reflections: "Riflessi",
+  cat_particles: "Particelle",
+  cat_background: "Movimento di sfondo",
+  cat_detail: "Dettaglio superfici",
+  t_off: "Disattivato",
+  t_on: "Attivo",
+  t_low: "Basso",
+  t_medium: "Medio",
+  t_high: "Alto",
+  t_fxaa: "FXAA",
+  t_smaa: "SMAA",
+  t_msaa: "MSAA",
+  t_static: "Statico",
+  t_animated: "Animato",
+  t_plain: "Semplice",
+  t_detailed: "Dettagliato",
+  d_noShadows: "nessuna ombra",
+  d_shadows: "ombre {n}\xB2",
+  d_ao: "occlusione ambientale",
+  d_aoHigh: "occlusione ambientale completa",
+  d_bloom: "bagliore",
+  d_reflections: "riflessi",
+  d_noAa: "nessun antialiasing"
+};
+var LOCALES = {
+  "en-US": EN,
+  "en-GB": { ...EN, cat_grade: "Colour grade" },
+  "es-419": ES,
+  "es-ES": { ...ES, showFps: "Mostrar im\xE1genes por segundo" },
+  "de-DE": DE,
+  "fr-FR": FR,
+  "fr-CA": { ...FR, showFps: "Afficher la fr\xE9quence d\u2019affichage", cat_bloom: "\xC9clat lumineux" },
+  "pt-BR": { ...PT, postFailed: "O p\xF3s-processamento n\xE3o est\xE1 dispon\xEDvel neste dispositivo; a c\xE2mera \xE9 exibida sem ele." },
+  "it-IT": IT
+};
+var BY_LANG = { en: "en-US", es: "es-419", de: "de-DE", fr: "fr-FR", pt: "pt-BR", it: "it-IT" };
+function pickLocale(lang) {
+  const l = String(lang || "en-US");
+  if (LOCALES[l]) return l;
+  const lower = l.toLowerCase();
+  for (const k of Object.keys(LOCALES)) if (k.toLowerCase() === lower) return k;
+  if (/^es-es$/i.test(l)) return "es-ES";
+  if (/^en-(gb|au|nz|ie|in|za)$/i.test(l)) return "en-GB";
+  if (/^fr-ca$/i.test(l)) return "fr-CA";
+  return BY_LANG[lower.split("-")[0]] || "en-US";
+}
+function translator(lang) {
+  const table = LOCALES[pickLocale(lang)];
+  return (key, vars) => {
+    let s = table[key] ?? EN[key] ?? key;
+    if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace("{" + k + "}", v);
+    return s;
+  };
+}
+function describeLocalized(t, r, shadowMap, pixels) {
+  const parts = [
+    r.shadows === "off" ? t("d_noShadows") : t("d_shadows", { n: shadowMap[r.shadows] }),
+    r.ao === "off" ? null : r.ao === "high" ? t("d_aoHigh") : t("d_ao"),
+    r.bloom === "on" ? t("d_bloom") : null,
+    r.reflections === "on" ? t("d_reflections") : null,
+    r.antialias === "off" ? t("d_noAa") : r.antialias.toUpperCase(),
+    pixels ? `${pixels[0]}\xD7${pixels[1]} px` : null
+  ];
+  return parts.filter(Boolean).join(" \xB7 ");
+}
+
+// src/platform-i18n.js
+var EN_US = {
+  signIn: "Sign in with StarHermit",
+  invite: "Invite a friend",
+  inviteCopied: "Invite link copied to the clipboard.",
+  inviteFailed: "Copy this invite link: {link}",
+  signedOut: "Signed out of StarHermit \u2014 progress keeps saving on this device."
+};
+var STRINGS = {
+  "en-US": EN_US,
+  "en-GB": { ...EN_US },
+  "es-419": {
+    signIn: "Iniciar sesi\xF3n con StarHermit",
+    invite: "Invitar a un amigo",
+    inviteCopied: "Enlace de invitaci\xF3n copiado al portapapeles.",
+    inviteFailed: "Copia este enlace de invitaci\xF3n: {link}",
+    signedOut: "Se cerr\xF3 la sesi\xF3n de StarHermit; el progreso se sigue guardando en este dispositivo."
+  },
+  "es-ES": {
+    signIn: "Iniciar sesi\xF3n con StarHermit",
+    invite: "Invitar a un amigo",
+    inviteCopied: "Enlace de invitaci\xF3n copiado al portapapeles.",
+    inviteFailed: "Copia este enlace de invitaci\xF3n: {link}",
+    signedOut: "Se ha cerrado la sesi\xF3n de StarHermit; el progreso se sigue guardando en este dispositivo."
+  },
+  "de-DE": {
+    signIn: "Mit StarHermit anmelden",
+    invite: "Freund einladen",
+    inviteCopied: "Einladungslink in die Zwischenablage kopiert.",
+    inviteFailed: "Kopiere diesen Einladungslink: {link}",
+    signedOut: "Von StarHermit abgemeldet \u2013 der Fortschritt wird weiter auf diesem Ger\xE4t gespeichert."
+  },
+  "fr-FR": {
+    signIn: "Se connecter avec StarHermit",
+    invite: "Inviter un ami",
+    inviteCopied: "Lien d\u2019invitation copi\xE9 dans le presse-papiers.",
+    inviteFailed: "Copiez ce lien d\u2019invitation : {link}",
+    signedOut: "D\xE9connect\xE9 de StarHermit \u2014 la progression reste enregistr\xE9e sur cet appareil."
+  },
+  "fr-CA": {
+    signIn: "Se connecter avec StarHermit",
+    invite: "Inviter un ami",
+    inviteCopied: "Lien d\u2019invitation copi\xE9 dans le presse-papiers.",
+    inviteFailed: "Copiez ce lien d\u2019invitation : {link}",
+    signedOut: "D\xE9connect\xE9 de StarHermit \u2014 la progression reste enregistr\xE9e sur cet appareil."
+  },
+  "pt-BR": {
+    signIn: "Entrar com StarHermit",
+    invite: "Convidar um amigo",
+    inviteCopied: "Link de convite copiado para a \xE1rea de transfer\xEAncia.",
+    inviteFailed: "Copie este link de convite: {link}",
+    signedOut: "Voc\xEA saiu do StarHermit \u2014 o progresso continua salvo neste dispositivo."
+  },
+  "it-IT": {
+    signIn: "Accedi con StarHermit",
+    invite: "Invita un amico",
+    inviteCopied: "Link di invito copiato negli appunti.",
+    inviteFailed: "Copia questo link di invito: {link}",
+    signedOut: "Disconnesso da StarHermit: i progressi continuano a essere salvati su questo dispositivo."
+  }
+};
+var PLATFORM_LOCALES = Object.keys(STRINGS);
+function pickPlatformLocale(tags) {
+  const list = (Array.isArray(tags) ? tags : [tags]).filter(Boolean).map(String);
+  for (const tag of list) {
+    const t = tag.replace("_", "-");
+    const exact = PLATFORM_LOCALES.find((l) => l.toLowerCase() === t.toLowerCase());
+    if (exact) return exact;
+    const [lang, region = ""] = t.split("-");
+    const r = region.toUpperCase();
+    switch (lang.toLowerCase()) {
+      case "en":
+        return r === "GB" || r === "UK" ? "en-GB" : "en-US";
+      case "es":
+        return r === "ES" ? "es-ES" : "es-419";
+      case "fr":
+        return r === "CA" ? "fr-CA" : "fr-FR";
+      case "pt":
+        return "pt-BR";
+      case "de":
+        return "de-DE";
+      case "it":
+        return "it-IT";
+    }
+  }
+  return "en-US";
+}
+function platformStrings(locale) {
+  return STRINGS[locale] || EN_US;
+}
+function currentPlatformStrings(locale) {
+  if (locale) return platformStrings(pickPlatformLocale(locale));
+  const langs = typeof navigator !== "undefined" ? navigator.languages || [navigator.language] : [];
+  return platformStrings(pickPlatformLocale(langs));
+}
+
+// src/ui.js
+var gpuProbe = null;
+function probeGpu() {
+  if (gpuProbe) return gpuProbe;
+  let name = "";
+  try {
+    const c = document.createElement("canvas");
+    const gl = c.getContext("webgl2") || c.getContext("webgl");
+    if (gl) {
+      const ext = gl.getExtension("WEBGL_debug_renderer_info");
+      name = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+      const lose = gl.getExtension("WEBGL_lose_context");
+      if (lose) lose.loseContext();
+    }
+  } catch {
+  }
+  const mobile = window.matchMedia && window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(any-pointer: fine)").matches || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "");
+  gpuProbe = { name: String(name || ""), detected: detectPreset(name, { mobile }) };
+  return gpuProbe;
+}
 var MATERIAL_KEYS = Object.keys(MATERIALS);
 var TERMINAL_TEXT = {
   "goal-complete": "All payloads delivered",
@@ -22431,6 +26891,7 @@ function init(deps) {
   function saveSettings() {
     storage2.saveSettings(settings);
     platform.cloudSave(currentDoc());
+    platform.syncSettings(settings);
     updateNetStatus();
     analytics2("settings-change", { consent: settings.consentAnalytics });
   }
@@ -22447,7 +26908,7 @@ function init(deps) {
     if (!net) return;
     const bits = [];
     if (platform.isHosted()) bits.push(platform.getNickname() || "Player");
-    bits.push(platform.isOffline() ? "offline" : "online");
+    bits.push(platform.isOffline() ? "local" : "online");
     if (platform.isHosted()) bits.push(platform.getSyncStatus());
     net.textContent = bits.join(" \xB7 ");
   }
@@ -22463,8 +26924,8 @@ function init(deps) {
     audio.setBusVolume("voice", settings.voice);
     audio.setMuted(settings.muted);
     applyA11yClasses();
+    applyGraphics();
     if (renderer) {
-      renderer.setQuality(settings.quality);
       renderer.setReducedMotion(settings.reducedMotion);
       if (renderer.setFraming) renderer.setFraming(settings.cameraDefault === "tight" ? 0.02 : 0.1);
     }
@@ -22478,7 +26939,7 @@ function init(deps) {
   const toastRegion = el("div", { class: "pf-toasts", "aria-live": "polite" });
   const header = el("header", { class: "pf-top" }, [
     el("h1", { class: "pf-logo", text: "Physics Foundry" }),
-    el("span", { class: "pf-net-status", id: "pf-net", text: platform.isOffline() ? "offline" : "" })
+    el("span", { class: "pf-net-status", id: "pf-net", text: platform.isOffline() ? "local" : "" })
   ]);
   const main = el("main", { class: "pf-main", id: "pf-main" });
   root.append(header, main, live, alertLive, toastRegion);
@@ -22494,6 +26955,18 @@ function init(deps) {
     const t = el("div", { class: "pf-toast pf-toast-" + kind, role: "status", text: msg });
     toastRegion.append(t);
     setTimeout(() => t.remove(), 4500);
+  }
+  const tg = translator(typeof navigator !== "undefined" ? navigator.language : "en-US");
+  function gfxSaved() {
+    if (!settings.graphics || typeof settings.graphics !== "object") settings.graphics = { preset: "auto" };
+    return settings.graphics;
+  }
+  function applyGraphics() {
+    const r = resolve(gfxSaved(), probeGpu().detected);
+    document.body.dataset.gfxPreset = r.preset;
+    document.body.dataset.gfxAuto = r.auto ? "1" : "0";
+    if (renderer && renderer.setGraphics) renderer.setGraphics(gfxSaved(), probeGpu().detected);
+    return r;
   }
   function applyA11yClasses() {
     document.body.classList.toggle("pf-hc", settings.highContrast);
@@ -22530,15 +27003,15 @@ function init(deps) {
   let pauseOverlay = null;
   let settingsOverlay = null;
   let dailyInfo = null;
-  let timeOffset = 0;
+  applyGraphics();
   const canvasWrap = el("div", { class: "pf-canvas-wrap" });
   const canvas = el("canvas", { class: "pf-canvas", "aria-label": "Test chamber view. Use the action tray or keyboard for all actions." });
   canvasWrap.append(canvas);
   function ensureRenderer() {
     if (renderer || !createRenderer) return renderer;
     renderer = createRenderer(canvas, { onPick: handlePick });
+    applyGraphics();
     if (renderer) {
-      renderer.setQuality(settings.quality);
       renderer.setReducedMotion(settings.reducedMotion);
       if (renderer.setFraming) renderer.setFraming(settings.cameraDefault === "tight" ? 0.02 : 0.1);
     }
@@ -22620,10 +27093,23 @@ function init(deps) {
         el("button", { class: "pf-btn pf-btn-secondary", text: "Leaderboards", onclick: () => {
           renderScores();
           showScreen("scores");
-        } })
+        } }),
+        platform.inviteLink() ? el("button", { class: "pf-btn pf-btn-secondary", id: "pf-invite", text: ps.invite, onclick: () => inviteFriend() }) : null,
+        platform.canSignIn() ? el("button", { class: "pf-btn pf-btn-secondary", id: "pf-signin", text: ps.signIn, onclick: () => platform.signIn() }) : null
       ])
     );
     updateDailyCountdown();
+  }
+  const ps = currentPlatformStrings();
+  async function inviteFriend() {
+    const link = platform.inviteLink();
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast(ps.inviteCopied);
+    } catch {
+      toast(ps.inviteFailed.replace("{link}", link));
+    }
   }
   function quickPlay() {
     analytics2("start", { mode: progress.lastMode });
@@ -23021,6 +27507,37 @@ function init(deps) {
     }
   }
   document.addEventListener("pointerdown", () => audio.unlock());
+  const DEFAULT_BINDINGS = {
+    cursor_up: ["ArrowUp", "KeyW"],
+    cursor_down: ["ArrowDown", "KeyS"],
+    cursor_left: ["ArrowLeft", "KeyA"],
+    cursor_right: ["ArrowRight", "KeyD"],
+    spawn: ["Enter", "NumpadEnter", "Space"],
+    material_1: ["Digit1", "Numpad1"],
+    material_2: ["Digit2", "Numpad2"],
+    material_3: ["Digit3", "Numpad3"],
+    material_4: ["Digit4", "Numpad4"],
+    joint: ["KeyJ"],
+    delete: ["Delete", "Backspace"],
+    run: ["KeyR"],
+    undo: ["KeyU"],
+    reframe: ["KeyC"],
+    pause: ["Escape"]
+  };
+  let bindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+  function actionFor(code) {
+    for (const [action, codes] of Object.entries(bindings)) if (codes.includes(code)) return action;
+    return null;
+  }
+  function keyName(code) {
+    const named = { ArrowUp: "\u2191", ArrowDown: "\u2193", ArrowLeft: "\u2190", ArrowRight: "\u2192", Escape: "Esc", Space: "Space", NumpadEnter: "Num Enter" };
+    if (named[code]) return named[code];
+    if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+    if (/^Digit\d$/.test(code)) return code.slice(5);
+    if (/^Numpad\d$/.test(code)) return "Num " + code.slice(6);
+    return code;
+  }
+  const keysFor = (...actions) => actions.map((a) => (bindings[a] || []).map(keyName).join(" / ")).join(" \xB7 ");
   document.addEventListener("keydown", (ev) => {
     const overlay = settingsOverlay || pauseOverlay;
     if (overlay) {
@@ -23052,27 +27569,27 @@ function init(deps) {
       }
       return;
     }
-    const k = ev.key.toLowerCase();
+    const k = actionFor(ev.code);
     const handled = () => {
       ev.preventDefault();
       audio.unlock();
     };
-    if (k === "arrowup" || k === "w") {
+    if (k === "cursor_up") {
       handled();
       moveCursor(0, 1);
-    } else if (k === "arrowdown" || k === "s") {
+    } else if (k === "cursor_down") {
       handled();
       moveCursor(0, -1);
-    } else if (k === "arrowleft" || k === "a") {
+    } else if (k === "cursor_left") {
       handled();
       moveCursor(-1, 0);
-    } else if (k === "arrowright" || k === "d") {
+    } else if (k === "cursor_right") {
       handled();
       moveCursor(1, 0);
-    } else if (k === "enter" || k === " ") {
+    } else if (k === "spawn") {
       handled();
       trySpawn(cursor.x, cursor.y);
-    } else if (k === "j") {
+    } else if (k === "joint") {
       handled();
       if (currentLevel.allowedJoints.length) {
         jointMode = true;
@@ -23080,28 +27597,28 @@ function init(deps) {
         announce(JOINT_TYPES[selectedJoint].name + " mode: select two bodies");
         renderTray();
       }
-    } else if (k === "delete" || k === "backspace") {
+    } else if (k === "delete") {
       handled();
       deleteSelected();
-    } else if (k === "r") {
+    } else if (k === "run") {
       handled();
       doRun();
-    } else if (k === "u") {
+    } else if (k === "undo") {
       handled();
       doUndo();
-    } else if (k === "escape") {
+    } else if (k === "pause") {
       handled();
       if (jointMode) {
         jointMode = false;
         jointAnchor = null;
         renderTray();
       } else pauseGame();
-    } else if (k === "c") {
+    } else if (k === "reframe") {
       handled();
       if (renderer && renderer.frameChamber) renderer.frameChamber();
       announce("Camera re-framed");
-    } else if (["1", "2", "3", "4"].includes(k)) {
-      const i = Number(k) - 1;
+    } else if (/^material_[1-4]$/.test(k || "")) {
+      const i = Number(k.slice(-1)) - 1;
       if (currentLevel.allowedMaterials[i]) {
         handled();
         selectedMaterial = currentLevel.allowedMaterials[i];
@@ -23111,7 +27628,7 @@ function init(deps) {
     }
   });
   document.addEventListener("keyup", (ev) => {
-    if (ev.key.toLowerCase() === "j" && settings.jointMode === "hold") {
+    if (actionFor(ev.code) === "joint" && settings.jointMode === "hold") {
       jointMode = false;
       jointAnchor = null;
       if (!screens.play.hidden) renderTray();
@@ -23125,7 +27642,7 @@ function init(deps) {
           if (e.type === "spawn") {
             audio.play("spawn", { material: e.material });
             progress.counters.spawns += 1;
-            if (progress.counters.spawns >= 500) unlockAchievement2("marathon-builder");
+            if (progress.counters.spawns >= 500) unlockAchievement("marathon-builder");
             saveProgress();
           } else if (e.type === "joint") audio.play("joint");
           else if (e.type === "delete") audio.play("delete");
@@ -23173,7 +27690,7 @@ function init(deps) {
         progress.lessonsDone[currentLevel.id] = true;
         saveProgress();
         toast("Lesson complete: " + currentLevel.name, "ok");
-        if (LEARN_LESSONS.every((l) => progress.lessonsDone[l.id])) unlockAchievement2("mechanic-mastery");
+        if (LEARN_LESSONS.every((l) => progress.lessonsDone[l.id])) unlockAchievement("mechanic-mastery");
       }
     } else {
       renderLessonBanner();
@@ -23209,10 +27726,10 @@ function init(deps) {
       progress.counters.wins += 1;
       progress.counters.streak += 1;
       if (currentCtx.daily) progress.dailyAttempts[currentCtx.daily.date] = { score: score.total };
-      unlockAchievement2("first-completion");
-      if (progress.counters.streak >= 3) unlockAchievement2("streak-3");
+      unlockAchievement("first-completion");
+      if (progress.counters.streak >= 3) unlockAchievement("streak-3");
       const masteryDone = JOURNEY_LEVELS.filter((l) => l.tutorialFlags && l.tutorialFlags.mastery).every((l) => progress.completed[l.id]);
-      if (masteryDone) unlockAchievement2("mastery-milestone");
+      if (masteryDone) unlockAchievement("mastery-milestone");
     } else {
       progress.counters.streak = 0;
       if (currentCtx.daily && !progress.dailyAttempts[currentCtx.daily.date]) {
@@ -23227,15 +27744,13 @@ function init(deps) {
     renderResults({ won, score, durationMs, prevBest, newBest, firstWin, reason: st.terminalReason });
     setTimeout(() => showScreen("results"), 900);
   }
-  function unlockAchievement2(key) {
+  function unlockAchievement(key) {
     if (progress.achievements.includes(key)) return;
     progress.achievements.push(key);
     saveProgress();
     const a = ACHIEVEMENTS[key];
     toast("Achievement unlocked: " + (a ? a.name : key), "ok");
     audio.play("achievement");
-    platform.unlockAchievement(key, progress.playerId).then(() => {
-    });
   }
   const resultsScreen = makeScreen("results");
   function renderResults(r) {
@@ -23258,40 +27773,7 @@ function init(deps) {
     const ranked = (currentMode === "journey" || currentMode === "daily" || currentMode === "challenge") && !currentCtx.practice;
     const submitWrap = el("div", { class: "pf-submit" });
     if (ranked && (currentMode === "journey" || currentMode === "daily")) {
-      if (platform.isHosted()) {
-        submitWrap.append(el("p", { class: "pf-note", text: "Ranked run recorded locally. Platform leaderboards are verified server-side and read-only for clients." }));
-      } else {
-        const submitBtn = el("button", {
-          class: "pf-btn pf-btn-secondary",
-          text: "Verify & share replay",
-          onclick: async () => {
-            submitBtn.disabled = true;
-            const replay = session.getReplay();
-            const payload = {
-              board: currentMode === "daily" ? "daily" : "global",
-              name: "foundry-" + String(progress.playerId).slice(0, 8),
-              contentVersion: CONTENT_VERSION,
-              rulesetVersion: SCHEMA_VERSION,
-              commands: replay.commands,
-              stateHashes: replay.stateHashes,
-              seed: session.state.seed,
-              durationMs: r.durationMs,
-              assists: 0
-            };
-            if (currentMode === "daily") payload.date = currentCtx.daily.date;
-            else payload.levelId = currentLevel.id;
-            const res = await platform.submitScore(payload);
-            if (res.error) {
-              flashError("Submit failed: " + res.error);
-              submitBtn.disabled = false;
-            } else {
-              toast("Rank " + res.rank + " with " + res.score + " points", "ok");
-              submitBtn.textContent = "Submitted \u2014 rank " + res.rank;
-            }
-          }
-        });
-        submitWrap.append(submitBtn);
-      }
+      submitWrap.append(el("p", { class: "pf-note", text: platform.isHosted() ? "Ranked run recorded locally. Platform leaderboards are verified server-side and read-only for clients." : "Ranked run recorded on this device." }));
     } else {
       submitWrap.append(el("p", { class: "pf-note", text: "Unranked session \u2014 no leaderboard submission." }));
     }
@@ -23358,15 +27840,9 @@ function init(deps) {
   async function startDaily() {
     let date, seed;
     const d = await platform.getDaily();
-    if (!d.error) {
-      date = d.date;
-      seed = d.seed;
-      dailyInfo = d;
-    } else {
-      date = new Date(Date.now() + timeOffset).toISOString().slice(0, 10);
-      seed = dailySeed(date);
-      dailyInfo = { date, seed, offline: true };
-    }
+    date = d.date;
+    seed = d.seed;
+    dailyInfo = d;
     const level = dailyLevel(date);
     if (progress.dailyAttempts[date]) {
       toast("Daily already attempted today \u2014 playing unranked practice run", "info");
@@ -23527,6 +28003,114 @@ function init(deps) {
     }
     return "Local guest profile \u2014 progress stays in this browser.";
   }
+  function buildGraphicsSection() {
+    const g = gfxSaved();
+    const gpu = probeGpu();
+    const tierName = (p) => tg(p);
+    const section = el("section", { class: "pf-gfx", id: "pf-gfx-section", "aria-labelledby": "pf-gfx-head" });
+    const presetSel = el("select", { class: "pf-input", id: "pf-gfx-preset", "data-gfx": "preset", "aria-label": tg("quality") });
+    const scaleIn = el("input", { type: "range", id: "pf-gfx-scale", "data-gfx": "render_scale", min: "50", max: "200", step: "5", "aria-label": tg("renderScale") });
+    const scaleOut = el("output", { class: "pf-gfx-val", for: "pf-gfx-scale" });
+    const catSels = {};
+    const adaptiveIn = el("input", { type: "checkbox", id: "pf-gfx-adaptive", "data-gfx": "adaptive", "aria-label": tg("adaptive") });
+    const fpsIn = el("input", { type: "checkbox", id: "pf-gfx-fps", "data-gfx": "show_fps", "aria-label": tg("showFps") });
+    const summary = el("p", { class: "pf-note pf-gfx-summary", id: "pf-gfx-summary", "aria-live": "polite" });
+    const note = el("p", { class: "pf-note pf-gfx-note", id: "pf-gfx-note", text: tg("postFailed") });
+    note.hidden = true;
+    function fillOptions() {
+      const r = resolve(g, gpu.detected);
+      presetSel.replaceChildren(
+        el("option", { value: "auto", text: tg("auto", { tier: tierName(gpu.detected) }) }),
+        ...PRESETS.map((p) => el("option", { value: p, text: tierName(p) }))
+      );
+      presetSel.value = PRESETS.includes(g.preset) ? g.preset : "auto";
+      for (const [cat, sel] of Object.entries(catSels)) {
+        const tiers = CATEGORIES[cat];
+        sel.replaceChildren(
+          el("option", { value: "preset", text: tg("fromPreset", { tier: tg("t_" + presetTier(r.preset, cat)) }) }),
+          ...tiers.map((t) => el("option", { value: t, text: tg("t_" + t) }))
+        );
+        sel.value = tiers.includes(g[cat]) ? g[cat] : "preset";
+      }
+      const pct = Math.round((Number(g.render_scale) || 1) * 100);
+      scaleIn.value = String(Math.min(200, Math.max(50, pct)));
+      scaleOut.textContent = scaleIn.value + "%";
+      adaptiveIn.checked = g.adaptive !== false;
+      fpsIn.checked = !!g.show_fps;
+    }
+    function refreshSummary() {
+      const r = resolve(g, gpu.detected);
+      let pixels;
+      let postFailed = false;
+      const info = renderer && renderer.graphicsInfo && canvas.clientWidth > 0 ? renderer.graphicsInfo() : null;
+      if (info && info.pixels[0] > 0) {
+        pixels = info.pixels;
+        postFailed = info.postFailed;
+      } else {
+        const ratio = Math.min(window.devicePixelRatio || 1, r.dprCap) * r.scale;
+        pixels = [Math.round(window.innerWidth * ratio), Math.round(window.innerHeight * ratio)];
+      }
+      summary.textContent = (gpu.name || tg("unknownGpu")) + " \xB7 " + describeLocalized(tg, r, SHADOW_MAP, pixels) + (info && info.fps ? " \xB7 " + info.fps + " fps" : "");
+      note.hidden = !(postFailed && r.post);
+    }
+    function commit() {
+      saveSettings();
+      applyGraphics();
+      refreshSummary();
+    }
+    presetSel.addEventListener("change", () => {
+      const next = choosePreset(g, presetSel.value);
+      for (const k of Object.keys(g)) delete g[k];
+      Object.assign(g, next);
+      fillOptions();
+      commit();
+      audio.play("ui-select");
+    });
+    scaleIn.addEventListener("input", () => {
+      g.render_scale = Number(scaleIn.value) / 100;
+      scaleOut.textContent = scaleIn.value + "%";
+      commit();
+    });
+    adaptiveIn.addEventListener("change", () => {
+      g.adaptive = adaptiveIn.checked;
+      commit();
+    });
+    fpsIn.addEventListener("change", () => {
+      g.show_fps = fpsIn.checked;
+      commit();
+    });
+    const rows = [];
+    for (const cat of Object.keys(CATEGORIES)) {
+      const sel = el("select", { class: "pf-input", id: "pf-gfx-" + cat, "data-gfx-cat": cat, "aria-label": tg("cat_" + cat) });
+      sel.addEventListener("change", () => {
+        if (sel.value === "preset") delete g[cat];
+        else g[cat] = sel.value;
+        commit();
+      });
+      catSels[cat] = sel;
+      rows.push(el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("cat_" + cat) }), sel]));
+    }
+    section.append(
+      el("h3", { id: "pf-gfx-head", text: tg("graphics") }),
+      el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("quality") }), presetSel]),
+      el("label", { class: "pf-field pf-gfx-row pf-gfx-scale" }, [el("span", { text: tg("renderScale") }), scaleIn, scaleOut]),
+      ...rows,
+      el("label", { class: "pf-field pf-check" }, [adaptiveIn, el("span", { text: tg("adaptive") })]),
+      el("label", { class: "pf-field pf-check" }, [fpsIn, el("span", { text: tg("showFps") })]),
+      summary,
+      note
+    );
+    fillOptions();
+    refreshSummary();
+    const timer = setInterval(() => {
+      if (!section.isConnected) {
+        clearInterval(timer);
+        return;
+      }
+      refreshSummary();
+    }, 1e3);
+    return section;
+  }
   function openSettings() {
     closeOverlays();
     const s = settings;
@@ -23559,17 +28143,7 @@ function init(deps) {
       });
       return el("label", { class: "pf-field pf-check" }, [input, el("span", { text: label })]);
     };
-    const qualitySel = el(
-      "select",
-      { class: "pf-input", "aria-label": "Graphics quality" },
-      ["low", "medium", "high"].map((q) => el("option", { value: q, text: q, selected: s.quality === q ? "" : null }))
-    );
-    qualitySel.value = s.quality;
-    qualitySel.addEventListener("change", () => {
-      s.quality = qualitySel.value;
-      saveSettings();
-      if (renderer) renderer.setQuality(s.quality);
-    });
+    const gfxSection = buildGraphicsSection();
     const camSel = el(
       "select",
       { class: "pf-input", "aria-label": "Camera default" },
@@ -23602,8 +28176,8 @@ function init(deps) {
         slider("Ambience", "ambience"),
         slider("Voice", "voice"),
         toggle("Mute all", "muted", (v) => audio.setMuted(v)),
-        el("h3", { text: "Graphics" }),
-        el("label", { class: "pf-field" }, [el("span", { text: "Quality tier" }), qualitySel]),
+        gfxSection,
+        el("h3", { text: "Display" }),
         el("label", { class: "pf-field" }, [el("span", { text: "Camera default" }), camSel]),
         toggle("Reduced motion", "reducedMotion", (v) => {
           if (renderer) renderer.setReducedMotion(v);
@@ -23697,15 +28271,15 @@ function init(deps) {
   function renderHelp() {
     helpScreen.innerHTML = "";
     const keys = [
-      ["Arrows / WASD", "Move the spawn cursor"],
-      ["Enter / Space", "Spawn selected material at cursor"],
-      ["1-4", "Select material"],
-      ["J", "Joint mode (" + (settings.jointMode === "hold" ? "hold" : "toggle") + "), then pick two bodies"],
-      ["Delete", "Remove selected body"],
-      ["R", "Run the simulation"],
-      ["U", "Undo last build action"],
-      ["C", "Re-frame camera"],
-      ["Esc", "Pause / cancel joint mode"]
+      [keysFor("cursor_up", "cursor_left", "cursor_down", "cursor_right"), "Move the spawn cursor"],
+      [keysFor("spawn"), "Spawn selected material at cursor"],
+      [keysFor("material_1", "material_2", "material_3", "material_4"), "Select material 1-4"],
+      [keysFor("joint"), "Joint mode (" + (settings.jointMode === "hold" ? "hold" : "toggle") + "), then pick two bodies"],
+      [keysFor("delete"), "Remove selected body"],
+      [keysFor("run"), "Run the simulation"],
+      [keysFor("undo"), "Undo last build action"],
+      [keysFor("reframe"), "Re-frame camera"],
+      [keysFor("pause"), "Pause / cancel joint mode"]
     ];
     helpScreen.append(
       el("h2", { text: "How to play" }),
@@ -23776,6 +28350,17 @@ function init(deps) {
       ]))
     ]));
   }
+  function renderLocalBests(wrap) {
+    const rows = JOURNEY_LEVELS.filter((l) => progress.bests[l.id]);
+    if (!rows.length) {
+      wrap.append(el("p", { class: "pf-note", text: "No local journey bests yet." }));
+      return;
+    }
+    wrap.append(el("table", { class: "pf-score-table" }, [
+      el("tr", {}, [el("th", { text: "Chamber" }), el("th", { text: "Best" })]),
+      ...rows.map((l) => el("tr", {}, [el("td", { text: l.name }), el("td", { text: String(progress.bests[l.id]) })]))
+    ]));
+  }
   async function renderScores() {
     scoresScreen.innerHTML = "";
     scoresScreen.append(el("h2", { text: "Leaderboards" }));
@@ -23798,7 +28383,12 @@ function init(deps) {
           renderLocalDaily(wrap);
           continue;
         }
-        wrap.append(el("p", { class: "pf-note", text: res.error === "offline" ? "Offline \u2014 board unavailable. Play and submit when connected." : "Board error: " + res.error }));
+        if (res.error === "local") {
+          head.textContent = "Local bests (Journey)";
+          renderLocalBests(wrap);
+          continue;
+        }
+        wrap.append(el("p", { class: "pf-note", text: "Board error: " + res.error }));
         continue;
       }
       if (res.hosted && board === "daily") {
@@ -23825,10 +28415,10 @@ function init(deps) {
   function updateDailyCountdown() {
     const node = titleScreen.querySelector("#pf-daily-cd");
     if (!node) return;
-    const now = Date.now() + timeOffset;
-    const next = new Date(now);
+    const now2 = Date.now();
+    const next = new Date(now2);
     next.setUTCHours(24, 0, 0, 0);
-    const ms = next.getTime() - now;
+    const ms = next.getTime() - now2;
     const h = Math.floor(ms / 36e5), m = Math.floor(ms % 36e5 / 6e4);
     node.textContent = "Next daily in " + h + "h " + m + "m";
   }
@@ -23836,17 +28426,29 @@ function init(deps) {
     if (!titleScreen.hidden) updateDailyCountdown();
   }, 3e4);
   updateNetStatus();
-  platform.fetchProfile().then(updateNetStatus);
-  platform.cloudLoad().then((doc) => {
-    if (doc) applyRemoteDoc(doc);
-    updateNetStatus();
+  platform.loadBindings(DEFAULT_BINDINGS).then((b) => {
+    bindings = b;
+    if (!screens.help.hidden) renderHelp();
   });
-  platform.getServerTime().then((r) => {
-    if (!r.error) timeOffset = r.offset || 0;
+  platform.onAuthChange(({ signedIn }) => {
+    if (!signedIn) toast(ps.signedOut);
+    updateNetStatus();
+    if (!screens.title.hidden) renderTitle();
+  });
+  platform.fetchProfile().then(updateNetStatus);
+  platform.cloudLoad().then(async (doc) => {
+    if (doc) applyRemoteDoc(doc);
+    const remote = await platform.loadRemoteSettings();
+    const picked = {};
+    for (const [k, v] of Object.entries(remote)) {
+      if (k !== "version" && k in settings && v != null && typeof v === typeof settings[k]) picked[k] = v;
+    }
+    if (Object.keys(picked).length) applyRemoteDoc({ settings: picked });
+    else platform.syncSettings(settings);
     updateNetStatus();
   });
   platform.getDaily().then((d) => {
-    if (!d.error) dailyInfo = d;
+    dailyInfo = d;
   });
   renderTitle();
   showScreen("title");
@@ -23877,7 +28479,7 @@ function defaultSettings() {
     ambience: 0.4,
     voice: 0.5,
     muted: false,
-    quality: "high",
+    graphics: { preset: "auto" },
     reducedMotion: false,
     highContrast: false,
     largeText: false,
