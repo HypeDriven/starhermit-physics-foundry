@@ -220,6 +220,9 @@ export function init(deps) {
   const screens = {};
   function showScreen(name) {
     for (const [k, s] of Object.entries(screens)) s.hidden = k !== name;
+    // run-end toasts (lesson complete, achievements) are listed on the results
+    // screen itself; drop them so they don't cover its score table or buttons
+    if (name === "results") toastRegion.replaceChildren();
     const s = screens[name];
     if (s) {
       const h = s.querySelector("h2, h3, button");
@@ -531,13 +534,12 @@ export function init(deps) {
 
     const cursorRow = el("div", { class: "pf-tray-row pf-cursor-ctl", role: "group", "aria-label": "Move spawn cursor" });
     const move = (dx, dy) => () => { moveCursor(dx, dy); };
+    // DOM order left, up, down, right; CSS places them as a d-pad (or one row on phones)
     cursorRow.append(
-      el("button", { class: "pf-btn pf-btn-sm", text: "↑", "aria-label": "Cursor up", onclick: move(0, 1) }),
-      el("div", { class: "pf-tray-row" }, [
-        el("button", { class: "pf-btn pf-btn-sm", text: "←", "aria-label": "Cursor left", onclick: move(-1, 0) }),
-        el("button", { class: "pf-btn pf-btn-sm", text: "↓", "aria-label": "Cursor down", onclick: move(0, -1) }),
-        el("button", { class: "pf-btn pf-btn-sm", text: "→", "aria-label": "Cursor right", onclick: move(1, 0) }),
-      ])
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-l", text: "←", "aria-label": "Cursor left", onclick: move(-1, 0) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-u", text: "↑", "aria-label": "Cursor up", onclick: move(0, 1) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-d", text: "↓", "aria-label": "Cursor down", onclick: move(0, -1) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-r", text: "→", "aria-label": "Cursor right", onclick: move(1, 0) }),
     );
 
     tray.append(matRow, spawnBtn, actRow, cursorRow);

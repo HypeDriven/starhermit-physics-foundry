@@ -75,6 +75,8 @@ html, body {
 .pf-screen[hidden] { display: none; }
 
 .pf-screen h2 { margin: 0.2rem 0; }
+/* headings take programmatic focus on screen change (screen readers); no focus ring */
+.pf-screen h2[tabindex="-1"]:focus, .pf-screen h3[tabindex="-1"]:focus { outline: none; }
 .pf-screen h3 { margin: 0.6rem 0 0.2rem; color: var(--accent-2); }
 
 /* buttons */
@@ -206,7 +208,11 @@ body.pf-lh .pf-rail-right { order: 0; }
 .pf-tray { display: flex; flex-direction: column; gap: 0.6rem; }
 .pf-tray-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .pf-mat { border-left: 6px solid var(--mat-color, transparent); }
-.pf-cursor-ctl { flex-direction: column; align-items: center; }
+.pf-cursor-ctl { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; gap: 0.5rem; }
+.pf-cur-u { grid-area: 1 / 2; }
+.pf-cur-l { grid-area: 2 / 1; }
+.pf-cur-d { grid-area: 2 / 2; }
+.pf-cur-r { grid-area: 2 / 3; }
 .pf-lesson { background: var(--panel-2); border: 1px solid var(--accent); border-radius: 8px; padding: 0.6rem; }
 .pf-lesson p { margin: 0.3rem 0; }
 
@@ -230,7 +236,7 @@ body.pf-lh .pf-rail-right { order: 0; }
   gap: 0.7rem;
   min-width: 280px;
   max-width: 480px;
-  max-height: 90vh;
+  max-height: calc(90vh / var(--ui-scale, 1));
   overflow-y: auto;
 }
 .pf-panel h2 { margin: 0; }
@@ -305,10 +311,13 @@ body.pf-lh .pf-rail-right { order: 0; }
   .pf-screen-play { padding: 0.5rem; gap: 0.5rem; }
   /* keep the whole play screen within the viewport: cap the playfield */
   .pf-canvas-wrap { width: min(100%, 32vh); margin: 0 auto; aspect-ratio: 1 / 1; min-height: 0; }
-  .pf-rail-left { max-height: 18vh; overflow-y: auto; }
+  .pf-rail-left { max-height: calc(18vh / var(--ui-scale, 1)); overflow-y: auto; }
   .pf-rail-right { padding-bottom: var(--sab); }
   .pf-rail { padding: 0.5rem; }
   .pf-tray-row .pf-btn { flex: 1 1 auto; }
+  /* cursor pad as one row so the whole tray fits above the fold */
+  .pf-cursor-ctl { grid-template-columns: repeat(4, minmax(44px, 4rem)); }
+  .pf-cursor-ctl .pf-btn { grid-area: auto; }
 }
 
 /* landscape mobile: status rail left, playfield centre, tray in its own
@@ -381,3 +390,18 @@ body.pf-rm *, body.pf-rm *::before, body.pf-rm *::after {
   .pf-gfx-row:not(.pf-gfx-scale) { flex-direction: column; align-items: stretch; gap: 0.25rem; }
   .pf-gfx-row:not(.pf-gfx-scale) select { max-width: 100%; width: 100%; }
 }
+
+/* ---------------- large screens ---------------- */
+/* ui-scale.js sets --ui-scale (1 up to 1600x1000, then grows). The header,
+   menu screens, play rails, overlays and toasts are zoomed once each; the 3D
+   canvas stays unzoomed and fills the play grid's centre track. */
+.pf-top, .pf-screen:not(.pf-screen-play), .pf-rail, .pf-overlay, .pf-toasts, .pf-fps, .pf-compat {
+  zoom: var(--ui-scale, 1);
+}
+html.ui-scaled .pf-screen-play {
+  grid-template-columns: calc(240px * var(--ui-scale)) 1fr calc(260px * var(--ui-scale));
+  gap: calc(0.75rem * var(--ui-scale));
+  padding: calc(0.75rem * var(--ui-scale));
+}
+/* menu, mode, results and board columns sit mid-screen rather than as an island at the top */
+html.ui-scaled .pf-screen:not(.pf-screen-play) { justify-content: safe center; }

@@ -27020,6 +27020,7 @@ function init(deps) {
   const screens = {};
   function showScreen(name) {
     for (const [k, s2] of Object.entries(screens)) s2.hidden = k !== name;
+    if (name === "results") toastRegion.replaceChildren();
     const s = screens[name];
     if (s) {
       const h = s.querySelector("h2, h3, button");
@@ -27377,12 +27378,10 @@ function init(deps) {
       moveCursor(dx, dy);
     };
     cursorRow.append(
-      el("button", { class: "pf-btn pf-btn-sm", text: "\u2191", "aria-label": "Cursor up", onclick: move(0, 1) }),
-      el("div", { class: "pf-tray-row" }, [
-        el("button", { class: "pf-btn pf-btn-sm", text: "\u2190", "aria-label": "Cursor left", onclick: move(-1, 0) }),
-        el("button", { class: "pf-btn pf-btn-sm", text: "\u2193", "aria-label": "Cursor down", onclick: move(0, -1) }),
-        el("button", { class: "pf-btn pf-btn-sm", text: "\u2192", "aria-label": "Cursor right", onclick: move(1, 0) })
-      ])
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-l", text: "\u2190", "aria-label": "Cursor left", onclick: move(-1, 0) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-u", text: "\u2191", "aria-label": "Cursor up", onclick: move(0, 1) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-d", text: "\u2193", "aria-label": "Cursor down", onclick: move(0, -1) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-r", text: "\u2192", "aria-label": "Cursor right", onclick: move(1, 0) })
     );
     tray.append(matRow, spawnBtn, actRow, cursorRow);
   }
