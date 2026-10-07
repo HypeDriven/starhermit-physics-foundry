@@ -192,7 +192,7 @@ No module may mutate rules state except through a validated command. Rendering c
 ## 6. StarHermit integration
 
 ### Packaging and launch
-- `npm run build` writes the distribution to `dist/` (`starhermit.txt`, `index.html`, the bundle, `browser-guard.js` and `starhermit-sdk.js`). `index.html` loads the shared SDK `starhermit-sdk.js` (an unchanged copy of `tools/starhermit-sdk.js`) and calls `StarHermit.init()` before the bundle; `src/platform.js` is the game's adapter over `window.StarHermit`.
+- `npm run build` writes the distribution to `dist/` (`starhermit.txt`, `score-script.js`, `index.html`, the bundle, `browser-guard.js` and `starhermit-sdk.js`). `index.html` loads the shared SDK `starhermit-sdk.js` (an unchanged copy of `tools/starhermit-sdk.js`) and calls `StarHermit.init()` before the bundle; `src/platform.js` is the game's adapter over `window.StarHermit`.
 - The SDK reads `#game_token=` (library launch) or `#access_token=` (direct sign-in return), strips it from the URL, takes the slug from the token's `game_scope` claim and renews the token via `POST /api/v1/games/{slug}/launch-token`. Tokens are never persisted. When renewal is refused the game toasts that it is signed out and keeps playing locally.
 - Without a token no StarHermit request is made. On `<id>.starhermit.com` without a token the title shows **Sign in with StarHermit**, which redirects through the platform sign-in.
 - The client never calls the repo's `server.js` routes (`/api/v1/time`, `/api/v1/daily`, `/api/v1/leaderboard*`, `/api/v1/achievements`). The UTC day and daily seed come from the device clock; without a launch token the game makes no network request beyond its static files.
@@ -206,10 +206,11 @@ No module may mutate rules state except through a validated command. Rendering c
 
 ### Achievements and leaderboards
 - Achievements are tracked locally (Progression screen); the platform has no server-declared achievements for this game.
-- Hosted, the Leaderboards screen reads the game's first platform board (read-only, nicknames resolved through profiles); the daily view stays local. Standalone it shows local journey bests and local daily runs. The client never submits scores.
+- Hosted, the Leaderboards screen reads the game's first platform board (nicknames resolved through profiles); the daily view stays local. Standalone it shows local journey bests and local daily runs.
+- Hosted, every finished ranked Journey or Daily run posts its total through `StarHermit.submitScores` (a practice session whose platform script `score-script.js` — `server=score-script.js` in `starhermit.txt`; canonical copy in the games repo's `tools/score-script.js` — posts it to the `high-score` board: integer, higher is better, 0–1,000,000). The results screen shows "Posting score…", then "Leaderboard rank: #N" (or posted / not posted), localized in the nine locales (`src/platform-i18n.js`). Practice, Learn and Challenge post nothing; standalone posts nothing and says "Ranked run recorded on this device."
 
 ### Not used
-- No matchmaking, sessions, chat, friends picker, replays, realtime rooms or voice: the game is a solo sandbox.
+- No matchmaking, chat, friends picker, replays, realtime rooms or voice, and no platform session beyond the score post's practice session: the game is a solo sandbox. `server.js` is the local dev server only.
 
 ## 7. Content, economy, and retention
 

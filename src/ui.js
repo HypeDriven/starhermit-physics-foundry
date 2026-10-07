@@ -898,6 +898,7 @@ export function init(deps) {
   }
 
   const resultsScreen = makeScreen("results");
+  let lbSeq = 0; // ignores a late leaderboard reply after the next results render
 
   function renderResults(r) {
     resultsScreen.innerHTML = "";
@@ -920,10 +921,20 @@ export function init(deps) {
       && !currentCtx.practice;
     const submitWrap = el("div", { class: "pf-submit" });
     if (ranked && (currentMode === "journey" || currentMode === "daily")) {
-      // Platform leaderboards are script-owned: clients never submit.
-      submitWrap.append(el("p", { class: "pf-note", text: platform.isHosted()
-        ? "Ranked run recorded locally. Platform leaderboards are verified server-side and read-only for clients."
-        : "Ranked run recorded on this device." }));
+      if (platform.isHosted() && typeof platform.submitScore === "function") {
+        // Signed in: post the total to the platform board and show the rank.
+        const ps = currentPlatformStrings();
+        const line = el("p", { class: "pf-note pf-lb", text: ps.lbPosting });
+        submitWrap.append(line);
+        const seq = ++lbSeq;
+        platform.submitScore(r.score.total).then((res) => {
+          if (seq !== lbSeq) return;
+          line.textContent = !res.posted ? ps.lbNotPosted
+            : res.rank ? ps.lbRank.replace("{rank}", res.rank) : ps.lbPosted;
+        });
+      } else {
+        submitWrap.append(el("p", { class: "pf-note", text: "Ranked run recorded on this device." }));
+      }
     } else {
       submitWrap.append(el("p", { class: "pf-note", text: "Unranked session — no leaderboard submission." }));
     }

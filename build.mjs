@@ -20,6 +20,7 @@ await esbuild.build({
 
 copyFileSync(resolve(root, "src", "style.css"), resolve(outdir, "style.css"));
 copyFileSync(resolve(root, "starhermit.txt"), resolve(outdir, "starhermit.txt"));
+copyFileSync(resolve(root, "score-script.js"), resolve(outdir, "score-script.js"));
 copyFileSync(resolve(root, "favicon.svg"), resolve(outdir, "favicon.svg"));
 copyFileSync(resolve(root, "browser-guard.js"), resolve(outdir, "browser-guard.js"));
 copyFileSync(resolve(root, "ui-scale.js"), resolve(outdir, "ui-scale.js"));

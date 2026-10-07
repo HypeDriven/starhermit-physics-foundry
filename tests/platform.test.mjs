@@ -112,6 +112,7 @@ test("standalone: no platform request, local defaults", async () => {
   assert.equal(platform.canSignIn(), false);
   assert.deepEqual(await platform.getLeaderboard("global"), { error: "local" });
   assert.match((await platform.getDaily()).date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.deepEqual(await platform.submitScore(1500), { posted: false, rank: null });
   assert.equal(calls.length, 0);
 });
 
@@ -121,4 +122,27 @@ test("sign-in offered on <id>.starhermit.com without a token", async () => {
   platform.handshake();
   assert.equal(platform.canSignIn(), true);
   assert.equal(calls.length, 0);
+});
+
+test("hosted: submitScore posts high-score and reads the rank", async () => {
+  install("https://example.test/index.html#game_token=" + TOKEN);
+  const platform = await import("../src/platform.js?submit");
+  platform.handshake();
+  const sent = [];
+  globalThis.StarHermit.submitScores = async (sc) => { sent.push(sc); return Object.keys(sc); };
+  globalThis.StarHermit.leaderboard = async (key) => ({ items: key === "high-score" ? [{ userId: "user-1234-abcd", rank: 5 }] : [] });
+  assert.deepEqual(await platform.submitScore(1325.4), { posted: true, rank: 5 });
+  assert.deepEqual(sent, [{ "high-score": 1325 }]);
+  globalThis.StarHermit.submitScores = async () => [];
+  assert.deepEqual(await platform.submitScore(10), { posted: false, rank: null });
+});
+
+test("leaderboard line strings in every locale", async () => {
+  const { platformStrings, PLATFORM_LOCALES } = await import("../src/platform-i18n.js");
+  assert.equal(PLATFORM_LOCALES.length, 9);
+  for (const l of PLATFORM_LOCALES) {
+    const t = platformStrings(l);
+    for (const k of ["lbPosting", "lbRank", "lbPosted", "lbNotPosted"]) assert.ok(t[k], l + " " + k);
+    assert.ok(t.lbRank.includes("{rank}"));
+  }
 });

@@ -137,8 +137,22 @@ export async function getDaily() {
 }
 
 // ---------------------------------------------------------------- leaderboards
-// On-platform clients can only READ boards (nicknames resolved through the
-// profile). Personal bests stay local and cloud-mirrored; nothing is submitted.
+// Boards are read with nicknames resolved through the profile. A finished ranked
+// run posts its total through StarHermit.submitScores (score-script.js range-checks
+// it onto the `high-score` board); personal bests stay local and cloud-mirrored.
+
+/** Post a ranked run's total; resolves { posted, rank } (rank on `high-score`, or null). */
+export async function submitScore(total) {
+  if (!isHosted() || typeof sdk().submitScores !== "function") return { posted: false, rank: null };
+  let keys = [];
+  try { keys = await sdk().submitScores({ "high-score": Math.max(0, Math.round(total)) }); } catch { keys = []; }
+  if (!keys.includes("high-score")) return { posted: false, rank: null };
+  try {
+    const r = await sdk().leaderboard("high-score", { pageSize: 100 });
+    const me = (r.items || []).find((i) => i.userId === getUserId());
+    return { posted: true, rank: me ? me.rank : null };
+  } catch { return { posted: true, rank: null }; }
+}
 
 export async function getLeaderboard() {
   if (!isHosted()) return { error: "local" };

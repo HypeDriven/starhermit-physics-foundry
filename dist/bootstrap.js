@@ -25288,6 +25288,7 @@ __export(platform_exports, {
   loadRemoteSettings: () => loadRemoteSettings,
   onAuthChange: () => onAuthChange,
   signIn: () => signIn,
+  submitScore: () => submitScore,
   syncSettings: () => syncSettings
 });
 init_rules();
@@ -25413,6 +25414,23 @@ async function resolveNickname(userId) {
 async function getDaily() {
   const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   return { date, seed: dailySeed(date), local: true };
+}
+async function submitScore(total) {
+  if (!isHosted() || typeof sdk().submitScores !== "function") return { posted: false, rank: null };
+  let keys = [];
+  try {
+    keys = await sdk().submitScores({ "high-score": Math.max(0, Math.round(total)) });
+  } catch {
+    keys = [];
+  }
+  if (!keys.includes("high-score")) return { posted: false, rank: null };
+  try {
+    const r = await sdk().leaderboard("high-score", { pageSize: 100 });
+    const me = (r.items || []).find((i) => i.userId === getUserId());
+    return { posted: true, rank: me ? me.rank : null };
+  } catch {
+    return { posted: true, rank: null };
+  }
 }
 async function getLeaderboard() {
   if (!isHosted()) return { error: "local" };
@@ -26747,7 +26765,11 @@ var EN_US = {
   invite: "Invite a friend",
   inviteCopied: "Invite link copied to the clipboard.",
   inviteFailed: "Copy this invite link: {link}",
-  signedOut: "Signed out of StarHermit \u2014 progress keeps saving on this device."
+  signedOut: "Signed out of StarHermit \u2014 progress keeps saving on this device.",
+  lbPosting: "Posting score to the leaderboard\u2026",
+  lbRank: "Leaderboard rank: #{rank}",
+  lbPosted: "Score posted to the leaderboard.",
+  lbNotPosted: "Score not posted to the leaderboard."
 };
 var STRINGS = {
   "en-US": EN_US,
@@ -26757,49 +26779,77 @@ var STRINGS = {
     invite: "Invitar a un amigo",
     inviteCopied: "Enlace de invitaci\xF3n copiado al portapapeles.",
     inviteFailed: "Copia este enlace de invitaci\xF3n: {link}",
-    signedOut: "Se cerr\xF3 la sesi\xF3n de StarHermit; el progreso se sigue guardando en este dispositivo."
+    signedOut: "Se cerr\xF3 la sesi\xF3n de StarHermit; el progreso se sigue guardando en este dispositivo.",
+    lbPosting: "Enviando la puntuaci\xF3n a la clasificaci\xF3n\u2026",
+    lbRank: "Puesto en la clasificaci\xF3n: #{rank}",
+    lbPosted: "Puntuaci\xF3n enviada a la clasificaci\xF3n.",
+    lbNotPosted: "No se envi\xF3 la puntuaci\xF3n a la clasificaci\xF3n."
   },
   "es-ES": {
     signIn: "Iniciar sesi\xF3n con StarHermit",
     invite: "Invitar a un amigo",
     inviteCopied: "Enlace de invitaci\xF3n copiado al portapapeles.",
     inviteFailed: "Copia este enlace de invitaci\xF3n: {link}",
-    signedOut: "Se ha cerrado la sesi\xF3n de StarHermit; el progreso se sigue guardando en este dispositivo."
+    signedOut: "Se ha cerrado la sesi\xF3n de StarHermit; el progreso se sigue guardando en este dispositivo.",
+    lbPosting: "Enviando la puntuaci\xF3n a la clasificaci\xF3n\u2026",
+    lbRank: "Puesto en la clasificaci\xF3n: #{rank}",
+    lbPosted: "Puntuaci\xF3n enviada a la clasificaci\xF3n.",
+    lbNotPosted: "No se ha enviado la puntuaci\xF3n a la clasificaci\xF3n."
   },
   "de-DE": {
     signIn: "Mit StarHermit anmelden",
     invite: "Freund einladen",
     inviteCopied: "Einladungslink in die Zwischenablage kopiert.",
     inviteFailed: "Kopiere diesen Einladungslink: {link}",
-    signedOut: "Von StarHermit abgemeldet \u2013 der Fortschritt wird weiter auf diesem Ger\xE4t gespeichert."
+    signedOut: "Von StarHermit abgemeldet \u2013 der Fortschritt wird weiter auf diesem Ger\xE4t gespeichert.",
+    lbPosting: "Punktzahl wird an die Bestenliste gesendet \u2026",
+    lbRank: "Platz in der Bestenliste: #{rank}",
+    lbPosted: "Punktzahl an die Bestenliste gesendet.",
+    lbNotPosted: "Punktzahl nicht an die Bestenliste gesendet."
   },
   "fr-FR": {
     signIn: "Se connecter avec StarHermit",
     invite: "Inviter un ami",
     inviteCopied: "Lien d\u2019invitation copi\xE9 dans le presse-papiers.",
     inviteFailed: "Copiez ce lien d\u2019invitation : {link}",
-    signedOut: "D\xE9connect\xE9 de StarHermit \u2014 la progression reste enregistr\xE9e sur cet appareil."
+    signedOut: "D\xE9connect\xE9 de StarHermit \u2014 la progression reste enregistr\xE9e sur cet appareil.",
+    lbPosting: "Envoi du score au classement\u2026",
+    lbRank: "Rang au classement : #{rank}",
+    lbPosted: "Score envoy\xE9 au classement.",
+    lbNotPosted: "Score non envoy\xE9 au classement."
   },
   "fr-CA": {
     signIn: "Se connecter avec StarHermit",
     invite: "Inviter un ami",
     inviteCopied: "Lien d\u2019invitation copi\xE9 dans le presse-papiers.",
     inviteFailed: "Copiez ce lien d\u2019invitation : {link}",
-    signedOut: "D\xE9connect\xE9 de StarHermit \u2014 la progression reste enregistr\xE9e sur cet appareil."
+    signedOut: "D\xE9connect\xE9 de StarHermit \u2014 la progression reste enregistr\xE9e sur cet appareil.",
+    lbPosting: "Envoi du pointage au classement\u2026",
+    lbRank: "Rang au classement : #{rank}",
+    lbPosted: "Pointage envoy\xE9 au classement.",
+    lbNotPosted: "Pointage non envoy\xE9 au classement."
   },
   "pt-BR": {
     signIn: "Entrar com StarHermit",
     invite: "Convidar um amigo",
     inviteCopied: "Link de convite copiado para a \xE1rea de transfer\xEAncia.",
     inviteFailed: "Copie este link de convite: {link}",
-    signedOut: "Voc\xEA saiu do StarHermit \u2014 o progresso continua salvo neste dispositivo."
+    signedOut: "Voc\xEA saiu do StarHermit \u2014 o progresso continua salvo neste dispositivo.",
+    lbPosting: "Enviando a pontua\xE7\xE3o para o ranking\u2026",
+    lbRank: "Posi\xE7\xE3o no ranking: #{rank}",
+    lbPosted: "Pontua\xE7\xE3o enviada para o ranking.",
+    lbNotPosted: "A pontua\xE7\xE3o n\xE3o foi enviada para o ranking."
   },
   "it-IT": {
     signIn: "Accedi con StarHermit",
     invite: "Invita un amico",
     inviteCopied: "Link di invito copiato negli appunti.",
     inviteFailed: "Copia questo link di invito: {link}",
-    signedOut: "Disconnesso da StarHermit: i progressi continuano a essere salvati su questo dispositivo."
+    signedOut: "Disconnesso da StarHermit: i progressi continuano a essere salvati su questo dispositivo.",
+    lbPosting: "Invio del punteggio alla classifica\u2026",
+    lbRank: "Posizione in classifica: #{rank}",
+    lbPosted: "Punteggio inviato alla classifica.",
+    lbNotPosted: "Punteggio non inviato alla classifica."
   }
 };
 var PLATFORM_LOCALES = Object.keys(STRINGS);
@@ -27752,6 +27802,7 @@ function init(deps) {
     audio.play("achievement");
   }
   const resultsScreen = makeScreen("results");
+  let lbSeq = 0;
   function renderResults(r) {
     resultsScreen.innerHTML = "";
     const st = session.state;
@@ -27772,7 +27823,18 @@ function init(deps) {
     const ranked = (currentMode === "journey" || currentMode === "daily" || currentMode === "challenge") && !currentCtx.practice;
     const submitWrap = el("div", { class: "pf-submit" });
     if (ranked && (currentMode === "journey" || currentMode === "daily")) {
-      submitWrap.append(el("p", { class: "pf-note", text: platform.isHosted() ? "Ranked run recorded locally. Platform leaderboards are verified server-side and read-only for clients." : "Ranked run recorded on this device." }));
+      if (platform.isHosted() && typeof platform.submitScore === "function") {
+        const ps2 = currentPlatformStrings();
+        const line = el("p", { class: "pf-note pf-lb", text: ps2.lbPosting });
+        submitWrap.append(line);
+        const seq = ++lbSeq;
+        platform.submitScore(r.score.total).then((res) => {
+          if (seq !== lbSeq) return;
+          line.textContent = !res.posted ? ps2.lbNotPosted : res.rank ? ps2.lbRank.replace("{rank}", res.rank) : ps2.lbPosted;
+        });
+      } else {
+        submitWrap.append(el("p", { class: "pf-note", text: "Ranked run recorded on this device." }));
+      }
     } else {
       submitWrap.append(el("p", { class: "pf-note", text: "Unranked session \u2014 no leaderboard submission." }));
     }
