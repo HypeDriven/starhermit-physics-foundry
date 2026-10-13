@@ -1168,10 +1168,10 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
       const k = gfx.post && !postFailed ? [gfx.ao, gfx.bloom, gfx.grade, gfx.antialias, w, h, pixelRatio].join("|") : "none";
       if (k !== postKey) { postKey = k; buildPost(w, h); }
       if (composer) {
-        try { composer.render(dt); }
-        catch { postFailed = true; postKey = null; composer = null; renderer.setRenderTarget(null); renderer.render(scene, camera); }
+        try { (globalThis.GameOptions ? globalThis.GameOptions.draw(composer.renderer, () => composer.render(dt)) : composer.render(dt)); }
+        catch { postFailed = true; postKey = null; composer = null; renderer.setRenderTarget(null); (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera)); }
       } else {
-        renderer.render(scene, camera);
+        (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera));
       }
     }
     raf = requestAnimationFrame(draw);

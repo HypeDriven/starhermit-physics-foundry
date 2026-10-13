@@ -24768,16 +24768,16 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
       }
       if (composer) {
         try {
-          composer.render(dt);
+          globalThis.GameOptions ? globalThis.GameOptions.draw(composer.renderer, () => composer.render(dt)) : composer.render(dt);
         } catch {
           postFailed = true;
           postKey = null;
           composer = null;
           renderer.setRenderTarget(null);
-          renderer.render(scene, camera);
+          globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera);
         }
       } else {
-        renderer.render(scene, camera);
+        globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera);
       }
     }
     raf = requestAnimationFrame(draw);
@@ -24981,12 +24981,12 @@ function createGraph() {
   const g = ctx.createGain();
   g.gain.value = muted ? 0 : 1;
   g.connect(ctx.destination);
-  buses._master = { gain: g, volume: 1 };
+  buses._master = globalThis.GameOptions ? globalThis.GameOptions.tagBus({ gain: g, volume: 1 }, "_master") : { gain: g, volume: 1 };
   for (const name of BUS_NAMES) {
     const bg = ctx.createGain();
     bg.gain.value = buses[name] ? buses[name].volume : DEFAULT_VOLUMES[name];
     bg.connect(g);
-    buses[name] = { gain: bg, volume: bg.gain.value };
+    buses[name] = globalThis.GameOptions ? globalThis.GameOptions.tagBus({ gain: bg, volume: bg.gain.value }, name) : { gain: bg, volume: bg.gain.value };
   }
 }
 function unlock() {
@@ -25055,7 +25055,7 @@ function env(gainNode, t0, peak, decay) {
 function tone(bus, { type = "sine", freq = 440, freqEnd = null, dur = 0.2, vol = 0.2, delay = 0 }) {
   if (!ctx || !buses[bus]) return;
   const t0 = ctx.currentTime + delay;
-  const o = ctx.createOscillator();
+  const o = globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), bus) : ctx.createOscillator();
   const g = ctx.createGain();
   o.type = type;
   o.frequency.setValueAtTime(freq, t0);
@@ -25078,7 +25078,7 @@ function getNoiseBuffer() {
 function noise(bus, { dur = 0.15, vol = 0.2, filterFreq = 2e3, q = 1, delay = 0 }) {
   if (!ctx || !buses[bus]) return;
   const t0 = ctx.currentTime + delay;
-  const src = ctx.createBufferSource();
+  const src = globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), bus) : ctx.createBufferSource();
   src.buffer = getNoiseBuffer();
   const f = ctx.createBiquadFilter();
   f.type = "bandpass";
@@ -25128,7 +25128,7 @@ function loadSample(name) {
 function playSample(name) {
   const entry = loadSample(name);
   if (!entry || typeof entry.then === "function") return false;
-  const src = ctx.createBufferSource();
+  const src = globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), name) : ctx.createBufferSource();
   src.buffer = entry;
   src.connect(buses.effects.gain);
   src.start();
@@ -25206,7 +25206,7 @@ function play(name, opts = {}) {
   }
 }
 function startAmbience() {
-  const src = ctx.createBufferSource();
+  const src = globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), null) : ctx.createBufferSource();
   const len = ctx.sampleRate * 2;
   const buf = ctx.createBuffer(1, len, ctx.sampleRate);
   const d = buf.getChannelData(0);
@@ -25240,7 +25240,7 @@ function startMusic() {
     const t0 = ctx.currentTime;
     if (musicStep % 4 === 0) {
       const f = BUILD_NOTES[musicStep / 4 % BUILD_NOTES.length];
-      const o = ctx.createOscillator();
+      const o = globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator();
       const g = ctx.createGain();
       o.type = "sine";
       o.frequency.value = f;
@@ -25252,7 +25252,7 @@ function startMusic() {
       o.stop(t0 + 2);
     }
     const rf = RUN_NOTES[musicStep % RUN_NOTES.length];
-    const ro = ctx.createOscillator();
+    const ro = globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createOscillator(), null) : ctx.createOscillator();
     const rg = ctx.createGain();
     ro.type = "triangle";
     ro.frequency.value = rf;

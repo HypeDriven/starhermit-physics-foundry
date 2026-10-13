@@ -23,6 +23,7 @@ copyFileSync(resolve(root, "starhermit.txt"), resolve(outdir, "starhermit.txt"))
 copyFileSync(resolve(root, "score-script.js"), resolve(outdir, "score-script.js"));
 copyFileSync(resolve(root, "favicon.svg"), resolve(outdir, "favicon.svg"));
 copyFileSync(resolve(root, "browser-guard.js"), resolve(outdir, "browser-guard.js"));
+copyFileSync(resolve(root, "game-options.js"), resolve(outdir, "game-options.js"));
 copyFileSync(resolve(root, "ui-scale.js"), resolve(outdir, "ui-scale.js"));
 copyFileSync(resolve(root, "starhermit-sdk.js"), resolve(outdir, "starhermit-sdk.js"));
 copyFileSync(resolve(root, "coverart.png"), resolve(outdir, "coverart.png"));
@@ -37,6 +38,7 @@ const html = `<!DOCTYPE html>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
 <title>Physics Foundry</title>
 <link rel="stylesheet" href="./style.css" />
+<script src="./game-options.js" data-game="physics-foundry"></script>
 <script src="./ui-scale.js"></script>
 <script src="./starhermit-sdk.js"></script>
 <script>StarHermit.init();</script>
