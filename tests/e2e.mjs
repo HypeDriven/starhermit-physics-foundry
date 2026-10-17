@@ -26,6 +26,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
+import { launchToken, stubStarHermit } from "./starhermit-e2e.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SHOT = (stage, vp) => `/tmp/physics-foundry-e2e-${stage}-${vp}.png`;
@@ -148,6 +149,67 @@ async function graphicsPass(page, label) {
   });
 }
 
+// Signed in through a stubbed StarHermit API (page.route; no real network):
+// Automatic follows the account's preferred language (fr-CA), a choice made in
+// Settings mid-chamber re-renders the HUD, pause panel and settings in place and
+// is saved as ui.language, and Report a problem posts to /reports.
+async function languagePass(page, label) {
+  await step(`[${label}] language: Automatic = account fr-CA; switch to German mid-chamber; ui.language; report`, async () => {
+    runPass.stubbed = true; // the stubbed /api/v1 calls are routed, never reach the own server
+    const calls = await stubStarHermit(page, { preferredLanguage: "fr-CA" });
+    await page.goto("about:blank");
+    await page.goto(`http://127.0.0.1:${runPass.port}/index.html#game_token=` + launchToken(), { waitUntil: "load" });
+    await page.waitForFunction(() => document.documentElement.lang === "fr-CA");
+    await page.waitForSelector(".pf-screen-title:not([hidden])");
+    if (!/Jouer/.test(await page.textContent(".pf-screen-title .pf-btn-big"))) throw new Error("title not in French");
+    await page.click(".pf-screen-title .pf-btn-big");
+    await page.waitForFunction(() => /Phase : construction/.test(document.getElementById("pf-phase")?.textContent || ""));
+    const budget = await page.textContent("#pf-budget");
+    await page.click(".pf-screen-play .pf-rail-left [data-i18n='Pause (Esc)']");
+    await page.click(".pf-overlay [data-i18n='Settings']");
+    const choice = page.locator("[data-game-language='choice']");
+    await choice.scrollIntoViewIfNeeded();
+    const auto = await choice.locator("option").first().textContent();
+    if (!/^Automatique — Français \(Canada\)$/.test(auto)) throw new Error("Automatic label not resolved: " + auto);
+    await choice.selectOption("de-DE");
+    await page.waitForFunction(() => document.documentElement.lang === "de-DE");
+    await page.waitForFunction(() => /gespeichert/.test(document.querySelector("[data-game-language='status']").textContent));
+    if (calls.settings["ui.language"]?.choice !== "de-DE") throw new Error("ui.language not saved: " + JSON.stringify(calls.settings));
+    if (!/Einstellungen/.test(await page.textContent(".pf-settings h2"))) throw new Error("settings title not re-rendered");
+    if (!/Grafik/.test(await page.textContent("#pf-gfx-head"))) throw new Error("graphics section not re-rendered");
+    await page.locator("[data-game-report='title']").scrollIntoViewIfNeeded();
+    await page.fill("[data-game-report='title']", "Test report");
+    await page.click("[data-game-report='send']");
+    await page.waitForFunction(() => /Danke/.test(document.querySelector("[data-game-report='status']").textContent));
+    if (!calls.reports?.[0] || calls.reports[0].kind !== "bug") throw new Error("report not posted");
+    await page.screenshot({ path: SHOT("language-settings", label) });
+    await page.locator(".pf-overlay [data-i18n='Done']").scrollIntoViewIfNeeded();
+    await page.click(".pf-overlay [data-i18n='Done']");
+    if (!/Pausiert/.test(await page.textContent(".pf-overlay h2"))) throw new Error("pause panel not in German");
+    await page.click(".pf-overlay [data-i18n='Resume']");
+    await page.waitForFunction(() => /Phase: Aufbau/.test(document.getElementById("pf-phase")?.textContent || ""));
+    const budgetDe = await page.textContent("#pf-budget");
+    if (budgetDe.replace(/\D+/g, " ").trim() !== budget.replace(/\D+/g, " ").trim()) throw new Error("chamber state changed: " + budget + " -> " + budgetDe);
+    if (!/Fracht/.test(await page.textContent("#pf-objective"))) throw new Error("HUD not re-rendered");
+    if (!/Am Cursor platzieren/.test(await page.textContent(".pf-tray"))) throw new Error("action tray not re-rendered");
+    // nothing in the German HUD/tray spills out of the viewport
+    const overflow = await page.evaluate(() => [...document.querySelectorAll(".pf-screen-play button, .pf-screen-play p, .pf-screen-play h2, .pf-top *")]
+      .filter((n) => n.offsetParent && n.getBoundingClientRect().right > window.innerWidth + 1).map((n) => n.textContent.slice(0, 30)));
+    if (overflow.length) throw new Error("German UI overflows the viewport: " + overflow.join(" | "));
+    await page.screenshot({ path: SHOT("language-play", label) });
+    await page.click(".pf-screen-play .pf-rail-left [data-i18n='Pause (Esc)']");
+    await page.click(".pf-overlay [data-i18n='Settings']");
+    await choice.scrollIntoViewIfNeeded();
+    await choice.selectOption("auto");
+    await page.waitForFunction(() => document.documentElement.lang === "fr-CA");
+    await page.click(".pf-overlay [data-i18n='Done']");
+    await page.click(".pf-overlay [data-i18n='Leave chamber']");
+    await page.waitForSelector(".pf-screen-title:not([hidden])");
+    if (!/Jouer/.test(await page.textContent(".pf-screen-title .pf-btn-big"))) throw new Error("title not back in French");
+    await page.unroute(/\/api\/v1\//);
+  });
+}
+
 async function runPass(browser, label, viewport, hasTouch) {
   const context = await browser.newContext({ viewport, hasTouch });
   const page = await context.newPage();
@@ -155,7 +217,7 @@ async function runPass(browser, label, viewport, hasTouch) {
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   page.on("request", (r) => {
     const u = new URL(r.url());
-    if (u.port === String(runPass.port) && /^\/(api|ws)(\/|$)/.test(u.pathname)) errors.push(`own-server request: ${r.method()} ${u.pathname}`);
+    if (!runPass.stubbed && u.port === String(runPass.port) && /^\/(api|ws)(\/|$)/.test(u.pathname)) errors.push(`own-server request: ${r.method()} ${u.pathname}`);
   });
   page.on("console", (m) => {
     if ((m.type() === "error" || m.type() === "warning") && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
@@ -341,7 +403,9 @@ async function runPass(browser, label, viewport, hasTouch) {
       });
     }
     await graphicsPass(page, label);
+    await languagePass(page, label);
   } finally {
+    runPass.stubbed = false;
     await context.close();
   }
 

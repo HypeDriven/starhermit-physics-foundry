@@ -1,6 +1,6 @@
-// Strings for the Graphics settings section. The rest of the game is English;
-// this panel follows the browser language (en-US, en-GB, es-419, es-ES, de-DE,
-// fr-FR, fr-CA, pt-BR, it-IT; other locales fall back by language, then en-US).
+// Strings for the Graphics settings section in the nine game locales (en-US,
+// en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT). ui.js asks for the
+// game language (i18n.js getLocale()) on every use, so a language change applies live.
 
 const EN = {
   graphics: "Graphics",

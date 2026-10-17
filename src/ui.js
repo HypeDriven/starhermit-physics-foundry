@@ -12,7 +12,9 @@ import {
 import { createGameSession } from "./session.js";
 import { PRESETS, CATEGORIES, SHADOW_MAP, detectPreset, resolve as resolveGfx, presetTier, choosePreset } from "./gfx.js";
 import { translator, describeLocalized } from "./gfx-i18n.js";
-import { currentPlatformStrings } from "./platform-i18n.js";
+import { platformStrings, pickPlatformLocale } from "./platform-i18n.js";
+import { mergeProgress } from "./platform.js";
+import { t, getLocale, onLocaleChange, levelName, reasonText } from "./i18n.js";
 
 // GPU name from WEBGL_debug_renderer_info (probed once on a throwaway context).
 let gpuProbe = null;
@@ -56,6 +58,9 @@ function el(tag, attrs = {}, children = []) {
   for (const [k, v] of Object.entries(attrs)) {
     if (k === "class") n.className = v;
     else if (k === "text") n.textContent = v;
+    // i18n / i18nAria: a string key re-applied in place on a language change.
+    else if (k === "i18n") { n.dataset.i18n = v; n.textContent = t(v); }
+    else if (k === "i18nAria") { n.dataset.i18nAria = v; n.setAttribute("aria-label", t(v)); }
     else if (k === "html") n.innerHTML = v;
     else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
     else if (k === "disabled") n.disabled = !!v;
@@ -95,18 +100,19 @@ export function init(deps) {
     const net = document.getElementById("pf-net");
     if (!net) return;
     const bits = [];
-    if (platform.isHosted()) bits.push(platform.getNickname() || "Player");
-    bits.push(platform.isOffline() ? "local" : "online");
-    if (platform.isHosted()) bits.push(platform.getSyncStatus());
+    if (platform.isHosted()) bits.push(platform.getNickname() || t("Player"));
+    bits.push(platform.isOffline() ? t("local") : t("online"));
+    if (platform.isHosted()) bits.push(t("sync." + platform.getSyncStatus()));
     net.textContent = bits.join(" · ");
   }
 
-  // Remote-preferred cloud restore: the cloud doc mirrors settings+progress;
-  // localStorage remains the offline cache.
-  function applyRemoteDoc(doc) {
+  // Cloud restore: the cloud doc mirrors settings+progress; localStorage stays
+  // the offline cache. Progress is merged (never dropped from either side);
+  // remote settings win at boot, this device's settings win on a save conflict.
+  function applyRemoteDoc(doc, { keepLocalSettings = false } = {}) {
     if (!doc || typeof doc !== "object") return;
-    if (doc.settings && typeof doc.settings === "object") Object.assign(settings, doc.settings);
-    if (doc.progress && typeof doc.progress === "object") Object.assign(progress, doc.progress);
+    if (!keepLocalSettings && doc.settings && typeof doc.settings === "object") Object.assign(settings, doc.settings);
+    if (doc.progress && typeof doc.progress === "object") Object.assign(progress, mergeProgress(doc.progress, progress));
     saveSettings();
     saveProgress();
     audio.setBusVolume("music", settings.music);
@@ -134,7 +140,7 @@ export function init(deps) {
 
   const header = el("header", { class: "pf-top" }, [
     el("h1", { class: "pf-logo", text: "Physics Foundry" }),
-    el("span", { class: "pf-net-status", id: "pf-net", text: platform.isOffline() ? "local" : "" }),
+    el("span", { class: "pf-net-status", id: "pf-net", text: platform.isOffline() ? t("local") : "" }),
   ]);
   const main = el("main", { class: "pf-main", id: "pf-main" });
   root.append(header, main, live, alertLive, toastRegion);
@@ -149,7 +155,7 @@ export function init(deps) {
   }
 
   // ------------------------------------------------------------ graphics settings
-  const tg = translator(typeof navigator !== "undefined" ? navigator.language : "en-US");
+  const tg = (key, vars) => translator(getLocale())(key, vars);
   function gfxSaved() {
     if (!settings.graphics || typeof settings.graphics !== "object") settings.graphics = { preset: "auto" };
     return settings.graphics;
@@ -201,7 +207,7 @@ export function init(deps) {
   applyGraphics(); // body data attributes before the chamber exists
 
   const canvasWrap = el("div", { class: "pf-canvas-wrap" });
-  const canvas = el("canvas", { class: "pf-canvas", "aria-label": "Test chamber view. Use the action tray or keyboard for all actions." });
+  const canvas = el("canvas", { class: "pf-canvas", i18nAria: "Test chamber view. Use the action tray or keyboard for all actions." });
   canvasWrap.append(canvas);
 
   // ------------------------------------------------------------ renderer
@@ -236,7 +242,7 @@ export function init(deps) {
   }
 
   function makeScreen(name) {
-    const s = el("section", { class: "pf-screen pf-screen-" + name, "aria-label": name });
+    const s = el("section", { class: "pf-screen pf-screen-" + name, i18nAria: "screen." + name });
     s.hidden = true;
     screens[name] = s;
     main.append(s);
@@ -248,42 +254,42 @@ export function init(deps) {
 
   function journeyProgressSummary() {
     const done = JOURNEY_LEVELS.filter((l) => progress.completed[l.id]).length;
-    return done + " / " + JOURNEY_LEVELS.length + " chambers";
+    return t("{done} / {total} chambers", { done, total: JOURNEY_LEVELS.length });
   }
 
   function renderTitle() {
     titleScreen.innerHTML = "";
     const playBtn = el("button", {
       class: "pf-btn pf-btn-primary pf-btn-big",
-      text: "Play",
+      text: t("Play"),
       onclick: () => { audio.play("ui-select"); quickPlay(); },
     });
     titleScreen.append(
-      el("h2", { class: "pf-title-head", text: "Industrial physics sandbox" }),
-      el("p", { class: "pf-tag", text: "Cast materials, rig joints, run the chamber, deliver every payload." }),
+      el("h2", { class: "pf-title-head", text: t("Industrial physics sandbox") }),
+      el("p", { class: "pf-tag", text: t("Cast materials, rig joints, run the chamber, deliver every payload.") }),
       playBtn,
       el("div", { class: "pf-title-grid" }, [
         el("button", { class: "pf-card", onclick: () => { audio.play("ui-select"); startDaily(); } }, [
-          el("strong", { text: "Daily challenge" }),
-          el("span", { text: dailyInfo ? "Today's cast: " + dailyInfo.date : "One shared chamber per day" }),
+          el("strong", { text: t("Daily challenge") }),
+          el("span", { text: dailyInfo ? t("Today's cast: {date}", { date: dailyInfo.date }) : t("One shared chamber per day") }),
           el("span", { class: "pf-daily-countdown", id: "pf-daily-cd", text: "" }),
         ]),
         el("button", { class: "pf-card", onclick: () => { audio.play("ui-select"); renderProgression(); showScreen("progression"); } }, [
-          el("strong", { text: "Journey" }),
+          el("strong", { text: t("Journey") }),
           el("span", { text: journeyProgressSummary() }),
         ]),
         el("button", { class: "pf-card", onclick: () => { audio.play("ui-select"); openSettings(); } }, [
-          el("strong", { text: "Profile & settings" }),
-          el("span", { text: progress.achievements.length + " achievements, audio & accessibility" }),
+          el("strong", { text: t("Profile & settings") }),
+          el("span", { text: t("{n} achievements, audio & accessibility", { n: progress.achievements.length }) }),
         ]),
         el("button", { class: "pf-card", onclick: () => { audio.play("ui-select"); renderModes(); showScreen("modes"); } }, [
-          el("strong", { text: "All modes" }),
-          el("span", { text: "Learn, Practice, Challenge, Score chase" }),
+          el("strong", { text: t("All modes") }),
+          el("span", { text: t("Learn, Practice, Challenge, Score chase") }),
         ]),
       ]),
       el("div", { class: "pf-title-foot" }, [
-        el("button", { class: "pf-btn pf-btn-secondary", text: "How to play", onclick: () => openHelp("title") }),
-        el("button", { class: "pf-btn pf-btn-secondary", text: "Leaderboards", onclick: () => { renderScores(); showScreen("scores"); } }),
+        el("button", { class: "pf-btn pf-btn-secondary", text: t("How to play"), onclick: () => openHelp("title") }),
+        el("button", { class: "pf-btn pf-btn-secondary", text: t("Leaderboards"), onclick: () => { renderScores(); showScreen("scores"); } }),
         platform.inviteLink() ? el("button", { class: "pf-btn pf-btn-secondary", id: "pf-invite", text: ps.invite, onclick: () => inviteFriend() }) : null,
         platform.canSignIn() ? el("button", { class: "pf-btn pf-btn-secondary", id: "pf-signin", text: ps.signIn, onclick: () => platform.signIn() }) : null,
       ])
@@ -292,7 +298,8 @@ export function init(deps) {
   }
 
   // StarHermit invite link (signed in only) -> clipboard + confirmation toast.
-  const ps = currentPlatformStrings();
+  // Account strings follow the game language (read at use time).
+  const ps = new Proxy({}, { get: (_, key) => platformStrings(pickPlatformLocale(getLocale()))[key] });
   async function inviteFriend() {
     const link = platform.inviteLink();
     if (!link) return;
@@ -332,20 +339,23 @@ export function init(deps) {
   // ------------------------------------------------------------ MODES
   const modesScreen = makeScreen("modes");
 
+  let openSetup = null; // mode whose setup panel is showing (re-rendered on a language change)
+
   function renderModes() {
     modesScreen.innerHTML = "";
+    openSetup = null;
     modesScreen.append(
-      el("h2", { text: "Choose a mode" }),
+      el("h2", { text: t("Choose a mode") }),
       el("div", { class: "pf-mode-grid" },
         MODE_DEFS.map((m) => el("button", {
           class: "pf-card pf-mode-card",
           onclick: () => { audio.play("ui-select"); selectMode(m.id); },
         }, [
-          el("strong", { text: m.name }),
-          el("span", { text: m.desc }),
+          el("strong", { text: t(m.name) }),
+          el("span", { text: t(m.desc) }),
         ]))),
       el("div", { class: "pf-setup", id: "pf-setup", hidden: true }),
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Back", onclick: () => { audio.play("ui-back"); renderTitle(); showScreen("title"); } })
+      el("button", { class: "pf-btn pf-btn-secondary", text: t("Back"), onclick: () => { audio.play("ui-back"); renderTitle(); showScreen("title"); } })
     );
   }
 
@@ -362,18 +372,19 @@ export function init(deps) {
     if (!setup) { renderModes(); return renderModeSetup(id); }
     setup.innerHTML = "";
     setup.hidden = false;
+    openSetup = id;
     const def = MODE_DEFS.find((m) => m.id === id);
-    setup.append(el("h3", { text: def.name + " setup" }),
+    setup.append(el("h3", { text: t("{mode} setup", { mode: t(def.name) }) }),
       el("dl", { class: "pf-setup-facts" }, [
-        el("dt", { text: "Rules" }), el("dd", { text: def.desc }),
-        el("dt", { text: "Expected duration" }), el("dd", { text: def.duration }),
-        el("dt", { text: "Ranked" }), el("dd", { text: def.ranked ? "Yes — verified replays" : "No — unranked" }),
+        el("dt", { text: t("Rules") }), el("dd", { text: t(def.desc) }),
+        el("dt", { text: t("Expected duration") }), el("dd", { text: t(def.duration) }),
+        el("dt", { text: t("Ranked") }), el("dd", { text: def.ranked ? t("Yes — verified replays") : t("No — unranked") }),
       ]));
 
     if (id === "practice") {
-      const filter = el("select", { class: "pf-input", "aria-label": "Difficulty filter" },
-        [el("option", { value: "0", text: "All difficulties" })]
-          .concat([1, 2, 3, 4, 5].map((d) => el("option", { value: String(d), text: "Difficulty " + d }))));
+      const filter = el("select", { class: "pf-input", "aria-label": t("Difficulty filter") },
+        [el("option", { value: "0", text: t("All difficulties") })]
+          .concat([1, 2, 3, 4, 5].map((d) => el("option", { value: String(d), text: t("Difficulty {n}", { n: d }) }))));
       const list = el("div", { class: "pf-level-list" });
       const renderList = () => {
         list.innerHTML = "";
@@ -383,11 +394,11 @@ export function init(deps) {
           (!maxD || l.difficulty === maxD));
         for (const l of unlocked) {
           list.append(el("button", {
-            class: "pf-chip", text: l.name,
+            class: "pf-chip", text: levelName(l),
             onclick: () => { audio.play("ui-select"); startLevel(l, "practice", { practice: true }); },
           }));
         }
-        if (!unlocked.length) list.append(el("p", { text: "No unlocked levels at this difficulty yet." }));
+        if (!unlocked.length) list.append(el("p", { text: t("No unlocked levels at this difficulty yet.") }));
       };
       filter.addEventListener("change", renderList);
       renderList();
@@ -399,7 +410,7 @@ export function init(deps) {
       for (const l of CHALLENGE_LEVELS) {
         list.append(el("button", {
           class: "pf-chip",
-          text: l.name + (progress.completed[l.id] ? " ✓" : ""),
+          text: levelName(l) + (progress.completed[l.id] ? " ✓" : ""),
           onclick: () => { audio.play("ui-select"); startLevel(l, "challenge", {}); },
         }));
       }
@@ -418,13 +429,13 @@ export function init(deps) {
   const hudError = el("p", { class: "pf-error", id: "pf-error", role: "status" });
   const lessonBanner = el("div", { class: "pf-lesson", id: "pf-lesson", hidden: true });
 
-  const tray = el("div", { class: "pf-tray", role: "toolbar", "aria-label": "Chamber actions" });
+  const tray = el("div", { class: "pf-tray", role: "toolbar", i18nAria: "Chamber actions" });
 
   playScreen.append(
     el("aside", { class: "pf-rail pf-rail-left" }, [
       hudObjective, hudProgress, hudBudget, hudTime, hudPhase, hudError,
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Pause (Esc)", onclick: () => pauseGame() }),
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Help", onclick: () => openHelp("play") }),
+      el("button", { class: "pf-btn pf-btn-secondary", i18n: "Pause (Esc)", onclick: () => pauseGame() }),
+      el("button", { class: "pf-btn pf-btn-secondary", i18n: "Help", onclick: () => openHelp("play") }),
     ]),
     canvasWrap,
     el("aside", { class: "pf-rail pf-rail-right" }, [lessonBanner, tray])
@@ -438,13 +449,13 @@ export function init(deps) {
   function refreshHud() {
     if (!session) return;
     const st = session.state;
-    hudObjective.textContent = currentLevel.name + " — deliver " + st.goals.total + " payload" + (st.goals.total > 1 ? "s" : "");
-    hudProgress.textContent = "Delivered: " + st.goals.delivered + " / " + st.goals.total;
-    hudBudget.textContent = "Spawns left: " + (st.spawnBudget - st.movesUsed) + " / " + st.spawnBudget;
-    hudPhase.textContent = "Phase: " + st.phase + (session.paused ? " (paused)" : "");
+    hudObjective.textContent = t(st.goals.total > 1 ? "{level} — deliver {n} payloads" : "{level} — deliver 1 payload", { level: levelName(currentLevel), n: st.goals.total });
+    hudProgress.textContent = t("Delivered: {done} / {total}", { done: st.goals.delivered, total: st.goals.total });
+    hudBudget.textContent = t("Spawns left: {left} / {total}", { left: st.spawnBudget - st.movesUsed, total: st.spawnBudget });
+    hudPhase.textContent = t(session.paused ? "Phase: {phase} (paused)" : "Phase: {phase}", { phase: t("phase." + st.phase) });
     if (st.phase === "run" && st.runStartTick !== null) {
       hudTime.hidden = false;
-      hudTime.textContent = "Time left: " + fmtTime(currentLevel.timeLimitTicks - (st.tick - st.runStartTick));
+      hudTime.textContent = t("Time left: {time}", { time: fmtTime(currentLevel.timeLimitTicks - (st.tick - st.runStartTick)) });
     } else {
       hudTime.hidden = st.phase !== "run";
     }
@@ -475,14 +486,14 @@ export function init(deps) {
     tray.innerHTML = "";
     const building = st.phase === "build";
 
-    const matRow = el("div", { class: "pf-tray-row", role: "group", "aria-label": "Materials" });
+    const matRow = el("div", { class: "pf-tray-row", role: "group", "aria-label": t("Materials") });
     currentLevel.allowedMaterials.forEach((m, i) => {
       const a = legal["spawn:" + m] || { ok: false };
       const b = el("button", {
         class: "pf-btn pf-mat" + (selectedMaterial === m ? " pf-selected" : ""),
-        text: MATERIALS[m].name + " (" + (i + 1) + ")",
+        text: t(MATERIALS[m].name) + " (" + (i + 1) + ")",
         "aria-pressed": selectedMaterial === m ? "true" : "false",
-        title: a.ok ? "Select " + MATERIALS[m].name : (a.reason || ""),
+        title: a.ok ? t("Select {material}", { material: t(MATERIALS[m].name) }) : (a.reason ? reasonText(a.reason) : ""),
         onclick: (ev) => { selectedMaterial = m; audio.play("ui-select"); renderTray(); ev.currentTarget.focus(); },
       });
       b.style.setProperty("--mat-color", MATERIALS[m].color);
@@ -491,24 +502,24 @@ export function init(deps) {
 
     const spawnBtn = el("button", {
       class: "pf-btn pf-btn-primary",
-      text: "Spawn at cursor (Enter)",
+      text: t("Spawn at cursor (Enter)"),
       disabled: !building,
       onclick: (ev) => { guard(ev.currentTarget); trySpawn(cursor.x, cursor.y); },
     });
 
-    const actRow = el("div", { class: "pf-tray-row", role: "group", "aria-label": "Actions" });
+    const actRow = el("div", { class: "pf-tray-row", role: "group", "aria-label": t("Actions") });
     if (currentLevel.allowedJoints.length) {
       for (const j of currentLevel.allowedJoints) {
         actRow.append(el("button", {
           class: "pf-btn" + (jointMode && selectedJoint === j ? " pf-selected" : ""),
-          text: JOINT_TYPES[j].name + " (J)",
+          text: t(JOINT_TYPES[j].name) + " (J)",
           "aria-pressed": jointMode && selectedJoint === j ? "true" : "false",
           onclick: () => {
             selectedJoint = j;
             jointMode = !(jointMode && selectedJoint === j);
             jointAnchor = null;
             audio.play("ui-select");
-            announce(jointMode ? JOINT_TYPES[j].name + " mode: select two bodies" : "Joint mode off");
+            announce(jointMode ? t("{joint} mode: select two bodies", { joint: t(JOINT_TYPES[j].name) }) : t("Joint mode off"));
             renderTray();
           },
         }));
@@ -516,30 +527,30 @@ export function init(deps) {
     }
     actRow.append(
       el("button", {
-        class: "pf-btn", text: "Delete selected (Del)",
+        class: "pf-btn", text: t("Delete selected (Del)"),
         disabled: !building || !selectedBody,
         onclick: (ev) => { guard(ev.currentTarget); deleteSelected(); },
       }),
       el("button", {
-        class: "pf-btn", text: "Undo (U)",
+        class: "pf-btn", text: t("Undo (U)"),
         disabled: !session.canUndo,
         onclick: (ev) => { guard(ev.currentTarget); doUndo(); },
       }),
       el("button", {
-        class: "pf-btn pf-btn-go", text: building ? "Run (R)" : "Running…",
+        class: "pf-btn pf-btn-go", text: building ? t("Run (R)") : t("Running…"),
         disabled: !building,
         onclick: (ev) => { guard(ev.currentTarget); doRun(); },
       })
     );
 
-    const cursorRow = el("div", { class: "pf-tray-row pf-cursor-ctl", role: "group", "aria-label": "Move spawn cursor" });
+    const cursorRow = el("div", { class: "pf-tray-row pf-cursor-ctl", role: "group", "aria-label": t("Move spawn cursor") });
     const move = (dx, dy) => () => { moveCursor(dx, dy); };
     // DOM order left, up, down, right; CSS places them as a d-pad (or one row on phones)
     cursorRow.append(
-      el("button", { class: "pf-btn pf-btn-sm pf-cur-l", text: "←", "aria-label": "Cursor left", onclick: move(-1, 0) }),
-      el("button", { class: "pf-btn pf-btn-sm pf-cur-u", text: "↑", "aria-label": "Cursor up", onclick: move(0, 1) }),
-      el("button", { class: "pf-btn pf-btn-sm pf-cur-d", text: "↓", "aria-label": "Cursor down", onclick: move(0, -1) }),
-      el("button", { class: "pf-btn pf-btn-sm pf-cur-r", text: "→", "aria-label": "Cursor right", onclick: move(1, 0) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-l", text: "←", "aria-label": t("Cursor left"), onclick: move(-1, 0) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-u", text: "↑", "aria-label": t("Cursor up"), onclick: move(0, 1) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-d", text: "↓", "aria-label": t("Cursor down"), onclick: move(0, -1) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-r", text: "→", "aria-label": t("Cursor right"), onclick: move(1, 0) }),
     );
 
     tray.append(matRow, spawnBtn, actRow, cursorRow);
@@ -552,7 +563,7 @@ export function init(deps) {
       renderer.setCursor(cursor.x, cursor.y);
       updateGhost();
     }
-    announce("Cursor " + cursor.x.toFixed(1) + ", " + cursor.y.toFixed(1));
+    announce(t("Cursor {x}, {y}", { x: cursor.x.toFixed(1), y: cursor.y.toFixed(1) }));
   }
 
   function updateGhost() {
@@ -568,28 +579,28 @@ export function init(deps) {
   function trySpawn(x, y) {
     if (!session || session.state.phase !== "build") return;
     const res = session.dispatch({ type: "spawn", material: selectedMaterial, x: Math.round(x * 4) / 4, y: Math.round(y * 4) / 4 });
-    if (res.error) flashError("Cannot spawn: " + res.error.message);
+    if (res.error) flashError(t("Cannot spawn: {reason}", { reason: reasonText(res.error.message) }));
     return res;
   }
 
   function deleteSelected() {
     if (!session || !selectedBody) return;
     const res = session.dispatch({ type: "delete", target: selectedBody });
-    if (res.error) flashError("Cannot delete: " + res.error.message);
+    if (res.error) flashError(t("Cannot delete: {reason}", { reason: reasonText(res.error.message) }));
     else selectedBody = null;
   }
 
   function doUndo() {
     if (!session) return;
     const r = session.undo();
-    if (!r.ok) flashError("Nothing to undo");
-    else { audio.play("undo"); announce("Undid " + r.undone.type); refreshHud(); }
+    if (!r.ok) flashError(t("Nothing to undo"));
+    else { audio.play("undo"); announce(t("Undid {action}", { action: t("action." + r.undone.type) })); refreshHud(); }
   }
 
   function doRun() {
     if (!session) return;
     const res = session.dispatch({ type: "run" });
-    if (res.error) { flashError("Cannot run: " + res.error.message); return; }
+    if (res.error) { flashError(t("Cannot run: {reason}", { reason: reasonText(res.error.message) })); return; }
     runStartWall = performance.now();
     runAccum = 0;
     lastTickWarned = null;
@@ -598,7 +609,7 @@ export function init(deps) {
     jointAnchor = null;
     audio.play("run-start");
     audio.setPhase("run");
-    announce("Simulation running");
+    announce(t("Simulation running"));
   }
 
   // ------------------------------------------------------------ picking
@@ -612,10 +623,10 @@ export function init(deps) {
           selectedBody = pick.id;
           if (renderer) renderer.setSelection(pick.id);
           audio.play("ui-select");
-          announce("First body selected; pick a second body");
+          announce(t("First body selected; pick a second body"));
         } else {
           const res = session.dispatch({ type: "joint", joint: selectedJoint, a: jointAnchor, b: pick.id });
-          if (res.error) flashError("Cannot joint: " + res.error.message);
+          if (res.error) flashError(t("Cannot connect: {reason}", { reason: reasonText(res.error.message) }));
           else { audio.play("joint"); }
           jointAnchor = null;
           if (settings.jointMode !== "hold") { /* stay in joint mode for chaining */ }
@@ -626,7 +637,7 @@ export function init(deps) {
         if (renderer) renderer.setSelection(pick.id);
         audio.play("ui-select");
         const b = session.state.bodies.find((x) => x.id === pick.id);
-        announce("Selected " + (b ? MATERIALS[b.material].name : "body") + (b && b.kind === "payload" ? " payload" : ""));
+        announce(t(b && b.kind === "payload" ? "Selected {body} payload" : "Selected {body}", { body: b ? t(MATERIALS[b.material].name) : t("body") }));
         renderTray();
       }
       return;
@@ -742,7 +753,7 @@ export function init(deps) {
       if (currentLevel.allowedJoints.length) {
         jointMode = true;
         jointAnchor = null;
-        announce(JOINT_TYPES[selectedJoint].name + " mode: select two bodies");
+        announce(t("{joint} mode: select two bodies", { joint: t(JOINT_TYPES[selectedJoint].name) }));
         renderTray();
       }
     }
@@ -754,7 +765,7 @@ export function init(deps) {
       if (jointMode) { jointMode = false; jointAnchor = null; renderTray(); }
       else pauseGame();
     }
-    else if (k === "reframe") { handled(); if (renderer && renderer.frameChamber) renderer.frameChamber(); announce("Camera re-framed"); }
+    else if (k === "reframe") { handled(); if (renderer && renderer.frameChamber) renderer.frameChamber(); announce(t("Camera re-framed")); }
     else if (/^material_[1-4]$/.test(k || "")) {
       const i = Number(k.slice(-1)) - 1;
       if (currentLevel.allowedMaterials[i]) {
@@ -786,20 +797,20 @@ export function init(deps) {
             saveProgress();
           } else if (e.type === "joint") audio.play("joint");
           else if (e.type === "delete") audio.play("delete");
-          else if (e.type === "reset") announce("Reset to build phase");
+          else if (e.type === "reset") announce(t("Reset to build phase"));
         }
         checkLessonProgress(ev.cmd);
         refreshHud();
         updateGhost();
       } else if (ev.type === "command-error") {
-        flashError("Illegal action: " + ev.error.message);
+        flashError(t("Illegal action: {reason}", { reason: reasonText(ev.error.message) }));
         refreshHud(); // invalid action counter changed
       } else if (ev.type === "step") {
         for (const e of ev.events) {
           if (renderer) renderer.emitEvent(e);
           if (e.type === "shatter") audio.play("shatter");
           else if (e.type === "destroyed") audio.play("impact", { material: "steel", strength: 8, avSeed: s.state.tick });
-          else if (e.type === "delivered") { audio.play("goal"); announce("Payload delivered"); }
+          else if (e.type === "delivered") { audio.play("goal"); announce(t("Payload delivered")); }
         }
       } else if (ev.type === "terminal") {
         onTerminal(ev);
@@ -819,13 +830,11 @@ export function init(deps) {
     analytics("tutorial-step", { lesson: currentLevel.id, step: lessonStep });
     audio.play("ui-select");
     if (lessonStep >= currentLevel.steps.length) {
-      lessonBanner.innerHTML = "";
-      lessonBanner.append(el("p", { text: "Lesson complete! Finish the delivery or move on." }),
-        el("button", { class: "pf-btn pf-btn-primary", text: "Next lesson", onclick: () => startLearn((currentCtx.lessonIndex + 1) % LEARN_LESSONS.length) }));
+      renderLessonBanner();
       if (!progress.lessonsDone[currentLevel.id]) {
         progress.lessonsDone[currentLevel.id] = true;
         saveProgress();
-        toast("Lesson complete: " + currentLevel.name, "ok");
+        toast(t("Lesson complete: {name}", { name: levelName(currentLevel) }), "ok");
         if (LEARN_LESSONS.every((l) => progress.lessonsDone[l.id])) unlockAchievement("mechanic-mastery");
       }
     } else {
@@ -833,15 +842,21 @@ export function init(deps) {
     }
   }
 
-  function renderLessonBanner() {
+  function renderLessonBanner(quiet) {
     const step = currentLevel.steps[lessonStep];
-    lessonBanner.hidden = !step;
     lessonBanner.innerHTML = "";
+    if (lessonStep >= currentLevel.steps.length) {
+      lessonBanner.hidden = false;
+      lessonBanner.append(el("p", { text: t("Lesson complete! Finish the delivery or move on.") }),
+        el("button", { class: "pf-btn pf-btn-primary", text: t("Next lesson"), onclick: () => startLearn((currentCtx.lessonIndex + 1) % LEARN_LESSONS.length) }));
+      return;
+    }
+    lessonBanner.hidden = !step;
     if (step) {
       lessonBanner.append(
-        el("strong", { text: "Lesson " + (currentCtx.lessonIndex + 1) + "/" + LEARN_LESSONS.length }),
-        el("p", { text: step.text }));
-      announce(step.text);
+        el("strong", { text: t("Lesson {n}/{total}", { n: currentCtx.lessonIndex + 1, total: LEARN_LESSONS.length }) }),
+        el("p", { text: t(step.text) }));
+      if (!quiet) announce(t(step.text));
     }
   }
 
@@ -884,7 +899,9 @@ export function init(deps) {
     saveProgress();
     analytics("round-end", { level: levelId, won, score: score.total });
 
-    renderResults({ won, score, durationMs, prevBest, newBest, firstWin, reason: st.terminalReason });
+    lastResults = { won, score, durationMs, prevBest, newBest, firstWin, reason: st.terminalReason, lb: null };
+    submitResult(lastResults);
+    renderResults(lastResults);
     setTimeout(() => showScreen("results"), 900);
   }
 
@@ -893,16 +910,39 @@ export function init(deps) {
     progress.achievements.push(key);
     saveProgress();
     const a = ACHIEVEMENTS[key];
-    toast("Achievement unlocked: " + (a ? a.name : key), "ok");
+    toast(t("Achievement unlocked: {name}", { name: a ? t(a.name) : key }), "ok");
     audio.play("achievement");
   }
 
   const resultsScreen = makeScreen("results");
-  let lbSeq = 0; // ignores a late leaderboard reply after the next results render
+  let lastResults = null; // the shown results (re-rendered on a language change)
+
+  function isRankedPost() {
+    const ranked = (currentMode === "journey" || currentMode === "daily" || currentMode === "challenge")
+      && !currentCtx.practice;
+    return ranked && (currentMode === "journey" || currentMode === "daily");
+  }
+
+  // Signed in: post the total to the platform board once; the results line
+  // reads r.lb so a re-render never posts again.
+  function submitResult(r) {
+    if (!isRankedPost() || !platform.isHosted() || typeof platform.submitScore !== "function") return;
+    r.lb = { state: "posting" };
+    platform.submitScore(r.score.total).then((res) => {
+      r.lb = !res.posted ? { state: "notPosted" } : res.rank ? { state: "rank", rank: res.rank } : { state: "posted" };
+      const line = r === lastResults && resultsScreen.querySelector(".pf-lb");
+      if (line) line.textContent = lbText(r.lb);
+    });
+  }
+  function lbText(lb) {
+    if (lb.state === "posting") return ps.lbPosting;
+    if (lb.state === "notPosted") return ps.lbNotPosted;
+    if (lb.state === "rank") return ps.lbRank.replace("{rank}", lb.rank);
+    return ps.lbPosted;
+  }
 
   function renderResults(r) {
     resultsScreen.innerHTML = "";
-    const st = session.state;
     const c = r.score.components;
     const rows = [
       ["Goal", c.goal], ["Time bonus", c.timeBonus],
@@ -910,61 +950,47 @@ export function init(deps) {
       ["Invalid-action penalty", c.invalidPenalty],
     ];
     const table = el("table", { class: "pf-score-table" }, [
-      el("caption", { text: "Score breakdown" }),
-      ...rows.map(([k, v]) => el("tr", {}, [el("th", { scope: "row", text: k }), el("td", { text: String(v) })])),
-      el("tr", { class: "pf-total" }, [el("th", { scope: "row", text: "Total" }), el("td", { text: String(r.score.total) })]),
+      el("caption", { text: t("Score breakdown") }),
+      ...rows.map(([k, v]) => el("tr", {}, [el("th", { scope: "row", text: t(k) }), el("td", { text: String(v) })])),
+      el("tr", { class: "pf-total" }, [el("th", { scope: "row", text: t("Total") }), el("td", { text: String(r.score.total) })]),
     ]);
 
     const earned = progress.achievements.slice(-3).map((k) => ACHIEVEMENTS[k]).filter(Boolean);
 
-    const ranked = (currentMode === "journey" || currentMode === "daily" || currentMode === "challenge")
-      && !currentCtx.practice;
     const submitWrap = el("div", { class: "pf-submit" });
-    if (ranked && (currentMode === "journey" || currentMode === "daily")) {
-      if (platform.isHosted() && typeof platform.submitScore === "function") {
-        // Signed in: post the total to the platform board and show the rank.
-        const ps = currentPlatformStrings();
-        const line = el("p", { class: "pf-note pf-lb", text: ps.lbPosting });
-        submitWrap.append(line);
-        const seq = ++lbSeq;
-        platform.submitScore(r.score.total).then((res) => {
-          if (seq !== lbSeq) return;
-          line.textContent = !res.posted ? ps.lbNotPosted
-            : res.rank ? ps.lbRank.replace("{rank}", res.rank) : ps.lbPosted;
-        });
-      } else {
-        submitWrap.append(el("p", { class: "pf-note", text: "Ranked run recorded on this device." }));
-      }
+    if (isRankedPost()) {
+      if (r.lb) submitWrap.append(el("p", { class: "pf-note pf-lb", text: lbText(r.lb) }));
+      else submitWrap.append(el("p", { class: "pf-note", text: t("Ranked run recorded on this device.") }));
     } else {
-      submitWrap.append(el("p", { class: "pf-note", text: "Unranked session — no leaderboard submission." }));
+      submitWrap.append(el("p", { class: "pf-note", text: t("Unranked session — no leaderboard submission.") }));
     }
 
     resultsScreen.append(
-      el("h2", { text: r.won ? "Delivery complete" : "Run failed" }),
-      el("p", { class: "pf-note", text: "Reason: " + (TERMINAL_TEXT[r.reason] || r.reason || "unknown") }),
+      el("h2", { text: r.won ? t("Delivery complete") : t("Run failed") }),
+      el("p", { class: "pf-note", text: t("Reason: {reason}", { reason: TERMINAL_TEXT[r.reason] ? t(TERMINAL_TEXT[r.reason]) : (r.reason || t("unknown")) }) }),
       table,
-      el("p", { class: "pf-note", text: r.newBest ? "New local best! (previous " + r.prevBest + ")" : "Local best: " + Math.max(r.prevBest, r.score.total) }),
-      earned.length ? el("p", { class: "pf-note", text: "Achievements: " + earned.map((a) => a.name).join(", ") }) : null,
+      el("p", { class: "pf-note", text: r.newBest ? t("New local best! (previous {n})", { n: r.prevBest }) : t("Local best: {n}", { n: Math.max(r.prevBest, r.score.total) }) }),
+      earned.length ? el("p", { class: "pf-note", text: t("Achievements: {list}", { list: earned.map((a) => t(a.name)).join(", ") }) }) : null,
       submitWrap,
       el("div", { class: "pf-btn-row" }, [
         el("button", {
-          class: "pf-btn", text: "Retry",
+          class: "pf-btn", text: t("Retry"),
           onclick: () => { analytics("retry", { level: currentLevel.id }); audio.play("ui-select"); restartCurrent(); },
         }),
         nextActionButton(),
         el("button", {
-          class: "pf-btn pf-btn-secondary", text: "Modes",
+          class: "pf-btn pf-btn-secondary", text: t("Modes"),
           onclick: () => { audio.play("ui-back"); teardownPlay(); renderModes(); showScreen("modes"); },
         }),
       ])
     );
-    announce((r.won ? "Won" : "Lost") + " with " + r.score.total + " points");
+    if (!r.announced) { r.announced = true; announce(t(r.won ? "Won with {n} points" : "Lost with {n} points", { n: r.score.total })); }
   }
 
   function nextActionButton() {
     if (currentMode === "learn") {
       return el("button", {
-        class: "pf-btn pf-btn-primary", text: "Next lesson",
+        class: "pf-btn pf-btn-primary", text: t("Next lesson"),
         onclick: () => startLearn((currentCtx.lessonIndex + 1) % LEARN_LESSONS.length),
       });
     }
@@ -972,7 +998,7 @@ export function init(deps) {
       const idx = JOURNEY_LEVELS.findIndex((l) => l.id === currentLevel.id);
       if (idx >= 0 && idx + 1 < JOURNEY_LEVELS.length) {
         return el("button", {
-          class: "pf-btn pf-btn-primary", text: "Next chamber",
+          class: "pf-btn pf-btn-primary", text: t("Next chamber"),
           onclick: () => startJourney(idx + 1),
         });
       }
@@ -998,7 +1024,7 @@ export function init(deps) {
     dailyInfo = d;
     const level = dailyLevel(date);
     if (progress.dailyAttempts[date]) {
-      toast("Daily already attempted today — playing unranked practice run", "info");
+      toast(t("Daily already attempted today — playing unranked practice run"), "info");
       return startLevel(level, "daily", { daily: { date }, practice: true });
     }
     startLevel(level, "daily", { daily: { date } });
@@ -1043,7 +1069,7 @@ export function init(deps) {
     audio.setPhase("build");
     refreshHud();
     showScreen("play");
-    announce(level.name + ". " + (level.intro || ""));
+    announce(levelName(level) + ". " + (level.intro ? t(level.intro) : ""));
     startLoop();
   }
 
@@ -1129,18 +1155,18 @@ export function init(deps) {
 
   function openPause() {
     closeOverlays();
-    pauseOverlay = el("div", { class: "pf-overlay", role: "dialog", "aria-modal": "true", "aria-label": "Paused" }, [
+    pauseOverlay = el("div", { class: "pf-overlay", role: "dialog", "aria-modal": "true", i18nAria: "Paused" }, [
       el("div", { class: "pf-panel" }, [
-        el("h2", { text: "Paused" }),
-        el("button", { class: "pf-btn pf-btn-primary pf-btn-big", text: "Resume", onclick: resumeGame }),
-        el("button", { class: "pf-btn", text: "Settings", onclick: openSettings }),
-        el("button", { class: "pf-btn", text: "Help", onclick: () => openHelp("pause") }),
+        el("h2", { i18n: "Paused" }),
+        el("button", { class: "pf-btn pf-btn-primary pf-btn-big", i18n: "Resume", onclick: resumeGame }),
+        el("button", { class: "pf-btn", i18n: "Settings", onclick: openSettings }),
+        el("button", { class: "pf-btn", i18n: "Help", onclick: () => openHelp("pause") }),
         el("button", {
-          class: "pf-btn", text: "Restart chamber",
+          class: "pf-btn", i18n: "Restart chamber",
           onclick: () => { audio.play("ui-select"); closeOverlays(); restartCurrent(); },
         }),
         el("button", {
-          class: "pf-btn pf-btn-secondary", text: "Leave chamber",
+          class: "pf-btn pf-btn-secondary", i18n: "Leave chamber",
           onclick: () => { teardownPlay(); renderTitle(); showScreen("title"); },
         }),
       ]),
@@ -1154,10 +1180,10 @@ export function init(deps) {
   // guest otherwise. Identity always comes from the account profile.
   function profileNote() {
     if (platform.isHosted()) {
-      return "Playing as " + (platform.getNickname() || "…")
-        + " — progress syncs to your account (" + platform.getSyncStatus() + ").";
+      return t("Playing as {name} — progress syncs to your account ({status}).",
+        { name: platform.getNickname() || "…", status: t("sync." + platform.getSyncStatus()) });
     }
-    return "Local guest profile — progress stays in this browser.";
+    return t("Local guest profile — progress stays in this browser.");
   }
 
   // Graphics section: quality preset, render scale, per-effect overrides,
@@ -1169,14 +1195,14 @@ export function init(deps) {
     const tierName = (p) => tg(p);
     const section = el("section", { class: "pf-gfx", id: "pf-gfx-section", "aria-labelledby": "pf-gfx-head" });
 
-    const presetSel = el("select", { class: "pf-input", id: "pf-gfx-preset", "data-gfx": "preset", "aria-label": tg("quality") });
-    const scaleIn = el("input", { type: "range", id: "pf-gfx-scale", "data-gfx": "render_scale", min: "50", max: "200", step: "5", "aria-label": tg("renderScale") });
+    const presetSel = el("select", { class: "pf-input", id: "pf-gfx-preset", "data-gfx": "preset", "aria-label": tg("quality"), "data-tg-aria": "quality" });
+    const scaleIn = el("input", { type: "range", id: "pf-gfx-scale", "data-gfx": "render_scale", min: "50", max: "200", step: "5", "aria-label": tg("renderScale"), "data-tg-aria": "renderScale" });
     const scaleOut = el("output", { class: "pf-gfx-val", for: "pf-gfx-scale" });
     const catSels = {};
-    const adaptiveIn = el("input", { type: "checkbox", id: "pf-gfx-adaptive", "data-gfx": "adaptive", "aria-label": tg("adaptive") });
-    const fpsIn = el("input", { type: "checkbox", id: "pf-gfx-fps", "data-gfx": "show_fps", "aria-label": tg("showFps") });
+    const adaptiveIn = el("input", { type: "checkbox", id: "pf-gfx-adaptive", "data-gfx": "adaptive", "aria-label": tg("adaptive"), "data-tg-aria": "adaptive" });
+    const fpsIn = el("input", { type: "checkbox", id: "pf-gfx-fps", "data-gfx": "show_fps", "aria-label": tg("showFps"), "data-tg-aria": "showFps" });
     const summary = el("p", { class: "pf-note pf-gfx-summary", id: "pf-gfx-summary", "aria-live": "polite" });
-    const note = el("p", { class: "pf-note pf-gfx-note", id: "pf-gfx-note", text: tg("postFailed") });
+    const note = el("p", { class: "pf-note pf-gfx-note", id: "pf-gfx-note", text: tg("postFailed"), "data-tg": "postFailed" });
     note.hidden = true;
 
     function fillOptions() {
@@ -1240,28 +1266,36 @@ export function init(deps) {
 
     const rows = [];
     for (const cat of Object.keys(CATEGORIES)) {
-      const sel = el("select", { class: "pf-input", id: "pf-gfx-" + cat, "data-gfx-cat": cat, "aria-label": tg("cat_" + cat) });
+      const sel = el("select", { class: "pf-input", id: "pf-gfx-" + cat, "data-gfx-cat": cat, "aria-label": tg("cat_" + cat), "data-tg-aria": "cat_" + cat });
       sel.addEventListener("change", () => {
         if (sel.value === "preset") delete g[cat];
         else g[cat] = sel.value;
         commit();
       });
       catSels[cat] = sel;
-      rows.push(el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("cat_" + cat) }), sel]));
+      rows.push(el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("cat_" + cat), "data-tg": "cat_" + cat }), sel]));
     }
 
     section.append(
-      el("h3", { id: "pf-gfx-head", text: tg("graphics") }),
-      el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("quality") }), presetSel]),
-      el("label", { class: "pf-field pf-gfx-row pf-gfx-scale" }, [el("span", { text: tg("renderScale") }), scaleIn, scaleOut]),
+      el("h3", { id: "pf-gfx-head", text: tg("graphics"), "data-tg": "graphics" }),
+      el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("quality"), "data-tg": "quality" }), presetSel]),
+      el("label", { class: "pf-field pf-gfx-row pf-gfx-scale" }, [el("span", { text: tg("renderScale"), "data-tg": "renderScale" }), scaleIn, scaleOut]),
       ...rows,
-      el("label", { class: "pf-field pf-check" }, [adaptiveIn, el("span", { text: tg("adaptive") })]),
-      el("label", { class: "pf-field pf-check" }, [fpsIn, el("span", { text: tg("showFps") })]),
+      el("label", { class: "pf-field pf-check" }, [adaptiveIn, el("span", { text: tg("adaptive"), "data-tg": "adaptive" })]),
+      el("label", { class: "pf-field pf-check" }, [fpsIn, el("span", { text: tg("showFps"), "data-tg": "showFps" })]),
       summary,
       note,
     );
     fillOptions();
     refreshSummary();
+    // Language change: relabel this section's own controls in place (the shared
+    // Sound / Language / Report sections mounted inside it relabel themselves).
+    section.relabel = () => {
+      for (const n of section.querySelectorAll("[data-tg]")) n.textContent = tg(n.dataset.tg);
+      for (const n of section.querySelectorAll("[data-tg-aria]")) n.setAttribute("aria-label", tg(n.dataset.tgAria));
+      fillOptions();
+      refreshSummary();
+    };
     const timer = setInterval(() => {
       if (!section.isConnected) { clearInterval(timer); return; }
       refreshSummary();
@@ -1276,7 +1310,7 @@ export function init(deps) {
     const slider = (label, bus) => {
       const input = el("input", {
         type: "range", min: "0", max: "1", step: "0.05",
-        value: String(audio.getBusVolume(bus)), "aria-label": label + " volume",
+        value: String(audio.getBusVolume(bus)), i18nAria: label + " volume",
       });
       input.addEventListener("input", () => {
         audio.unlock();
@@ -1284,11 +1318,11 @@ export function init(deps) {
         s[bus] = Number(input.value);
         saveSettings();
       });
-      return el("label", { class: "pf-field" }, [el("span", { text: label }), input]);
+      return el("label", { class: "pf-field" }, [el("span", { i18n: label }), input]);
     };
 
     const toggle = (label, key, onchange) => {
-      const input = el("input", { type: "checkbox", "aria-label": label });
+      const input = el("input", { type: "checkbox", i18nAria: label });
       input.checked = !!s[key];
       input.addEventListener("change", () => {
         s[key] = input.checked;
@@ -1297,13 +1331,13 @@ export function init(deps) {
         if (onchange) onchange(input.checked);
         audio.play("ui-select");
       });
-      return el("label", { class: "pf-field pf-check" }, [input, el("span", { text: label })]);
+      return el("label", { class: "pf-field pf-check" }, [input, el("span", { i18n: label })]);
     };
 
     const gfxSection = buildGraphicsSection();
 
-    const camSel = el("select", { class: "pf-input", "aria-label": "Camera default" },
-      [el("option", { value: "frame", text: "Full chamber" }), el("option", { value: "tight", text: "Tight frame" })]);
+    const camSel = el("select", { class: "pf-input", i18nAria: "Camera default" },
+      [el("option", { value: "frame", i18n: "Full chamber" }), el("option", { value: "tight", i18n: "Tight frame" })]);
     camSel.value = s.cameraDefault;
     camSel.addEventListener("change", () => {
       s.cameraDefault = camSel.value;
@@ -1311,36 +1345,36 @@ export function init(deps) {
       if (renderer && renderer.setFraming) renderer.setFraming(camSel.value === "tight" ? 0.02 : 0.1);
     });
 
-    const jointSel = el("select", { class: "pf-input", "aria-label": "Joint mode behavior" },
-      [el("option", { value: "toggle", text: "Toggle (press J)" }), el("option", { value: "hold", text: "Hold (hold J)" })]);
+    const jointSel = el("select", { class: "pf-input", i18nAria: "Joint mode behavior" },
+      [el("option", { value: "toggle", i18n: "Toggle (press J)" }), el("option", { value: "hold", i18n: "Hold (hold J)" })]);
     jointSel.value = s.jointMode;
     jointSel.addEventListener("change", () => { s.jointMode = jointSel.value; saveSettings(); });
 
-    settingsOverlay = el("div", { class: "pf-overlay", role: "dialog", "aria-modal": "true", "aria-label": "Settings" }, [
+    settingsOverlay = el("div", { class: "pf-overlay", role: "dialog", "aria-modal": "true", i18nAria: "Settings" }, [
       el("div", { class: "pf-panel pf-settings" }, [
-        el("h2", { text: "Settings" }),
-        el("h3", { text: "Profile" }),
-        el("p", { class: "pf-note", text: profileNote() }),
-        el("h3", { text: "Audio" }),
+        el("h2", { i18n: "Settings" }),
+        el("h3", { i18n: "Profile" }),
+        el("p", { class: "pf-note pf-profile-note", text: profileNote() }),
+        el("h3", { i18n: "Audio" }),
         slider("Music", "music"), slider("Effects", "effects"), slider("Ambience", "ambience"), slider("Voice", "voice"),
         toggle("Mute all", "muted", (v) => audio.setMuted(v)),
         gfxSection,
-        el("h3", { text: "Display" }),
-        el("label", { class: "pf-field" }, [el("span", { text: "Camera default" }), camSel]),
+        el("h3", { i18n: "Display" }),
+        el("label", { class: "pf-field" }, [el("span", { i18n: "Camera default" }), camSel]),
         toggle("Reduced motion", "reducedMotion", (v) => { if (renderer) renderer.setReducedMotion(v); }),
         toggle("High contrast", "highContrast"),
         toggle("Larger text", "largeText"),
-        el("h3", { text: "Controls" }),
+        el("h3", { i18n: "Controls" }),
         toggle("Left-handed action tray", "leftHanded"),
-        el("label", { class: "pf-field" }, [el("span", { text: "Joint mode" }), jointSel]),
+        el("label", { class: "pf-field" }, [el("span", { i18n: "Joint mode" }), jointSel]),
         toggle("Haptics (vibration)", "haptics"),
-        el("h3", { text: "Other" }),
+        el("h3", { i18n: "Other" }),
         toggle("Share anonymous usage events", "consentAnalytics"),
         el("button", {
-          class: "pf-btn", text: "Replay tutorial",
+          class: "pf-btn", i18n: "Replay tutorial",
           onclick: () => { progress.lessonsDone = {}; saveProgress(); closeOverlays(); startLearn(0); },
         }),
-        el("button", { class: "pf-btn pf-btn-primary", text: "Done", onclick: () => { closeOverlays(); if (session && session.paused) openPause(); } }),
+        el("button", { class: "pf-btn pf-btn-primary", i18n: "Done", onclick: () => { closeOverlays(); if (session && session.paused) openPause(); } }),
       ]),
     ]);
     root.append(settingsOverlay);
@@ -1362,7 +1396,7 @@ export function init(deps) {
         el("button", {
           class: "pf-chip",
           disabled: !unlocked,
-          text: (i + 1) + ". " + l.name + (star ? " ★" : "") + (mastery ? " ◆" : ""),
+          text: (i + 1) + ". " + levelName(l) + (star ? " ★" : "") + (mastery ? " ◆" : ""),
           onclick: () => { audio.play("ui-select"); startJourney(i); },
         }),
       ]);
@@ -1371,24 +1405,24 @@ export function init(deps) {
     const lessons = el("div", { class: "pf-level-list" },
       LEARN_LESSONS.map((l, i) => el("button", {
         class: "pf-chip",
-        text: "Lesson " + (i + 1) + (progress.lessonsDone[l.id] ? " ✓" : ""),
+        text: t("Lesson {n}", { n: i + 1 }) + (progress.lessonsDone[l.id] ? " ✓" : ""),
         onclick: () => { audio.play("ui-select"); startLearn(i); },
       })));
     const achList = el("ul", { class: "pf-ach" },
       Object.values(ACHIEVEMENTS).map((a) => el("li", {
         class: progress.achievements.includes(a.key) ? "pf-ach-on" : "pf-ach-off",
-        text: (progress.achievements.includes(a.key) ? "★ " : "☆ ") + a.name + " — " + a.description,
+        text: (progress.achievements.includes(a.key) ? "★ " : "☆ ") + t(a.name) + " — " + t(a.description),
       })));
     progressionScreen.append(
-      el("h2", { text: "Progression" }),
-      el("h3", { text: "Journey (" + journeyProgressSummary() + ")" }),
+      el("h2", { text: t("Progression") }),
+      el("h3", { text: t("Journey ({summary})", { summary: journeyProgressSummary() }) }),
       list,
-      el("h3", { text: "Lessons" }),
+      el("h3", { text: t("Lessons") }),
       lessons,
-      el("h3", { text: "Achievements" }),
+      el("h3", { text: t("Achievements") }),
       achList,
-      el("p", { class: "pf-note", text: "Lifetime spawns: " + progress.counters.spawns + " · Wins: " + progress.counters.wins + " · Current streak: " + progress.counters.streak }),
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Back", onclick: () => { audio.play("ui-back"); renderTitle(); showScreen("title"); } })
+      el("p", { class: "pf-note", text: t("Lifetime spawns: {spawns} · Wins: {wins} · Current streak: {streak}", progress.counters) }),
+      el("button", { class: "pf-btn pf-btn-secondary", text: t("Back"), onclick: () => { audio.play("ui-back"); renderTitle(); showScreen("title"); } })
     );
   }
 
@@ -1398,35 +1432,35 @@ export function init(deps) {
   function renderHelp() {
     helpScreen.innerHTML = "";
     const keys = [
-      [keysFor("cursor_up", "cursor_left", "cursor_down", "cursor_right"), "Move the spawn cursor"],
-      [keysFor("spawn"), "Spawn selected material at cursor"],
-      [keysFor("material_1", "material_2", "material_3", "material_4"), "Select material 1-4"],
-      [keysFor("joint"), "Joint mode (" + (settings.jointMode === "hold" ? "hold" : "toggle") + "), then pick two bodies"],
-      [keysFor("delete"), "Remove selected body"],
-      [keysFor("run"), "Run the simulation"],
-      [keysFor("undo"), "Undo last build action"],
-      [keysFor("reframe"), "Re-frame camera"],
-      [keysFor("pause"), "Pause / cancel joint mode"],
+      [keysFor("cursor_up", "cursor_left", "cursor_down", "cursor_right"), t("Move the spawn cursor")],
+      [keysFor("spawn"), t("Spawn selected material at cursor")],
+      [keysFor("material_1", "material_2", "material_3", "material_4"), t("Select material 1-4")],
+      [keysFor("joint"), t(settings.jointMode === "hold" ? "Joint mode (hold), then pick two bodies" : "Joint mode (toggle), then pick two bodies")],
+      [keysFor("delete"), t("Remove selected body")],
+      [keysFor("run"), t("Run the simulation")],
+      [keysFor("undo"), t("Undo last build action")],
+      [keysFor("reframe"), t("Re-frame camera")],
+      [keysFor("pause"), t("Pause / cancel joint mode")],
     ];
     helpScreen.append(
-      el("h2", { text: "How to play" }),
-      el("p", { text: "Build phase: spawn balls and connect them with joints. Run phase: gravity takes over — deliver every payload (outlined ball) into a pulsing target ring. Glass shatters on hard impacts; hazard strips destroy anything." }),
-      el("h3", { text: "Controls" }),
+      el("h2", { text: t("How to play") }),
+      el("p", { text: t("Build phase: spawn balls and connect them with joints. Run phase: gravity takes over — deliver every payload (outlined ball) into a pulsing target ring. Glass shatters on hard impacts; hazard strips destroy anything.") }),
+      el("h3", { text: t("Controls") }),
       el("div", { class: "pf-cards" }, keys.map(([k, v]) =>
         el("div", { class: "pf-card" }, [el("strong", { text: k }), el("span", { text: v })]))),
-      el("h3", { text: "Materials" }),
+      el("h3", { text: t("Materials") }),
       el("div", { class: "pf-cards" }, Object.values(MATERIALS).map((m) =>
         el("div", { class: "pf-card" }, [
-          el("strong", { text: m.name }),
-          el("span", { text: "Density " + m.density + ", bounce " + m.restitution + (m.shatterSpeed ? ", shatters above impact " + m.shatterSpeed : "") }),
+          el("strong", { text: t(m.name) }),
+          el("span", { text: t(m.shatterSpeed ? "Density {d}, bounce {b}, shatters above impact {s}" : "Density {d}, bounce {b}", { d: m.density, b: m.restitution, s: m.shatterSpeed }) }),
         ]))),
-      el("h3", { text: "Joints" }),
+      el("h3", { text: t("Joints") }),
       el("div", { class: "pf-cards" }, Object.values(JOINT_TYPES).map((j) =>
         el("div", { class: "pf-card" }, [
-          el("strong", { text: j.name }),
-          el("span", { text: "Max length " + j.maxLength + (j.stiffness ? ", stiffness " + j.stiffness : ", rigid distance lock") }),
+          el("strong", { text: t(j.name) }),
+          el("span", { text: t(j.stiffness ? "Max length {n}, stiffness {s}" : "Max length {n}, rigid distance lock", { n: j.maxLength, s: j.stiffness }) }),
         ]))),
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Back", onclick: () => { audio.play("ui-back"); backFromHelp(); } })
+      el("button", { class: "pf-btn pf-btn-secondary", text: t("Back"), onclick: () => { audio.play("ui-back"); backFromHelp(); } })
     );
   }
 
@@ -1471,16 +1505,17 @@ export function init(deps) {
 
   // ------------------------------------------------------------ score chase / leaderboards
   const scoresScreen = makeScreen("scores");
+  let scoresSeq = 0;
 
   // Local daily attempts (the offline cache) when no board is reachable.
   function renderLocalDaily(wrap) {
     const days = Object.keys(progress.dailyAttempts || {}).sort().reverse().slice(0, 10);
     if (!days.length) {
-      wrap.append(el("p", { class: "pf-note", text: "No local daily runs yet." }));
+      wrap.append(el("p", { class: "pf-note", text: t("No local daily runs yet.") }));
       return;
     }
     wrap.append(el("table", { class: "pf-score-table" }, [
-      el("tr", {}, [el("th", { text: "Day" }), el("th", { text: "Score" })]),
+      el("tr", {}, [el("th", { text: t("Day") }), el("th", { text: t("Score") })]),
       ...days.map((d) => el("tr", {}, [
         el("td", { text: d }), el("td", { text: String((progress.dailyAttempts[d] || {}).score ?? 0) }),
       ])),
@@ -1491,41 +1526,43 @@ export function init(deps) {
   function renderLocalBests(wrap) {
     const rows = JOURNEY_LEVELS.filter((l) => progress.bests[l.id]);
     if (!rows.length) {
-      wrap.append(el("p", { class: "pf-note", text: "No local journey bests yet." }));
+      wrap.append(el("p", { class: "pf-note", text: t("No local journey bests yet.") }));
       return;
     }
     wrap.append(el("table", { class: "pf-score-table" }, [
-      el("tr", {}, [el("th", { text: "Chamber" }), el("th", { text: "Best" })]),
-      ...rows.map((l) => el("tr", {}, [el("td", { text: l.name }), el("td", { text: String(progress.bests[l.id]) })])),
+      el("tr", {}, [el("th", { text: t("Chamber") }), el("th", { text: t("Best") })]),
+      ...rows.map((l) => el("tr", {}, [el("td", { text: levelName(l) }), el("td", { text: String(progress.bests[l.id]) })])),
     ]));
   }
 
   async function renderScores() {
     scoresScreen.innerHTML = "";
-    scoresScreen.append(el("h2", { text: "Leaderboards" }));
+    const seq = ++scoresSeq;
+    scoresScreen.append(el("h2", { text: t("Leaderboards") }));
     const boards = el("div", { class: "pf-boards" });
     scoresScreen.append(boards,
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Back", onclick: () => { audio.play("ui-back"); renderTitle(); showScreen("title"); } }));
+      el("button", { class: "pf-btn pf-btn-secondary", text: t("Back"), onclick: () => { audio.play("ui-back"); renderTitle(); showScreen("title"); } }));
     for (const board of ["global", "daily"]) {
-      const head = el("h3", { text: board === "global" ? "Global (Journey)" : "Daily" });
+      const head = el("h3", { text: board === "global" ? t("Global (Journey)") : t("Daily") });
       const wrap = el("section", { class: "pf-board" }, [head]);
       boards.append(wrap);
       const res = await platform.getLeaderboard(board);
+      if (seq !== scoresSeq) return; // a newer render (language change) replaced this one
       if (res.error) {
         if (board === "daily") { renderLocalDaily(wrap); continue; }
-        if (res.error === "local") { head.textContent = "Local bests (Journey)"; renderLocalBests(wrap); continue; }
-        wrap.append(el("p", { class: "pf-note", text: "Board error: " + res.error }));
+        if (res.error === "local") { head.textContent = t("Local bests (Journey)"); renderLocalBests(wrap); continue; }
+        wrap.append(el("p", { class: "pf-note", text: t("Board error: {error}", { error: res.error }) }));
         continue;
       }
       // the platform exposes a single read-only board; per-day views stay local
       if (res.hosted && board === "daily") { renderLocalDaily(wrap); continue; }
-      if (res.hosted) head.textContent = "StarHermit leaderboard";
+      if (res.hosted) head.textContent = t("StarHermit leaderboard");
       if (!res.entries || !res.entries.length) {
-        wrap.append(el("p", { class: "pf-note", text: "No entries yet. Be the first." }));
+        wrap.append(el("p", { class: "pf-note", text: t("No entries yet. Be the first.") }));
         continue;
       }
       const t = el("table", { class: "pf-score-table" }, [
-        el("tr", {}, [el("th", { text: "#" }), el("th", { text: "Name" }), el("th", { text: "Score" }), el("th", { text: "Goal" })]),
+        el("tr", {}, [el("th", { text: "#" }), el("th", { text: t("Name") }), el("th", { text: t("Score") }), el("th", { text: t("Goal") })]),
         ...res.entries.map((e, i) => el("tr", {}, [
           el("td", { text: String(i + 1) }), el("td", { text: e.name }),
           el("td", { text: String(e.score) }), el("td", { text: String(e.goal) }),
@@ -1544,7 +1581,7 @@ export function init(deps) {
     next.setUTCHours(24, 0, 0, 0);
     const ms = next.getTime() - now;
     const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
-    node.textContent = "Next daily in " + h + "h " + m + "m";
+    node.textContent = t("Next daily in {h}h {m}m", { h, m });
   }
   setInterval(() => { if (!titleScreen.hidden) updateDailyCountdown(); }, 30000);
 
@@ -1560,17 +1597,51 @@ export function init(deps) {
   platform.fetchProfile().then(updateNetStatus);
   platform.cloudLoad().then(async (doc) => {
     if (doc) applyRemoteDoc(doc);
-    // Platform settings KV wins over local values for known preference keys.
+    // Platform settings KV wins over local values for known preference keys
+    // (platform-owned ui.* keys such as ui.language are not game settings).
     const remote = await platform.loadRemoteSettings();
     const picked = {};
     for (const [k, v] of Object.entries(remote)) {
-      if (k !== "version" && k in settings && v != null && typeof v === typeof settings[k]) picked[k] = v;
+      if (k !== "version" && !k.startsWith("ui.") && k in settings && v != null && typeof v === typeof settings[k]) picked[k] = v;
     }
     if (Object.keys(picked).length) applyRemoteDoc({ settings: picked });
     else platform.syncSettings(settings);
     updateNetStatus();
   });
   platform.getDaily().then((d) => { dailyInfo = d; });
+
+  // Another device saved first: merge its document with ours (progress from
+  // both sides, this device's settings and run) and save the merged copy.
+  platform.onSaveConflict((remote) => {
+    if (remote) applyRemoteDoc(remote, { keepLocalSettings: true });
+    else saveProgress();
+    updateNetStatus();
+  });
+
+  // ------------------------------------------------------------ live language switching
+  // Static nodes carry data-i18n / data-i18n-aria; screens built in code are
+  // re-rendered in place. The session, run clock and overlays stay as they are.
+  onLocaleChange(() => {
+    for (const n of document.querySelectorAll("[data-i18n]")) n.textContent = t(n.dataset.i18n);
+    for (const n of document.querySelectorAll("[data-i18n-aria]")) n.setAttribute("aria-label", t(n.dataset.i18nAria));
+    updateNetStatus();
+    if (session && !screens.play.hidden) {
+      refreshHud();
+      if (currentMode === "learn" && currentLevel.steps) renderLessonBanner(true);
+    }
+    if (settingsOverlay) {
+      const note = settingsOverlay.querySelector(".pf-profile-note");
+      if (note) note.textContent = profileNote();
+      const gfx = settingsOverlay.querySelector("#pf-gfx-section");
+      if (gfx && gfx.relabel) gfx.relabel();
+    }
+    if (!screens.title.hidden) renderTitle();
+    else if (!screens.modes.hidden) { const id = openSetup; renderModes(); if (id) renderModeSetup(id); }
+    else if (!screens.progression.hidden) renderProgression();
+    else if (!screens.help.hidden) renderHelp();
+    else if (!screens.scores.hidden) renderScores();
+    else if (!screens.results.hidden && lastResults) renderResults(lastResults);
+  });
 
   // ------------------------------------------------------------ boot into title
   renderTitle();

@@ -18,6 +18,8 @@ const TOKEN = "hdr." + b64u({ sub: "user-1234-abcd", game_scope: "pf-slug", exp:
 
 const calls = [];
 const saves = {};
+const etags = {};
+let version = 0;
 const kv = { music: 0.25 };
 let replaced = null;
 
@@ -27,8 +29,20 @@ function route(url, init) {
   if (url === "/api/v1/users/user-1234-abcd/profile") return j({ username: "should-not-display", nickname: "Forge Tester" });
   if (url === "/api/v1/users/u-rival-9/profile") return j({ username: "rival-user", nickname: "" });
   if (url.startsWith("/api/v1/me/cloud-saves/")) {
-    const key = decodeURIComponent(url.split("/cloud-saves/")[1]);
-    if (init.method === "PUT") { saves[key] = Buffer.from(JSON.parse(init.body).dataBase64, "base64"); return j({}); }
+    // Versioned slot: /info reports the ETag; a PUT must match it (If-Match) or
+    // target an empty slot (If-None-Match: *), else 412 like the platform.
+    const rest = decodeURIComponent(url.split("/cloud-saves/")[1]);
+    const key = rest.replace(/\/info$/, "");
+    if (rest.endsWith("/info")) return j(saves[key] ? { exists: true, etag: etags[key] } : { exists: false });
+    if (init.method === "PUT") {
+      const h = init.headers || {};
+      if ((h["If-Match"] && h["If-Match"] !== etags[key]) || (h["If-None-Match"] === "*" && saves[key])) {
+        return new Response(JSON.stringify({ error: "precondition failed", etag: etags[key] }), { status: 412 });
+      }
+      saves[key] = Buffer.from(JSON.parse(init.body).dataBase64, "base64");
+      etags[key] = '"v' + (++version) + '"';
+      return j({ etag: etags[key] });
+    }
     return saves[key] ? r(200, saves[key]) : r(404, "");
   }
   if (url === "/api/v1/games/pf-slug/settings" && init.method === "PATCH") { Object.assign(kv, JSON.parse(init.body).settings); return j({}); }
@@ -117,7 +131,7 @@ test("standalone: no platform request, local defaults", async () => {
 });
 
 test("sign-in offered on <id>.starhermit.com without a token", async () => {
-  install("https://pf-slug.starhermit.com/index.html");
+  install("https://0b9d6f2e-3c4a-4e5b-9a7c-1d2e3f405162.starhermit.com/index.html");
   const platform = await import("../src/platform.js?signin");
   platform.handshake();
   assert.equal(platform.canSignIn(), true);
@@ -145,4 +159,51 @@ test("leaderboard line strings in every locale", async () => {
     for (const k of ["lbPosting", "lbRank", "lbPosted", "lbNotPosted"]) assert.ok(t[k], l + " " + k);
     assert.ok(t.lbRank.includes("{rank}"));
   }
+});
+
+test("hosted: a save that lost to another device is merged and saved again", async () => {
+  install("https://example.test/index.html#game_token=" + TOKEN);
+  for (const k of Object.keys(saves)) delete saves[k];
+  const platform = await import("../src/platform.js?conflict");
+  platform.handshake();
+  assert.equal(await platform.cloudLoad(), null); // empty slot: next write is If-None-Match: *
+  // another device saves first
+  const remoteDoc = { settings: { music: 0.1 }, progress: { completed: { "journey-2": true }, bests: { "journey-1": 50, "journey-2": 700 }, achievements: ["streak-3"], counters: { spawns: 90, wins: 4, streak: 0 } } };
+  const zipped = await (async () => {
+    // write through a second SDK instance so the slot holds a real zip
+    const other = holder.StarHermit.create({ window: { location: { hash: "#game_token=" + TOKEN, search: "", pathname: "/", origin: "https://example.test", hostname: "example.test", href: "https://example.test/" }, history: { replaceState() {} } }, fetch: globalThis.fetch, setTimeout: () => 0, clearTimeout: () => {} });
+    other.init();
+    await other.writeSave(JSON.stringify(remoteDoc));
+    return saves["game:pf-slug"];
+  })();
+  assert.ok(zipped);
+  const conflicts = [];
+  platform.onSaveConflict((remote) => conflicts.push(remote));
+  const local = { settings: { music: 0.9 }, progress: { completed: { "journey-1": true }, bests: { "journey-1": 900 }, achievements: ["first-completion"], counters: { spawns: 10, wins: 1, streak: 1 } } };
+  platform.cloudSave(local);
+  assert.equal(await platform.flushCloudSave(), false);
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(conflicts.length, 1);
+  assert.deepEqual(conflicts[0], remoteDoc);
+  const merged = platform.mergeProgress(conflicts[0].progress, local.progress);
+  assert.deepEqual(merged.completed, { "journey-2": true, "journey-1": true });
+  assert.deepEqual(merged.bests, { "journey-1": 900, "journey-2": 700 });
+  assert.deepEqual(merged.achievements, ["first-completion", "streak-3"]);
+  assert.deepEqual(merged.counters, { spawns: 90, wins: 4, streak: 1 });
+  // after the reload the merged document saves on top of the newer version
+  platform.cloudSave({ settings: local.settings, progress: merged });
+  assert.equal(await platform.flushCloudSave(), true);
+});
+
+test("settings KV mirror ignores platform ui.* keys", async () => {
+  install("https://example.test/index.html#game_token=" + TOKEN);
+  kv["ui.language"] = { choice: "de-DE" };
+  const platform = await import("../src/platform.js?uikeys");
+  platform.handshake();
+  await platform.loadRemoteSettings();
+  calls.length = 0;
+  await platform.syncSettings({ music: 0.25, "ui.language": { choice: "fr-FR" } });
+  assert.equal(calls.filter((c) => c.method === "PATCH").length, 0);
+  delete kv["ui.language"];
 });

@@ -59,7 +59,8 @@ export function inviteLink() { return isHosted() ? sdk().inviteLink() : null; }
 
 // ---------------------------------------------------------------- cloud save
 // ONE slot (game:<slug>); localStorage stays the offline cache, the cloud is a
-// mirror; on load the remote wins.
+// mirror. loadJSON makes later writes conditional; ui.js merges the loaded doc
+// (and a conflicting one, see onSaveConflict) with local progress.
 
 export async function cloudLoad() {
   if (!isHosted()) return null;
@@ -86,7 +87,7 @@ export async function loadRemoteSettings() {
   if (!isHosted()) return {};
   const s = (await sdk().getSettings()) || {};
   settingsLoaded = true;
-  for (const [k, v] of Object.entries(s)) sentSettings[k] = JSON.stringify(v);
+  for (const [k, v] of Object.entries(s)) if (!k.startsWith("ui.")) sentSettings[k] = JSON.stringify(v);
   return s;
 }
 
@@ -95,7 +96,7 @@ export function syncSettings(prefs) {
   if (!isHosted() || !settingsLoaded) return Promise.resolve(null);
   const patch = {};
   for (const [k, v] of Object.entries(prefs || {})) {
-    if (k === "version") continue;
+    if (k === "version" || k.startsWith("ui.")) continue; // ui.* keys belong to the platform (ui.language)
     const json = JSON.stringify(v);
     if (sentSettings[k] !== json) { patch[k] = v; sentSettings[k] = json; }
   }
@@ -167,4 +168,50 @@ export async function getLeaderboard() {
       goal: en.components && en.components.goal != null ? en.components.goal : 0,
     }))),
   };
+}
+
+// ---------------------------------------------------------------- save conflicts
+// The SDK makes cloud writes conditional on the last-read version; when another
+// device saved first it emits `saveconflict` and blocks writes until a reload.
+
+/** Merge two progress documents without dropping either side's progress. */
+export function mergeProgress(remote, local) {
+  const r = remote && typeof remote === "object" ? remote : {};
+  const l = local && typeof local === "object" ? local : {};
+  const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+  const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const union = (a, b) => ({ ...obj(a), ...Object.fromEntries(Object.entries(obj(b)).filter(([, v]) => v)) });
+  const bests = { ...obj(r.bests) };
+  for (const [k, v] of Object.entries(obj(l.bests))) bests[k] = Math.max(num(bests[k]), num(v));
+  const daily = { ...obj(r.dailyAttempts) };
+  for (const [k, v] of Object.entries(obj(l.dailyAttempts))) {
+    daily[k] = !daily[k] || num(obj(v).score) > num(obj(daily[k]).score) ? v : daily[k];
+  }
+  const rc = obj(r.counters), lc = obj(l.counters);
+  const achievements = [...(Array.isArray(l.achievements) ? l.achievements : [])];
+  for (const a of Array.isArray(r.achievements) ? r.achievements : []) if (!achievements.includes(a)) achievements.push(a);
+  return {
+    ...r, ...l,
+    playerId: r.playerId || l.playerId,
+    completed: union(r.completed, l.completed),
+    stars: union(r.stars, l.stars),
+    lessonsDone: union(r.lessonsDone, l.lessonsDone),
+    achievements,
+    // lifetime totals take the larger side; the win streak is this device's run
+    counters: { ...rc, ...lc, spawns: Math.max(num(rc.spawns), num(lc.spawns)), wins: Math.max(num(rc.wins), num(lc.wins)), streak: num(lc.streak) },
+    bests,
+    dailyAttempts: daily,
+    lastMode: l.lastMode || r.lastMode,
+  };
+}
+
+/** fn(remoteDoc|null) after another device's save won: reload, then the caller merges and saves. */
+export function onSaveConflict(fn) {
+  const sh = sdk();
+  if (!sh || typeof sh.on !== "function") return;
+  sh.on("saveconflict", async () => {
+    let remote = null;
+    try { remote = await sh.loadJSON(); } catch { remote = null; }
+    fn(remote && typeof remote === "object" ? remote : null);
+  });
 }

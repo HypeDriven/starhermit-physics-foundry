@@ -3,6 +3,7 @@
 import * as audio from "./audio.js";
 import * as platform from "./platform.js";
 import { init as initUi } from "./ui.js";
+import { t } from "./i18n.js";
 
 // ---------------------------------------------------------------- storage
 // Versioned, checksummed localStorage docs (settings and progression are
@@ -130,7 +131,7 @@ function mount() {
     const note = document.createElement("div");
     note.className = "pf-compat";
     note.setAttribute("role", "alert");
-    note.textContent = "WebGL is unavailable in this browser, so the 3D chamber view is disabled. All menus and the rules remain usable; enable hardware acceleration or try another browser for the full experience.";
+    note.textContent = t("WebGL is unavailable in this browser, so the 3D chamber view is disabled. All menus and the rules remain usable; enable hardware acceleration or try another browser for the full experience.");
     document.body.prepend(note);
   }
 

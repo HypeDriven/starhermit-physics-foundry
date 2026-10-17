@@ -19,9 +19,9 @@ function makeRng(seed) {
   const next = () => {
     s |= 0;
     s = s + 1831565813 | 0;
-    let t = Math.imul(s ^ s >>> 15, 1 | s);
-    t ^= t + Math.imul(t ^ t >>> 7, 61 | t);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    let t2 = Math.imul(s ^ s >>> 15, 1 | s);
+    t2 ^= t2 + Math.imul(t2 ^ t2 >>> 7, 61 | t2);
+    return ((t2 ^ t2 >>> 14) >>> 0) / 4294967296;
   };
   const int = (lo, hi) => lo + Math.floor(next() * (hi - lo));
   const pick = (arr) => arr[Math.floor(next() * arr.length)];
@@ -407,7 +407,7 @@ function stepRun(state, ticks) {
     for (let i = s.bodies.length - 1; i >= 0; i--) {
       const b = s.bodies[i];
       if (b.kind !== "payload") continue;
-      const hit = (s.level.targets || []).some((t) => Math.hypot(b.x - t.x, b.y - t.y) <= t.r);
+      const hit = (s.level.targets || []).some((t2) => Math.hypot(b.x - t2.x, b.y - t2.y) <= t2.r);
       if (hit) {
         removeBody(s, events, i, "delivered");
         s.goals.delivered += 1;
@@ -589,8 +589,8 @@ function clamp2(value, min, max) {
 function euclideanModulo(n, m) {
   return (n % m + m) % m;
 }
-function lerp(x, y, t) {
-  return (1 - t) * x + t * y;
+function lerp(x, y, t2) {
+  return (1 - t2) * x + t2 * y;
 }
 function isPowerOfTwo(value) {
   return (value & value - 1) === 0 && value !== 0;
@@ -693,12 +693,12 @@ function satForAxes(axes, v0, v1, v2, extents) {
   }
   return true;
 }
-function hue2rgb(p, q, t) {
-  if (t < 0) t += 1;
-  if (t > 1) t -= 1;
-  if (t < 1 / 6) return p + (q - p) * 6 * t;
-  if (t < 1 / 2) return q;
-  if (t < 2 / 3) return p + (q - p) * 6 * (2 / 3 - t);
+function hue2rgb(p, q, t2) {
+  if (t2 < 0) t2 += 1;
+  if (t2 > 1) t2 -= 1;
+  if (t2 < 1 / 6) return p + (q - p) * 6 * t2;
+  if (t2 < 1 / 2) return q;
+  if (t2 < 2 / 3) return p + (q - p) * 6 * (2 / 3 - t2);
   return p;
 }
 function checkIntersection(object, material, raycaster, ray, pA, pB, pC, point) {
@@ -7733,23 +7733,23 @@ var init_three_module = __esm({
     EventDispatcher = class {
       addEventListener(type, listener) {
         if (this._listeners === void 0) this._listeners = {};
-        const listeners = this._listeners;
-        if (listeners[type] === void 0) {
-          listeners[type] = [];
+        const listeners2 = this._listeners;
+        if (listeners2[type] === void 0) {
+          listeners2[type] = [];
         }
-        if (listeners[type].indexOf(listener) === -1) {
-          listeners[type].push(listener);
+        if (listeners2[type].indexOf(listener) === -1) {
+          listeners2[type].push(listener);
         }
       }
       hasEventListener(type, listener) {
         if (this._listeners === void 0) return false;
-        const listeners = this._listeners;
-        return listeners[type] !== void 0 && listeners[type].indexOf(listener) !== -1;
+        const listeners2 = this._listeners;
+        return listeners2[type] !== void 0 && listeners2[type].indexOf(listener) !== -1;
       }
       removeEventListener(type, listener) {
         if (this._listeners === void 0) return;
-        const listeners = this._listeners;
-        const listenerArray = listeners[type];
+        const listeners2 = this._listeners;
+        const listenerArray = listeners2[type];
         if (listenerArray !== void 0) {
           const index = listenerArray.indexOf(listener);
           if (index !== -1) {
@@ -7759,8 +7759,8 @@ var init_three_module = __esm({
       }
       dispatchEvent(event) {
         if (this._listeners === void 0) return;
-        const listeners = this._listeners;
-        const listenerArray = listeners[event.type];
+        const listeners2 = this._listeners;
+        const listenerArray = listeners2[event.type];
         if (listenerArray !== void 0) {
           event.target = this;
           const array = listenerArray.slice(0);
@@ -9193,17 +9193,17 @@ var init_three_module = __esm({
         this._z = z;
         this._w = w;
       }
-      static slerpFlat(dst, dstOffset, src0, srcOffset0, src1, srcOffset1, t) {
+      static slerpFlat(dst, dstOffset, src0, srcOffset0, src1, srcOffset1, t2) {
         let x0 = src0[srcOffset0 + 0], y0 = src0[srcOffset0 + 1], z0 = src0[srcOffset0 + 2], w0 = src0[srcOffset0 + 3];
         const x1 = src1[srcOffset1 + 0], y1 = src1[srcOffset1 + 1], z1 = src1[srcOffset1 + 2], w1 = src1[srcOffset1 + 3];
-        if (t === 0) {
+        if (t2 === 0) {
           dst[dstOffset + 0] = x0;
           dst[dstOffset + 1] = y0;
           dst[dstOffset + 2] = z0;
           dst[dstOffset + 3] = w0;
           return;
         }
-        if (t === 1) {
+        if (t2 === 1) {
           dst[dstOffset + 0] = x1;
           dst[dstOffset + 1] = y1;
           dst[dstOffset + 2] = z1;
@@ -9211,19 +9211,19 @@ var init_three_module = __esm({
           return;
         }
         if (w0 !== w1 || x0 !== x1 || y0 !== y1 || z0 !== z1) {
-          let s = 1 - t;
+          let s = 1 - t2;
           const cos = x0 * x1 + y0 * y1 + z0 * z1 + w0 * w1, dir = cos >= 0 ? 1 : -1, sqrSin = 1 - cos * cos;
           if (sqrSin > Number.EPSILON) {
             const sin = Math.sqrt(sqrSin), len = Math.atan2(sin, cos * dir);
             s = Math.sin(s * len) / sin;
-            t = Math.sin(t * len) / sin;
+            t2 = Math.sin(t2 * len) / sin;
           }
-          const tDir = t * dir;
+          const tDir = t2 * dir;
           x0 = x0 * s + x1 * tDir;
           y0 = y0 * s + y1 * tDir;
           z0 = z0 * s + z1 * tDir;
           w0 = w0 * s + w1 * tDir;
-          if (s === 1 - t) {
+          if (s === 1 - t2) {
             const f = 1 / Math.sqrt(x0 * x0 + y0 * y0 + z0 * z0 + w0 * w0);
             x0 *= f;
             y0 *= f;
@@ -9419,8 +9419,8 @@ var init_three_module = __esm({
       rotateTowards(q, step) {
         const angle = this.angleTo(q);
         if (angle === 0) return this;
-        const t = Math.min(1, step / angle);
-        this.slerp(q, t);
+        const t2 = Math.min(1, step / angle);
+        this.slerp(q, t2);
         return this;
       }
       identity() {
@@ -9478,9 +9478,9 @@ var init_three_module = __esm({
         this._onChangeCallback();
         return this;
       }
-      slerp(qb, t) {
-        if (t === 0) return this;
-        if (t === 1) return this.copy(qb);
+      slerp(qb, t2) {
+        if (t2 === 0) return this;
+        if (t2 === 1) return this.copy(qb);
         const x = this._x, y = this._y, z = this._z, w = this._w;
         let cosHalfTheta = w * qb._w + x * qb._x + y * qb._y + z * qb._z;
         if (cosHalfTheta < 0) {
@@ -9501,17 +9501,17 @@ var init_three_module = __esm({
         }
         const sqrSinHalfTheta = 1 - cosHalfTheta * cosHalfTheta;
         if (sqrSinHalfTheta <= Number.EPSILON) {
-          const s = 1 - t;
-          this._w = s * w + t * this._w;
-          this._x = s * x + t * this._x;
-          this._y = s * y + t * this._y;
-          this._z = s * z + t * this._z;
+          const s = 1 - t2;
+          this._w = s * w + t2 * this._w;
+          this._x = s * x + t2 * this._x;
+          this._y = s * y + t2 * this._y;
+          this._z = s * z + t2 * this._z;
           this.normalize();
           return this;
         }
         const sinHalfTheta = Math.sqrt(sqrSinHalfTheta);
         const halfTheta = Math.atan2(sinHalfTheta, cosHalfTheta);
-        const ratioA = Math.sin((1 - t) * halfTheta) / sinHalfTheta, ratioB = Math.sin(t * halfTheta) / sinHalfTheta;
+        const ratioA = Math.sin((1 - t2) * halfTheta) / sinHalfTheta, ratioB = Math.sin(t2 * halfTheta) / sinHalfTheta;
         this._w = w * ratioA + this._w * ratioB;
         this._x = x * ratioA + this._x * ratioB;
         this._y = y * ratioA + this._y * ratioB;
@@ -9519,8 +9519,8 @@ var init_three_module = __esm({
         this._onChangeCallback();
         return this;
       }
-      slerpQuaternions(qa, qb, t) {
-        return this.copy(qa).slerp(qb, t);
+      slerpQuaternions(qa, qb, t2) {
+        return this.copy(qa).slerp(qb, t2);
       }
       random() {
         const u1 = Math.random();
@@ -9977,10 +9977,10 @@ var init_three_module = __esm({
       }
       randomDirection() {
         const u = (Math.random() - 0.5) * 2;
-        const t = Math.random() * Math.PI * 2;
+        const t2 = Math.random() * Math.PI * 2;
         const f = Math.sqrt(1 - u ** 2);
-        this.x = f * Math.cos(t);
-        this.y = f * Math.sin(t);
+        this.x = f * Math.cos(t2);
+        this.y = f * Math.sin(t2);
         this.z = u;
         return this;
       }
@@ -10421,15 +10421,15 @@ var init_three_module = __esm({
         this.direction.copy(ray.direction);
         return this;
       }
-      at(t, target) {
-        return target.copy(this.origin).addScaledVector(this.direction, t);
+      at(t2, target) {
+        return target.copy(this.origin).addScaledVector(this.direction, t2);
       }
       lookAt(v) {
         this.direction.copy(v).sub(this.origin).normalize();
         return this;
       }
-      recast(t) {
-        this.origin.copy(this.at(t, _vector$a));
+      recast(t2) {
+        this.origin.copy(this.at(t2, _vector$a));
         return this;
       }
       closestPointToPoint(point, target) {
@@ -10535,15 +10535,15 @@ var init_three_module = __esm({
           }
           return null;
         }
-        const t = -(this.origin.dot(plane.normal) + plane.constant) / denominator;
-        return t >= 0 ? t : null;
+        const t2 = -(this.origin.dot(plane.normal) + plane.constant) / denominator;
+        return t2 >= 0 ? t2 : null;
       }
       intersectPlane(plane, target) {
-        const t = this.distanceToPlane(plane);
-        if (t === null) {
+        const t2 = this.distanceToPlane(plane);
+        if (t2 === null) {
           return null;
         }
-        return this.at(t, target);
+        return this.at(t2, target);
       }
       intersectsPlane(plane) {
         const distToPoint = plane.distanceToPoint(this.origin);
@@ -11181,9 +11181,9 @@ var init_three_module = __esm({
       makeRotationAxis(axis, angle) {
         const c = Math.cos(angle);
         const s = Math.sin(angle);
-        const t = 1 - c;
+        const t2 = 1 - c;
         const x = axis.x, y = axis.y, z = axis.z;
-        const tx = t * x, ty = t * y;
+        const tx = t2 * x, ty = t2 * y;
         this.set(
           tx * x + c,
           tx * y - s * z,
@@ -11195,7 +11195,7 @@ var init_three_module = __esm({
           0,
           tx * z - s * y,
           ty * z + s * x,
-          t * z * z + c,
+          t2 * z * z + c,
           0,
           0,
           0,
@@ -13714,10 +13714,10 @@ var init_three_module = __esm({
         function handleVertex(v) {
           n.fromArray(normals, v * 3);
           n2.copy(n);
-          const t = tan1[v];
-          tmp.copy(t);
-          tmp.sub(n.multiplyScalar(n.dot(t))).normalize();
-          tmp2.crossVectors(n2, t);
+          const t2 = tan1[v];
+          tmp.copy(t2);
+          tmp.sub(n.multiplyScalar(n.dot(t2))).normalize();
+          tmp2.crossVectors(n2, t2);
           const test = tmp2.dot(tan2[v]);
           const w = test < 0 ? -1 : 1;
           tangents[v * 4] = tmp.x;
@@ -14837,11 +14837,11 @@ var init_three_module = __esm({
           }
           return null;
         }
-        const t = -(line.start.dot(this.normal) + this.constant) / denominator;
-        if (t < 0 || t > 1) {
+        const t2 = -(line.start.dot(this.normal) + this.constant) / denominator;
+        if (t2 < 0 || t2 > 1) {
           return null;
         }
-        return target.copy(line.start).addScaledVector(direction, t);
+        return target.copy(line.start).addScaledVector(direction, t2);
       }
       intersectsLine(line) {
         const startSign = this.distanceToPoint(line.start);
@@ -19235,17 +19235,17 @@ void main() {
         this.settings = null;
         this.DefaultSettings_ = {};
       }
-      evaluate(t) {
+      evaluate(t2) {
         const pp = this.parameterPositions;
         let i1 = this._cachedIndex, t1 = pp[i1], t0 = pp[i1 - 1];
         validate_interval: {
           seek: {
             let right;
             linear_scan: {
-              forward_scan: if (!(t < t1)) {
+              forward_scan: if (!(t2 < t1)) {
                 for (let giveUpAt = i1 + 2; ; ) {
                   if (t1 === void 0) {
-                    if (t < t0) break forward_scan;
+                    if (t2 < t0) break forward_scan;
                     i1 = pp.length;
                     this._cachedIndex = i1;
                     return this.copySampleValue_(i1 - 1);
@@ -19253,16 +19253,16 @@ void main() {
                   if (i1 === giveUpAt) break;
                   t0 = t1;
                   t1 = pp[++i1];
-                  if (t < t1) {
+                  if (t2 < t1) {
                     break seek;
                   }
                 }
                 right = pp.length;
                 break linear_scan;
               }
-              if (!(t >= t0)) {
+              if (!(t2 >= t0)) {
                 const t1global = pp[1];
-                if (t < t1global) {
+                if (t2 < t1global) {
                   i1 = 2;
                   t0 = t1global;
                 }
@@ -19274,7 +19274,7 @@ void main() {
                   if (i1 === giveUpAt) break;
                   t1 = t0;
                   t0 = pp[--i1 - 1];
-                  if (t >= t0) {
+                  if (t2 >= t0) {
                     break seek;
                   }
                 }
@@ -19286,7 +19286,7 @@ void main() {
             }
             while (i1 < right) {
               const mid = i1 + right >>> 1;
-              if (t < pp[mid]) {
+              if (t2 < pp[mid]) {
                 right = mid;
               } else {
                 i1 = mid + 1;
@@ -19307,7 +19307,7 @@ void main() {
           this._cachedIndex = i1;
           this.intervalChanged_(i1, t0, t1);
         }
-        return this.interpolate_(i1, t0, t, t1);
+        return this.interpolate_(i1, t0, t2, t1);
       }
       getSettings_() {
         return this.settings || this.DefaultSettings_;
@@ -19377,8 +19377,8 @@ void main() {
         this._offsetPrev = iPrev * stride;
         this._offsetNext = iNext * stride;
       }
-      interpolate_(i1, t0, t, t1) {
-        const result = this.resultBuffer, values = this.sampleValues, stride = this.valueSize, o1 = i1 * stride, o0 = o1 - stride, oP = this._offsetPrev, oN = this._offsetNext, wP = this._weightPrev, wN = this._weightNext, p = (t - t0) / (t1 - t0), pp = p * p, ppp = pp * p;
+      interpolate_(i1, t0, t2, t1) {
+        const result = this.resultBuffer, values = this.sampleValues, stride = this.valueSize, o1 = i1 * stride, o0 = o1 - stride, oP = this._offsetPrev, oN = this._offsetNext, wP = this._weightPrev, wN = this._weightNext, p = (t2 - t0) / (t1 - t0), pp = p * p, ppp = pp * p;
         const sP = -wP * ppp + 2 * wP * pp - wP * p;
         const s0 = (1 + wP) * ppp + (-1.5 - 2 * wP) * pp + (-0.5 + wP) * p + 1;
         const s1 = (-1 - wN) * ppp + (1.5 + wN) * pp + 0.5 * p;
@@ -19393,8 +19393,8 @@ void main() {
       constructor(parameterPositions, sampleValues, sampleSize, resultBuffer) {
         super(parameterPositions, sampleValues, sampleSize, resultBuffer);
       }
-      interpolate_(i1, t0, t, t1) {
-        const result = this.resultBuffer, values = this.sampleValues, stride = this.valueSize, offset1 = i1 * stride, offset0 = offset1 - stride, weight1 = (t - t0) / (t1 - t0), weight0 = 1 - weight1;
+      interpolate_(i1, t0, t2, t1) {
+        const result = this.resultBuffer, values = this.sampleValues, stride = this.valueSize, offset1 = i1 * stride, offset0 = offset1 - stride, weight1 = (t2 - t0) / (t1 - t0), weight0 = 1 - weight1;
         for (let i = 0; i !== stride; ++i) {
           result[i] = values[offset0 + i] * weight0 + values[offset1 + i] * weight1;
         }
@@ -19653,8 +19653,8 @@ void main() {
       constructor(parameterPositions, sampleValues, sampleSize, resultBuffer) {
         super(parameterPositions, sampleValues, sampleSize, resultBuffer);
       }
-      interpolate_(i1, t0, t, t1) {
-        const result = this.resultBuffer, values = this.sampleValues, stride = this.valueSize, alpha = (t - t0) / (t1 - t0);
+      interpolate_(i1, t0, t2, t1) {
+        const result = this.resultBuffer, values = this.sampleValues, stride = this.valueSize, alpha = (t2 - t0) / (t1 - t0);
         let offset = i1 * stride;
         for (let end = offset + stride; offset !== end; offset += 4) {
           Quaternion.slerpFlat(result, 0, values, offset - stride, values, offset, alpha);
@@ -21783,9 +21783,9 @@ var init_SimplexNoise = __esm({
         const i = Math.floor(xin + s);
         const j = Math.floor(yin + s);
         const G2 = (3 - Math.sqrt(3)) / 6;
-        const t = (i + j) * G2;
-        const X0 = i - t;
-        const Y0 = j - t;
+        const t2 = (i + j) * G2;
+        const X0 = i - t2;
+        const Y0 = j - t2;
         const x0 = xin - X0;
         const y0 = yin - Y0;
         let i1;
@@ -21818,11 +21818,11 @@ var init_SimplexNoise = __esm({
           t1 *= t1;
           n1 = t1 * t1 * this.dot(this.grad3[gi1], x1, y1);
         }
-        let t2 = 0.5 - x2 * x2 - y2 * y2;
-        if (t2 < 0) n2 = 0;
+        let t22 = 0.5 - x2 * x2 - y2 * y2;
+        if (t22 < 0) n2 = 0;
         else {
-          t2 *= t2;
-          n2 = t2 * t2 * this.dot(this.grad3[gi2], x2, y2);
+          t22 *= t22;
+          n2 = t22 * t22 * this.dot(this.grad3[gi2], x2, y2);
         }
         return 70 * (n0 + n1 + n2);
       }
@@ -21838,10 +21838,10 @@ var init_SimplexNoise = __esm({
         const j = Math.floor(yin + s);
         const k = Math.floor(zin + s);
         const G3 = 1 / 6;
-        const t = (i + j + k) * G3;
-        const X0 = i - t;
-        const Y0 = j - t;
-        const Z0 = k - t;
+        const t2 = (i + j + k) * G3;
+        const X0 = i - t2;
+        const Y0 = j - t2;
+        const Z0 = k - t2;
         const x0 = xin - X0;
         const y0 = yin - Y0;
         const z0 = zin - Z0;
@@ -21926,11 +21926,11 @@ var init_SimplexNoise = __esm({
           t1 *= t1;
           n1 = t1 * t1 * this.dot3(this.grad3[gi1], x1, y1, z1);
         }
-        let t2 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2;
-        if (t2 < 0) n2 = 0;
+        let t22 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2;
+        if (t22 < 0) n2 = 0;
         else {
-          t2 *= t2;
-          n2 = t2 * t2 * this.dot3(this.grad3[gi2], x2, y2, z2);
+          t22 *= t22;
+          n2 = t22 * t22 * this.dot3(this.grad3[gi2], x2, y2, z2);
         }
         let t3 = 0.6 - x3 * x3 - y3 * y3 - z3 * z3;
         if (t3 < 0) n3 = 0;
@@ -21957,11 +21957,11 @@ var init_SimplexNoise = __esm({
         const j = Math.floor(y + s);
         const k = Math.floor(z + s);
         const l = Math.floor(w + s);
-        const t = (i + j + k + l) * G4;
-        const X0 = i - t;
-        const Y0 = j - t;
-        const Z0 = k - t;
-        const W0 = l - t;
+        const t2 = (i + j + k + l) * G4;
+        const X0 = i - t2;
+        const Y0 = j - t2;
+        const Z0 = k - t2;
+        const W0 = l - t2;
         const x0 = x - X0;
         const y0 = y - Y0;
         const z0 = z - Z0;
@@ -22022,11 +22022,11 @@ var init_SimplexNoise = __esm({
           t1 *= t1;
           n1 = t1 * t1 * this.dot4(grad4[gi1], x1, y1, z1, w1);
         }
-        let t2 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2 - w2 * w2;
-        if (t2 < 0) n2 = 0;
+        let t22 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2 - w2 * w2;
+        if (t22 < 0) n2 = 0;
         else {
-          t2 *= t2;
-          n2 = t2 * t2 * this.dot4(grad4[gi2], x2, y2, z2, w2);
+          t22 *= t22;
+          n2 = t22 * t22 * this.dot4(grad4[gi2], x2, y2, z2, w2);
         }
         let t3 = 0.6 - x3 * x3 - y3 * y3 - z3 * z3 - w3 * w3;
         if (t3 < 0) n3 = 0;
@@ -23747,8 +23747,8 @@ function makePanelTexture() {
   const rnd = hashNoise(24301);
   const pw = W2 / 5, ph = H2 / 3;
   for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) {
-    const t = 40 + Math.floor(rnd() * 12);
-    g.fillStyle = `rgb(${t},${t + 4},${t + 14})`;
+    const t2 = 40 + Math.floor(rnd() * 12);
+    g.fillStyle = `rgb(${t2},${t2 + 4},${t2 + 14})`;
     g.fillRect(i * pw, j * ph, pw, ph);
     for (let k = 0; k < 60; k++) {
       const y = j * ph + rnd() * ph;
@@ -24154,16 +24154,16 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
       levelGroup.add(mesh);
       hazardMeshes.push(mesh);
     }
-    for (const t of level.targets || []) {
-      const ring = new Mesh(new RingGeometry(t.r - 0.12, t.r, 48), mats.target);
-      ring.position.set(t.x - CH_CX, t.y - CH_CY, 0.05);
+    for (const t2 of level.targets || []) {
+      const ring = new Mesh(new RingGeometry(t2.r - 0.12, t2.r, 48), mats.target);
+      ring.position.set(t2.x - CH_CX, t2.y - CH_CY, 0.05);
       levelGroup.add(ring);
-      const inner = new Mesh(new RingGeometry(t.r * 0.45, t.r * 0.45 + 0.06, 32), mats.target);
+      const inner = new Mesh(new RingGeometry(t2.r * 0.45, t2.r * 0.45 + 0.06, 32), mats.target);
       inner.position.copy(ring.position);
       levelGroup.add(inner);
       targetRings.push(ring, inner);
-      const glow = new Mesh(new PlaneGeometry(t.r * 3, t.r * 3), mats.targetGlow);
-      glow.position.set(t.x - CH_CX, t.y - CH_CY, -0.05);
+      const glow = new Mesh(new PlaneGeometry(t2.r * 3, t2.r * 3), mats.targetGlow);
+      glow.position.set(t2.x - CH_CX, t2.y - CH_CY, -0.05);
       glow.visible = !!gfx && gfx.detail === "detailed";
       levelGroup.add(glow);
       targetGlows.push(glow);
@@ -24371,15 +24371,15 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   const texCache = {};
   function texture(name) {
     if (texCache[name]) return texCache[name];
-    let t;
-    if (name === "panel") t = makePanelTexture();
-    else if (name === "tread") t = makeTreadTexture();
-    else t = makeBodyTexture(name);
+    let t2;
+    if (name === "panel") t2 = makePanelTexture();
+    else if (name === "tread") t2 = makeTreadTexture();
+    else t2 = makeBodyTexture(name);
     if (name === "wood") {
-      t.wrapS = t.wrapT = RepeatWrapping;
+      t2.wrapS = t2.wrapT = RepeatWrapping;
     }
-    texCache[name] = t;
-    return t;
+    texCache[name] = t2;
+    return t2;
   }
   function setMap(mat, map, bump = null, bumpScale = 1) {
     if (mat.map === map && mat.bumpMap === bump) return;
@@ -24648,12 +24648,12 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   }
   let raf = 0;
   let lastT = 0;
-  function lerp2(a, b, t) {
-    return a + (b - a) * t;
+  function lerp2(a, b, t2) {
+    return a + (b - a) * t2;
   }
-  function draw(t) {
-    const dt = Math.min(0.05, lastT ? (t - lastT) / 1e3 : 0.016);
-    lastT = t;
+  function draw(t2) {
+    const dt = Math.min(0.05, lastT ? (t2 - lastT) / 1e3 : 0.016);
+    lastT = t2;
     if (!document.hidden) elapsed += dt;
     if (curSnap) {
       const seen = /* @__PURE__ */ new Set();
@@ -24883,7 +24883,7 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
       dGeo.dispose();
       dMat.dispose();
       softSprite.dispose();
-      for (const t of Object.values(texCache)) t.dispose();
+      for (const t2 of Object.values(texCache)) t2.dispose();
       if (envTex) envTex.dispose();
       if (composer) composer.dispose();
       if (fpsEl) fpsEl.remove();
@@ -25042,9 +25042,9 @@ function setPhase(p) {
 }
 function applyStemMix() {
   if (!ctx || !buildStem || !runStem) return;
-  const t = ctx.currentTime;
-  buildStem.gain.setTargetAtTime(phase === "build" ? 0.5 : phase === "none" ? 0.25 : 0.08, t, 0.6);
-  runStem.gain.setTargetAtTime(phase === "run" ? 0.5 : 0, t, 0.4);
+  const t2 = ctx.currentTime;
+  buildStem.gain.setTargetAtTime(phase === "build" ? 0.5 : phase === "none" ? 0.25 : 0.08, t2, 0.6);
+  runStem.gain.setTargetAtTime(phase === "run" ? 0.5 : 0, t2, 0.4);
 }
 function env(gainNode, t0, peak, decay) {
   const g = gainNode.gain;
@@ -25286,7 +25286,9 @@ __export(platform_exports, {
   isOffline: () => isOffline,
   loadBindings: () => loadBindings,
   loadRemoteSettings: () => loadRemoteSettings,
+  mergeProgress: () => mergeProgress,
   onAuthChange: () => onAuthChange,
+  onSaveConflict: () => onSaveConflict,
   signIn: () => signIn,
   submitScore: () => submitScore,
   syncSettings: () => syncSettings
@@ -25378,14 +25380,14 @@ async function loadRemoteSettings() {
   if (!isHosted()) return {};
   const s = await sdk().getSettings() || {};
   settingsLoaded = true;
-  for (const [k, v] of Object.entries(s)) sentSettings[k] = JSON.stringify(v);
+  for (const [k, v] of Object.entries(s)) if (!k.startsWith("ui.")) sentSettings[k] = JSON.stringify(v);
   return s;
 }
 function syncSettings(prefs) {
   if (!isHosted() || !settingsLoaded) return Promise.resolve(null);
   const patch = {};
   for (const [k, v] of Object.entries(prefs || {})) {
-    if (k === "version") continue;
+    if (k === "version" || k.startsWith("ui.")) continue;
     const json = JSON.stringify(v);
     if (sentSettings[k] !== json) {
       patch[k] = v;
@@ -25445,6 +25447,49 @@ async function getLeaderboard() {
       goal: en.components && en.components.goal != null ? en.components.goal : 0
     })))
   };
+}
+function mergeProgress(remote, local) {
+  const r = remote && typeof remote === "object" ? remote : {};
+  const l = local && typeof local === "object" ? local : {};
+  const obj = (v) => v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  const num = (v) => typeof v === "number" && Number.isFinite(v) ? v : 0;
+  const union = (a, b) => ({ ...obj(a), ...Object.fromEntries(Object.entries(obj(b)).filter(([, v]) => v)) });
+  const bests = { ...obj(r.bests) };
+  for (const [k, v] of Object.entries(obj(l.bests))) bests[k] = Math.max(num(bests[k]), num(v));
+  const daily = { ...obj(r.dailyAttempts) };
+  for (const [k, v] of Object.entries(obj(l.dailyAttempts))) {
+    daily[k] = !daily[k] || num(obj(v).score) > num(obj(daily[k]).score) ? v : daily[k];
+  }
+  const rc = obj(r.counters), lc = obj(l.counters);
+  const achievements = [...Array.isArray(l.achievements) ? l.achievements : []];
+  for (const a of Array.isArray(r.achievements) ? r.achievements : []) if (!achievements.includes(a)) achievements.push(a);
+  return {
+    ...r,
+    ...l,
+    playerId: r.playerId || l.playerId,
+    completed: union(r.completed, l.completed),
+    stars: union(r.stars, l.stars),
+    lessonsDone: union(r.lessonsDone, l.lessonsDone),
+    achievements,
+    // lifetime totals take the larger side; the win streak is this device's run
+    counters: { ...rc, ...lc, spawns: Math.max(num(rc.spawns), num(lc.spawns)), wins: Math.max(num(rc.wins), num(lc.wins)), streak: num(lc.streak) },
+    bests,
+    dailyAttempts: daily,
+    lastMode: l.lastMode || r.lastMode
+  };
+}
+function onSaveConflict(fn) {
+  const sh = sdk();
+  if (!sh || typeof sh.on !== "function") return;
+  sh.on("saveconflict", async () => {
+    let remote = null;
+    try {
+      remote = await sh.loadJSON();
+    } catch {
+      remote = null;
+    }
+    fn(remote && typeof remote === "object" ? remote : null);
+  });
 }
 
 // src/ui.js
@@ -26320,9 +26365,9 @@ function createGameSession({ level, seed, mode }) {
   let undoStack = [];
   let paused = false;
   let nextHashTick = HASH_INTERVAL;
-  const listeners = /* @__PURE__ */ new Set();
+  const listeners2 = /* @__PURE__ */ new Set();
   function emit(ev) {
-    for (const fn of listeners) {
+    for (const fn of listeners2) {
       try {
         fn(ev);
       } catch {
@@ -26360,8 +26405,8 @@ function createGameSession({ level, seed, mode }) {
       return state.phase === "build" && undoStack.length > 0;
     },
     on(fn) {
-      listeners.add(fn);
-      return () => listeners.delete(fn);
+      listeners2.add(fn);
+      return () => listeners2.delete(fn);
     },
     legal() {
       return legalActions(state);
@@ -26740,20 +26785,20 @@ function pickLocale(lang) {
   return BY_LANG[lower.split("-")[0]] || "en-US";
 }
 function translator(lang) {
-  const table = LOCALES[pickLocale(lang)];
+  const table2 = LOCALES[pickLocale(lang)];
   return (key, vars) => {
-    let s = table[key] ?? EN[key] ?? key;
+    let s = table2[key] ?? EN[key] ?? key;
     if (vars) for (const [k, v] of Object.entries(vars)) s = s.replace("{" + k + "}", v);
     return s;
   };
 }
-function describeLocalized(t, r, shadowMap, pixels) {
+function describeLocalized(t2, r, shadowMap, pixels) {
   const parts = [
-    r.shadows === "off" ? t("d_noShadows") : t("d_shadows", { n: shadowMap[r.shadows] }),
-    r.ao === "off" ? null : r.ao === "high" ? t("d_aoHigh") : t("d_ao"),
-    r.bloom === "on" ? t("d_bloom") : null,
-    r.reflections === "on" ? t("d_reflections") : null,
-    r.antialias === "off" ? t("d_noAa") : r.antialias.toUpperCase(),
+    r.shadows === "off" ? t2("d_noShadows") : t2("d_shadows", { n: shadowMap[r.shadows] }),
+    r.ao === "off" ? null : r.ao === "high" ? t2("d_aoHigh") : t2("d_ao"),
+    r.bloom === "on" ? t2("d_bloom") : null,
+    r.reflections === "on" ? t2("d_reflections") : null,
+    r.antialias === "off" ? t2("d_noAa") : r.antialias.toUpperCase(),
     pixels ? `${pixels[0]}\xD7${pixels[1]} px` : null
   ];
   return parts.filter(Boolean).join(" \xB7 ");
@@ -26856,10 +26901,10 @@ var PLATFORM_LOCALES = Object.keys(STRINGS);
 function pickPlatformLocale(tags) {
   const list = (Array.isArray(tags) ? tags : [tags]).filter(Boolean).map(String);
   for (const tag of list) {
-    const t = tag.replace("_", "-");
-    const exact = PLATFORM_LOCALES.find((l) => l.toLowerCase() === t.toLowerCase());
+    const t2 = tag.replace("_", "-");
+    const exact = PLATFORM_LOCALES.find((l) => l.toLowerCase() === t2.toLowerCase());
     if (exact) return exact;
-    const [lang, region = ""] = t.split("-");
+    const [lang, region = ""] = t2.split("-");
     const r = region.toUpperCase();
     switch (lang.toLowerCase()) {
       case "en":
@@ -26878,14 +26923,1956 @@ function pickPlatformLocale(tags) {
   }
   return "en-US";
 }
-function platformStrings(locale) {
-  return STRINGS[locale] || EN_US;
+function platformStrings(locale2) {
+  return STRINGS[locale2] || EN_US;
 }
-function currentPlatformStrings(locale) {
-  if (locale) return platformStrings(pickPlatformLocale(locale));
-  const langs = typeof navigator !== "undefined" ? navigator.languages || [navigator.language] : [];
-  return platformStrings(pickPlatformLocale(langs));
+
+// src/strings.js
+var DE2 = {
+  // symbolic keys
+  "sync.synced": "synchronisiert",
+  "sync.saving": "speichert",
+  "sync.offline": "offline",
+  "phase.build": "Aufbau",
+  "phase.run": "Lauf",
+  "phase.won": "gewonnen",
+  "phase.lost": "verloren",
+  "action.spawn": "Platzieren",
+  "action.joint": "Gelenk",
+  "action.delete": "Entfernen",
+  "screen.title": "Titel",
+  "screen.modes": "Modi",
+  "screen.play": "Kammer",
+  "screen.results": "Ergebnis",
+  "screen.progression": "Fortschritt",
+  "screen.help": "Spielanleitung",
+  "screen.scores": "Bestenlisten",
+  "reason.already-running": "die Simulation l\xE4uft bereits",
+  "reason.session-over": "die Runde ist vorbei",
+  "reason.material-unknown": "unbekanntes Material",
+  "reason.material-not-allowed": "dieses Material ist hier nicht erlaubt",
+  "reason.budget-exhausted": "keine Platzierungen mehr \xFCbrig",
+  "reason.joint-unknown": "unbekanntes Gelenk",
+  "reason.joint-not-allowed": "dieses Gelenk ist hier nicht erlaubt",
+  "reason.need-two-bodies": "daf\xFCr braucht es zwei K\xF6rper",
+  "reason.nothing-to-delete": "nichts zu entfernen",
+  "reason.nothing-to-undo": "nichts r\xFCckg\xE4ngig zu machen",
+  "reason.bad-bodies": "w\xE4hle zwei verschiedene K\xF6rper",
+  "reason.bad-position": "ung\xFCltige Position",
+  "reason.not-found": "K\xF6rper nicht gefunden",
+  "reason.out-of-bounds": "au\xDFerhalb der Kammer",
+  "reason.payload-locked": "Fracht kann nicht entfernt werden",
+  "reason.too-far": "die K\xF6rper sind zu weit voneinander entfernt",
+  "reason.malformed-command": "fehlerhafter Befehl",
+  "reason.unknown-command": "unbekannter Befehl",
+  // UI
+  "Achievement unlocked: {name}": "Erfolg freigeschaltet: {name}",
+  "Achievements": "Erfolge",
+  "Achievements: {list}": "Erfolge: {list}",
+  "Actions": "Aktionen",
+  "All difficulties": "Alle Schwierigkeitsgrade",
+  "All modes": "Alle Modi",
+  "Audio": "Audio",
+  "Back": "Zur\xFCck",
+  "Best": "Bestwert",
+  "Board error: {error}": "Fehler der Bestenliste: {error}",
+  "Build phase: spawn balls and connect them with joints. Run phase: gravity takes over \u2014 deliver every payload (outlined ball) into a pulsing target ring. Glass shatters on hard impacts; hazard strips destroy anything.": "Aufbauphase: Platziere Kugeln und verbinde sie mit Gelenken. Laufphase: Die Schwerkraft \xFCbernimmt \u2014 bringe jede Fracht (umrandete Kugel) in einen pulsierenden Zielring. Glas zerspringt bei harten Aufprallen; Gefahrenstreifen zerst\xF6ren alles.",
+  "Camera default": "Standardkamera",
+  "Camera re-framed": "Kamera neu ausgerichtet",
+  "Cannot connect: {reason}": "Verbinden nicht m\xF6glich: {reason}",
+  "Cannot delete: {reason}": "Entfernen nicht m\xF6glich: {reason}",
+  "Cannot run: {reason}": "Start nicht m\xF6glich: {reason}",
+  "Cannot spawn: {reason}": "Platzieren nicht m\xF6glich: {reason}",
+  "Cast materials, rig joints, run the chamber, deliver every payload.": "Materialien gie\xDFen, Gelenke setzen, die Kammer starten, jede Fracht ausliefern.",
+  "Chamber": "Kammer",
+  "Chamber actions": "Kammeraktionen",
+  "Choose a mode": "W\xE4hle einen Modus",
+  "Controls": "Steuerung",
+  "Cursor down": "Cursor nach unten",
+  "Cursor left": "Cursor nach links",
+  "Cursor right": "Cursor nach rechts",
+  "Cursor up": "Cursor nach oben",
+  "Cursor {x}, {y}": "Cursor {x}, {y}",
+  "Daily": "T\xE4glich",
+  "Daily already attempted today \u2014 playing unranked practice run": "Tagesaufgabe heute schon gespielt \u2014 \xDCbungslauf ohne Wertung",
+  "Daily challenge": "Tagesaufgabe",
+  "Daily Cast {date}": "Tagesguss {date}",
+  "Day": "Tag",
+  "Delete selected (Del)": "Auswahl entfernen (Entf)",
+  "Delivered: {done} / {total}": "Geliefert: {done} / {total}",
+  "Delivery complete": "Lieferung abgeschlossen",
+  "Density {d}, bounce {b}": "Dichte {d}, Sprungkraft {b}",
+  "Density {d}, bounce {b}, shatters above impact {s}": "Dichte {d}, Sprungkraft {b}, zerspringt ab Aufprall {s}",
+  "Difficulty filter": "Schwierigkeitsfilter",
+  "Difficulty {n}": "Schwierigkeit {n}",
+  "Display": "Anzeige",
+  "Done": "Fertig",
+  "Expected duration": "Erwartete Dauer",
+  "First body selected; pick a second body": "Erster K\xF6rper gew\xE4hlt; w\xE4hle einen zweiten",
+  "Full chamber": "Ganze Kammer",
+  "Global (Journey)": "Global (Reise)",
+  "Goal": "Ziel",
+  "Help": "Hilfe",
+  "Hold (hold J)": "Halten (J halten)",
+  "How to play": "Spielanleitung",
+  "Illegal action: {reason}": "Unzul\xE4ssige Aktion: {reason}",
+  "Industrial physics sandbox": "Industrieller Physik-Sandkasten",
+  "Joint mode": "Gelenkmodus",
+  "Joint mode (hold), then pick two bodies": "Gelenkmodus (halten), dann zwei K\xF6rper w\xE4hlen",
+  "Joint mode (toggle), then pick two bodies": "Gelenkmodus (umschalten), dann zwei K\xF6rper w\xE4hlen",
+  "Joint mode behavior": "Verhalten des Gelenkmodus",
+  "Joint mode off": "Gelenkmodus aus",
+  "Joints": "Gelenke",
+  "Journey": "Reise",
+  "Journey ({summary})": "Reise ({summary})",
+  "Leaderboards": "Bestenlisten",
+  "Learn, Practice, Challenge, Score chase": "Lernen, \xDCben, Herausforderung, Punktejagd",
+  "Leave chamber": "Kammer verlassen",
+  "Lesson complete! Finish the delivery or move on.": "Lektion geschafft! Beende die Lieferung oder mach weiter.",
+  "Lesson complete: {name}": "Lektion geschafft: {name}",
+  "Lesson {n}": "Lektion {n}",
+  "Lesson {n}/{total}": "Lektion {n}/{total}",
+  "Lessons": "Lektionen",
+  "Lifetime spawns: {spawns} \xB7 Wins: {wins} \xB7 Current streak: {streak}": "Platzierungen insgesamt: {spawns} \xB7 Siege: {wins} \xB7 Aktuelle Serie: {streak}",
+  "Local best: {n}": "Lokaler Bestwert: {n}",
+  "Local bests (Journey)": "Lokale Bestwerte (Reise)",
+  "Local guest profile \u2014 progress stays in this browser.": "Lokales Gastprofil \u2014 der Fortschritt bleibt in diesem Browser.",
+  "Lost with {n} points": "Verloren mit {n} Punkten",
+  "Materials": "Materialien",
+  "Max length {n}, rigid distance lock": "Max. L\xE4nge {n}, starre Abstandssperre",
+  "Max length {n}, stiffness {s}": "Max. L\xE4nge {n}, Steifigkeit {s}",
+  "Modes": "Modi",
+  "Move spawn cursor": "Platzierungscursor bewegen",
+  "Move the spawn cursor": "Platzierungscursor bewegen",
+  "Name": "Name",
+  "New local best! (previous {n})": "Neuer lokaler Bestwert! (vorher {n})",
+  "Next chamber": "N\xE4chste Kammer",
+  "Next daily in {h}h {m}m": "N\xE4chste Tagesaufgabe in {h} h {m} min",
+  "Next lesson": "N\xE4chste Lektion",
+  "No entries yet. Be the first.": "Noch keine Eintr\xE4ge. Sei die erste Person.",
+  "No local daily runs yet.": "Noch keine lokalen Tagesl\xE4ufe.",
+  "No local journey bests yet.": "Noch keine lokalen Reise-Bestwerte.",
+  "No unlocked levels at this difficulty yet.": "Noch keine freigeschalteten Level in diesem Schwierigkeitsgrad.",
+  "No \u2014 unranked": "Nein \u2014 ohne Wertung",
+  "Nothing to undo": "Nichts r\xFCckg\xE4ngig zu machen",
+  "One shared chamber per day": "Eine gemeinsame Kammer pro Tag",
+  "Other": "Sonstiges",
+  "Pause (Esc)": "Pause (Esc)",
+  "Pause / cancel joint mode": "Pause / Gelenkmodus abbrechen",
+  "Paused": "Pausiert",
+  "Payload delivered": "Fracht geliefert",
+  "Phase: {phase}": "Phase: {phase}",
+  "Phase: {phase} (paused)": "Phase: {phase} (pausiert)",
+  "Play": "Spielen",
+  "Player": "Spieler",
+  "Playing as {name} \u2014 progress syncs to your account ({status}).": "Du spielst als {name} \u2014 der Fortschritt wird mit deinem Konto synchronisiert ({status}).",
+  "Profile": "Profil",
+  "Profile & settings": "Profil & Einstellungen",
+  "Progression": "Fortschritt",
+  "Ranked": "Gewertet",
+  "Ranked run recorded on this device.": "Gewerteter Lauf auf diesem Ger\xE4t gespeichert.",
+  "Re-frame camera": "Kamera neu ausrichten",
+  "Reason: {reason}": "Grund: {reason}",
+  "Remove selected body": "Gew\xE4hlten K\xF6rper entfernen",
+  "Replay tutorial": "Tutorial wiederholen",
+  "Reset to build phase": "Zur\xFCck zur Aufbauphase",
+  "Restart chamber": "Kammer neu starten",
+  "Resume": "Weiter",
+  "Retry": "Nochmal",
+  "Rules": "Regeln",
+  "Run (R)": "Start (R)",
+  "Run failed": "Lauf gescheitert",
+  "Run the simulation": "Simulation starten",
+  "Running\u2026": "L\xE4uft \u2026",
+  "Score": "Punkte",
+  "Score breakdown": "Punkteaufschl\xFCsselung",
+  "Select material 1-4": "Material 1\u20134 w\xE4hlen",
+  "Select {material}": "{material} w\xE4hlen",
+  "Selected {body}": "{body} gew\xE4hlt",
+  "Selected {body} payload": "Fracht ({body}) gew\xE4hlt",
+  "Settings": "Einstellungen",
+  "Simulation running": "Simulation l\xE4uft",
+  "Spawn at cursor (Enter)": "Am Cursor platzieren (Enter)",
+  "Spawn selected material at cursor": "Gew\xE4hltes Material am Cursor platzieren",
+  "Spawns left: {left} / {total}": "Platzierungen \xFCbrig: {left} / {total}",
+  "StarHermit leaderboard": "StarHermit-Bestenliste",
+  "Test chamber view. Use the action tray or keyboard for all actions.": "Ansicht der Testkammer. Nutze die Aktionsleiste oder die Tastatur f\xFCr alle Aktionen.",
+  "Tight frame": "Enger Ausschnitt",
+  "Time left: {time}": "Restzeit: {time}",
+  "Today's cast: {date}": "Heutiger Guss: {date}",
+  "Toggle (press J)": "Umschalten (J dr\xFCcken)",
+  "Total": "Gesamt",
+  "Undid {action}": "{action} r\xFCckg\xE4ngig gemacht",
+  "Undo (U)": "R\xFCckg\xE4ngig (U)",
+  "Undo last build action": "Letzte Bauaktion r\xFCckg\xE4ngig machen",
+  "Unranked session \u2014 no leaderboard submission.": "Runde ohne Wertung \u2014 kein Eintrag in die Bestenliste.",
+  "Won with {n} points": "Gewonnen mit {n} Punkten",
+  "Yes \u2014 verified replays": "Ja \u2014 gepr\xFCfte Wiederholungen",
+  "body": "K\xF6rper",
+  "local": "lokal",
+  "online": "online",
+  "unknown": "unbekannt",
+  "{done} / {total} chambers": "{done} / {total} Kammern",
+  "{joint} mode: select two bodies": "Modus {joint}: w\xE4hle zwei K\xF6rper",
+  "{level} \u2014 deliver 1 payload": "{level} \u2014 1 Fracht liefern",
+  "{level} \u2014 deliver {n} payloads": "{level} \u2014 {n} Frachten liefern",
+  "{mode} setup": "{mode}: Einrichtung",
+  "{n} achievements, audio & accessibility": "{n} Erfolge, Audio & Barrierefreiheit",
+  // dynamic UI keys
+  "Time bonus": "Zeitbonus",
+  "Material efficiency": "Materialeffizienz",
+  "Spawn efficiency": "Platzierungseffizienz",
+  "Invalid-action penalty": "Strafe f\xFCr unzul\xE4ssige Aktionen",
+  "All payloads delivered": "Alle Frachten geliefert",
+  "Time expired": "Zeit abgelaufen",
+  "Payload destroyed": "Fracht zerst\xF6rt",
+  "Learn": "Lernen",
+  "Six interactive lessons; one rule at a time.": "Sechs interaktive Lektionen; eine Regel nach der anderen.",
+  "44 authored chambers with rising complexity.": "44 gestaltete Kammern mit steigender Komplexit\xE4t.",
+  "One shared chamber per UTC day, one ranked attempt.": "Eine gemeinsame Kammer pro UTC-Tag, ein gewerteter Versuch.",
+  "Practice": "\xDCben",
+  "Any unlocked level, free restart and undo, unranked.": "Jedes freigeschaltete Level, freier Neustart und R\xFCckg\xE4ngig, ohne Wertung.",
+  "Challenge": "Herausforderung",
+  "Four constrained chambers: limits, clocks, altered gravity.": "Vier Kammern mit Auflagen: Limits, Uhren, ver\xE4nderte Schwerkraft.",
+  "Score chase": "Punktejagd",
+  "Global and daily leaderboards with verified replays.": "Globale und t\xE4gliche Bestenlisten mit gepr\xFCften Wiederholungen.",
+  "2-4 min each": "je 2\u20134 min",
+  "1-3 min per level": "1\u20133 min pro Level",
+  "~2 min": "~2 min",
+  "open-ended": "unbegrenzt",
+  "2-5 min": "2\u20135 min",
+  "-": "\u2013",
+  "Music": "Musik",
+  "Effects": "Effekte",
+  "Ambience": "Atmosph\xE4re",
+  "Voice": "Stimme",
+  "Music volume": "Musiklautst\xE4rke",
+  "Effects volume": "Effektlautst\xE4rke",
+  "Ambience volume": "Atmosph\xE4renlautst\xE4rke",
+  "Voice volume": "Stimmenlautst\xE4rke",
+  "Mute all": "Alles stummschalten",
+  "Reduced motion": "Weniger Bewegung",
+  "High contrast": "Hoher Kontrast",
+  "Larger text": "Gr\xF6\xDFere Schrift",
+  "Left-handed action tray": "Aktionsleiste f\xFCr Linksh\xE4nder",
+  "Haptics (vibration)": "Haptik (Vibration)",
+  "Share anonymous usage events": "Anonyme Nutzungsereignisse teilen",
+  "Steel": "Stahl",
+  "Wood": "Holz",
+  "Glass": "Glas",
+  "Rubber": "Gummi",
+  "Pin Joint": "Stiftgelenk",
+  "Spring": "Feder",
+  "WebGL is unavailable in this browser, so the 3D chamber view is disabled. All menus and the rules remain usable; enable hardware acceleration or try another browser for the full experience.": "WebGL ist in diesem Browser nicht verf\xFCgbar, daher ist die 3D-Kammeransicht deaktiviert. Alle Men\xFCs und Regeln bleiben nutzbar; aktiviere die Hardwarebeschleunigung oder nutze einen anderen Browser f\xFCr das volle Erlebnis.",
+  // content
+  "First Casting": "Erster Guss",
+  "Drop a wood ball anywhere inside the chamber.": "Lass irgendwo in der Kammer eine Holzkugel fallen.",
+  "Spawn a wood ball above the floor.": "Platziere eine Holzkugel \xFCber dem Boden.",
+  "Heavy Stock": "Schweres Material",
+  "Steel is dense and barely bounces. Spawn one.": "Stahl ist dicht und springt kaum. Platziere eine Stahlkugel.",
+  "Spawn a steel ball.": "Platziere eine Stahlkugel.",
+  "Pin and Link": "Stift und Glied",
+  "Pins hold two balls at a fixed distance. Link two balls.": "Stifte halten zwei Kugeln auf festem Abstand. Verbinde zwei Kugeln.",
+  "Spawn a wood ball near the payload.": "Platziere eine Holzkugel nahe der Fracht.",
+  "Connect two balls with a pin joint.": "Verbinde zwei Kugeln mit einem Stiftgelenk.",
+  "Second Thoughts": "Umentschieden",
+  "Remove a ball you no longer need.": "Entferne eine Kugel, die du nicht mehr brauchst.",
+  "Spawn a rubber ball.": "Platziere eine Gummikugel.",
+  "Delete a ball you spawned.": "Entferne eine Kugel, die du platziert hast.",
+  "Let It Run": "Lass es laufen",
+  "Start the simulation and watch the payload fall.": "Starte die Simulation und sieh zu, wie die Fracht f\xE4llt.",
+  "Issue the run command.": "Gib den Startbefehl.",
+  "Full Cycle": "Ganzer Zyklus",
+  "Build, connect, run: the complete foundry loop.": "Bauen, verbinden, starten: der komplette Gie\xDFerei-Ablauf.",
+  "Spawn any ball.": "Platziere eine beliebige Kugel.",
+  "Join two balls with a spring.": "Verbinde zwei Kugeln mit einer Feder.",
+  "Run the simulation.": "Starte die Simulation.",
+  "First Drop": "Erster Fall",
+  "Run it. Gravity does the work.": "Starte. Die Schwerkraft erledigt den Rest.",
+  "Off the Mark": "Daneben",
+  "The ramp nudges the payload toward the zone.": "Die Rampe schiebt die Fracht in Richtung Zone.",
+  "Steel Nudge": "Stahlsto\xDF",
+  "A steel ball can shove the payload sideways.": "Eine Stahlkugel kann die Fracht seitlich wegsto\xDFen.",
+  "Bounce House": "H\xFCpfburg",
+  "Rubber keeps energy. Use the ramps.": "Gummi beh\xE4lt seine Energie. Nutze die Rampen.",
+  "Brittle Cargo": "Zerbrechliche Fracht",
+  "Glass shatters above impact speed 6. Cushion the fall.": "Glas zerspringt ab Aufprallgeschwindigkeit 6. D\xE4mpfe den Fall.",
+  "Two Moves": "Zwei Z\xFCge",
+  "Exactly two spawns. Plan them.": "Genau zwei Platzierungen. Plane sie.",
+  "High Shelf": "Oberes Regal",
+  "Ramps chain the payload across the chamber.": "Rampen reichen die Fracht quer durch die Kammer.",
+  "Mastery: The Crucible": "Meisterpr\xFCfung: Der Schmelztiegel",
+  "Everything so far, one fragile payload.": "Alles Bisherige, eine zerbrechliche Fracht.",
+  "First Pin": "Erster Stift",
+  "Pin a counterweight to the payload.": "Befestige ein Gegengewicht an der Fracht.",
+  "First Spring": "Erste Feder",
+  "A spring tugs without a rigid lock.": "Eine Feder zieht ohne starre Sperre.",
+  "Anchor Line": "Ankerleine",
+  "Steel anchors steer bouncy cargo.": "Stahlanker lenken springende Fracht.",
+  "Twin Links": "Doppelglied",
+  "Two pins shape a falling train.": "Zwei Stifte formen einen fallenden Zug.",
+  "Elastic Catch": "Elastischer Fang",
+  "Springs soften what glass cannot take.": "Federn d\xE4mpfen, was Glas nicht aush\xE4lt.",
+  "Mixed Rigging": "Gemischte Takelage",
+  "Pins and springs in one rig.": "Stifte und Federn in einer Konstruktion.",
+  "Swing Set": "Schaukelger\xFCst",
+  "A pinned pendulum carries momentum sideways.": "Ein befestigtes Pendel tr\xE4gt Schwung zur Seite.",
+  "Mastery: Rigging Exam": "Meisterpr\xFCfung: Takelage",
+  "Fragile cargo, long traverse, full toolkit.": "Zerbrechliche Fracht, langer Weg, volles Werkzeug.",
+  "Hot Floor": "Hei\xDFer Boden",
+  "The left strip melts anything that lands in it.": "Der linke Streifen schmilzt alles, was darauf landet.",
+  "Narrow Slot": "Schmaler Schlitz",
+  "One safe landing lane between the burn lines.": "Eine sichere Landebahn zwischen den Brandlinien.",
+  "Over the Fire": "\xDCber dem Feuer",
+  "Arc the payload across the hazard.": "Lenke die Fracht im Bogen \xFCber die Gefahr.",
+  "Glass Over Coals": "Glas \xFCber Glut",
+  "Fragile cargo above a burning floor.": "Zerbrechliche Fracht \xFCber brennendem Boden.",
+  "Side Burn": "Seitenbrand",
+  "A floating burn strip blocks the direct line.": "Ein schwebender Brandstreifen blockiert den direkten Weg.",
+  "Double Jeopardy": "Doppelte Gefahr",
+  "Two hazard zones, one long descent.": "Zwei Gefahrenzonen, ein langer Abstieg.",
+  "The Gauntlet": "Spie\xDFrutenlauf",
+  "Thread fragile cargo through three burn zones.": "F\xE4dle zerbrechliche Fracht durch drei Brandzonen.",
+  "Mastery: Furnace Walk": "Meisterpr\xFCfung: Ofengang",
+  "Everything you know, under fire.": "Alles, was du kannst, unter Beschuss.",
+  "Two Crates": "Zwei Kisten",
+  "Both payloads must reach a zone.": "Beide Frachten m\xFCssen eine Zone erreichen.",
+  "Cross Traffic": "Querverkehr",
+  "The payloads swap sides.": "Die Frachten tauschen die Seiten.",
+  "Shared Zone": "Gemeinsame Zone",
+  "One wide zone accepts both.": "Eine breite Zone nimmt beide auf.",
+  "Escort Duty": "Geleitschutz",
+  "A fragile and a sturdy payload, one destination.": "Eine zerbrechliche und eine robuste Fracht, ein Ziel.",
+  "Three Deep": "Dreifach",
+  "Three payloads, three zones.": "Drei Frachten, drei Zonen.",
+  "Chain Delivery": "Kettenlieferung",
+  "Linked cargo over the burn line.": "Verbundene Fracht \xFCber die Brandlinie.",
+  "Split Decision": "Geteilte Entscheidung",
+  "Opposite corners, opposite materials.": "Gegen\xFCberliegende Ecken, gegens\xE4tzliche Materialien.",
+  "Mastery: Freight Master": "Meisterpr\xFCfung: Frachtmeister",
+  "Three payloads, two burn strips, full rig.": "Drei Frachten, zwei Brandstreifen, volle Konstruktion.",
+  "Short Fuse": "Kurze Lunte",
+  "The run clock is tight now.": "Die Laufzeit ist jetzt knapp.",
+  "Quick Rig": "Schneller Aufbau",
+  "Rig fast, run faster.": "Schnell bauen, schneller laufen.",
+  "Burning Clock": "Brennende Uhr",
+  "Hazards and a short clock.": "Gefahren und wenig Zeit.",
+  "Twin Sprint": "Doppelsprint",
+  "Two payloads before the clock dies.": "Zwei Frachten, bevor die Zeit abl\xE4uft.",
+  "Precision Window": "Pr\xE4zisionsfenster",
+  "A small zone, a soft landing, little time.": "Eine kleine Zone, eine sanfte Landung, wenig Zeit.",
+  "Assembly Line": "Flie\xDFband",
+  "Converge both lines on one zone, quickly.": "F\xFChre beide Linien schnell in einer Zone zusammen.",
+  "Final Approach": "Endanflug",
+  "The hardest traverse, on a clock.": "Der schwerste Weg, gegen die Uhr.",
+  "Mastery: Shift Supervisor": "Meisterpr\xFCfung: Schichtleitung",
+  "Two cargoes, two clocks' worth of trouble.": "Zwei Frachten, doppelter Zeitdruck.",
+  "Wood Only": "Nur Holz",
+  "No steel, no rubber. Wood and pins.": "Kein Stahl, kein Gummi. Holz und Stifte.",
+  "Rubber Riot": "Gummichaos",
+  "Everything bounces. Control it anyway.": "Alles springt. Behalte trotzdem die Kontrolle.",
+  "Skeleton Crew": "Rumpfmannschaft",
+  "Two steel balls. Nothing else.": "Zwei Stahlkugeln. Sonst nichts.",
+  "Mastery: Foundry Master": "Meisterpr\xFCfung: Gie\xDFereimeister",
+  "The final exam of the foundry.": "Die Abschlusspr\xFCfung der Gie\xDFerei.",
+  "One Ball Only": "Nur eine Kugel",
+  "One steel ball. Make it count.": "Eine Stahlkugel. Nutze sie gut.",
+  "Speedrun Bay": "Speedrun-Halle",
+  "Eight seconds of simulation. No more.": "Acht Sekunden Simulation. Nicht mehr.",
+  "No Rigging": "Ohne Gelenke",
+  "Joints are forbidden in this chamber.": "Gelenke sind in dieser Kammer verboten.",
+  "Heavy Water": "Schweres Wasser",
+  "Gravity runs hot here: 16 u/s\xB2.": "Hier ist die Schwerkraft stark: 16 E/s\xB2.",
+  "One shared chamber for everyone, today only.": "Eine gemeinsame Kammer f\xFCr alle, nur heute.",
+  "First Completion": "Erster Abschluss",
+  "Complete any session with every payload delivered.": "Schlie\xDFe eine Runde ab, in der jede Fracht geliefert wurde.",
+  "Mechanic Mastery": "Mechanik gemeistert",
+  "Complete every Learn mode lesson.": "Schlie\xDFe jede Lektion im Lernmodus ab.",
+  "Hot Streak": "Gl\xFCcksstr\xE4hne",
+  "Win three sessions in a row.": "Gewinne drei Runden in Folge.",
+  "Mastery Milestone": "Meilenstein Meisterschaft",
+  "Complete every Journey mastery stage.": "Schlie\xDFe jede Meisterpr\xFCfung der Reise ab.",
+  "Marathon Builder": "Marathon-Baumeister",
+  "Spawn 500 bodies over your lifetime.": "Platziere insgesamt 500 K\xF6rper."
+};
+var ES2 = {
+  "sync.synced": "sincronizado",
+  "sync.saving": "guardando",
+  "sync.offline": "sin conexi\xF3n",
+  "phase.build": "construcci\xF3n",
+  "phase.run": "ejecuci\xF3n",
+  "phase.won": "ganada",
+  "phase.lost": "perdida",
+  "action.spawn": "colocar",
+  "action.joint": "uni\xF3n",
+  "action.delete": "eliminar",
+  "screen.title": "Inicio",
+  "screen.modes": "Modos",
+  "screen.play": "C\xE1mara",
+  "screen.results": "Resultados",
+  "screen.progression": "Progreso",
+  "screen.help": "C\xF3mo jugar",
+  "screen.scores": "Clasificaciones",
+  "reason.already-running": "la simulaci\xF3n ya est\xE1 en marcha",
+  "reason.session-over": "la partida termin\xF3",
+  "reason.material-unknown": "material desconocido",
+  "reason.material-not-allowed": "ese material no est\xE1 permitido aqu\xED",
+  "reason.budget-exhausted": "no quedan colocaciones",
+  "reason.joint-unknown": "uni\xF3n desconocida",
+  "reason.joint-not-allowed": "esa uni\xF3n no est\xE1 permitida aqu\xED",
+  "reason.need-two-bodies": "se necesitan dos cuerpos",
+  "reason.nothing-to-delete": "no hay nada que eliminar",
+  "reason.nothing-to-undo": "no hay nada que deshacer",
+  "reason.bad-bodies": "elige dos cuerpos distintos",
+  "reason.bad-position": "posici\xF3n no v\xE1lida",
+  "reason.not-found": "cuerpo no encontrado",
+  "reason.out-of-bounds": "fuera de la c\xE1mara",
+  "reason.payload-locked": "las cargas no se pueden eliminar",
+  "reason.too-far": "los cuerpos est\xE1n demasiado lejos",
+  "reason.malformed-command": "comando mal formado",
+  "reason.unknown-command": "comando desconocido",
+  "Achievement unlocked: {name}": "Logro desbloqueado: {name}",
+  "Achievements": "Logros",
+  "Achievements: {list}": "Logros: {list}",
+  "Actions": "Acciones",
+  "All difficulties": "Todas las dificultades",
+  "All modes": "Todos los modos",
+  "Audio": "Audio",
+  "Back": "Volver",
+  "Best": "Mejor",
+  "Board error: {error}": "Error de la clasificaci\xF3n: {error}",
+  "Build phase: spawn balls and connect them with joints. Run phase: gravity takes over \u2014 deliver every payload (outlined ball) into a pulsing target ring. Glass shatters on hard impacts; hazard strips destroy anything.": "Fase de construcci\xF3n: coloca bolas y con\xE9ctalas con uniones. Fase de ejecuci\xF3n: la gravedad toma el control \u2014 lleva cada carga (bola contorneada) a un anillo objetivo pulsante. El vidrio se rompe con impactos fuertes; las franjas de peligro destruyen todo.",
+  "Camera default": "C\xE1mara predeterminada",
+  "Camera re-framed": "C\xE1mara reencuadrada",
+  "Cannot connect: {reason}": "No se puede unir: {reason}",
+  "Cannot delete: {reason}": "No se puede eliminar: {reason}",
+  "Cannot run: {reason}": "No se puede ejecutar: {reason}",
+  "Cannot spawn: {reason}": "No se puede colocar: {reason}",
+  "Cast materials, rig joints, run the chamber, deliver every payload.": "Funde materiales, arma uniones, pon en marcha la c\xE1mara y entrega cada carga.",
+  "Chamber": "C\xE1mara",
+  "Chamber actions": "Acciones de la c\xE1mara",
+  "Choose a mode": "Elige un modo",
+  "Controls": "Controles",
+  "Cursor down": "Cursor abajo",
+  "Cursor left": "Cursor a la izquierda",
+  "Cursor right": "Cursor a la derecha",
+  "Cursor up": "Cursor arriba",
+  "Cursor {x}, {y}": "Cursor {x}, {y}",
+  "Daily": "Diario",
+  "Daily already attempted today \u2014 playing unranked practice run": "Ya jugaste el reto diario hoy \u2014 partida de pr\xE1ctica sin clasificaci\xF3n",
+  "Daily challenge": "Reto diario",
+  "Daily Cast {date}": "Fundici\xF3n diaria {date}",
+  "Day": "D\xEDa",
+  "Delete selected (Del)": "Eliminar selecci\xF3n (Supr)",
+  "Delivered: {done} / {total}": "Entregadas: {done} / {total}",
+  "Delivery complete": "Entrega completada",
+  "Density {d}, bounce {b}": "Densidad {d}, rebote {b}",
+  "Density {d}, bounce {b}, shatters above impact {s}": "Densidad {d}, rebote {b}, se rompe con impactos mayores de {s}",
+  "Difficulty filter": "Filtro de dificultad",
+  "Difficulty {n}": "Dificultad {n}",
+  "Display": "Pantalla",
+  "Done": "Listo",
+  "Expected duration": "Duraci\xF3n estimada",
+  "First body selected; pick a second body": "Primer cuerpo seleccionado; elige un segundo cuerpo",
+  "Full chamber": "C\xE1mara completa",
+  "Global (Journey)": "Global (Traves\xEDa)",
+  "Goal": "Objetivo",
+  "Help": "Ayuda",
+  "Hold (hold J)": "Mantener (mant\xE9n J)",
+  "How to play": "C\xF3mo jugar",
+  "Illegal action: {reason}": "Acci\xF3n no permitida: {reason}",
+  "Industrial physics sandbox": "Sandbox de f\xEDsica industrial",
+  "Joint mode": "Modo uni\xF3n",
+  "Joint mode (hold), then pick two bodies": "Modo uni\xF3n (mantener) y luego elige dos cuerpos",
+  "Joint mode (toggle), then pick two bodies": "Modo uni\xF3n (alternar) y luego elige dos cuerpos",
+  "Joint mode behavior": "Comportamiento del modo uni\xF3n",
+  "Joint mode off": "Modo uni\xF3n desactivado",
+  "Joints": "Uniones",
+  "Journey": "Traves\xEDa",
+  "Journey ({summary})": "Traves\xEDa ({summary})",
+  "Leaderboards": "Clasificaciones",
+  "Learn, Practice, Challenge, Score chase": "Aprender, Pr\xE1ctica, Desaf\xEDo, Caza de puntos",
+  "Leave chamber": "Salir de la c\xE1mara",
+  "Lesson complete! Finish the delivery or move on.": "\xA1Lecci\xF3n completada! Termina la entrega o sigue adelante.",
+  "Lesson complete: {name}": "Lecci\xF3n completada: {name}",
+  "Lesson {n}": "Lecci\xF3n {n}",
+  "Lesson {n}/{total}": "Lecci\xF3n {n}/{total}",
+  "Lessons": "Lecciones",
+  "Lifetime spawns: {spawns} \xB7 Wins: {wins} \xB7 Current streak: {streak}": "Colocaciones totales: {spawns} \xB7 Victorias: {wins} \xB7 Racha actual: {streak}",
+  "Local best: {n}": "Mejor local: {n}",
+  "Local bests (Journey)": "Mejores locales (Traves\xEDa)",
+  "Local guest profile \u2014 progress stays in this browser.": "Perfil de invitado local \u2014 el progreso se queda en este navegador.",
+  "Lost with {n} points": "Perdiste con {n} puntos",
+  "Materials": "Materiales",
+  "Max length {n}, rigid distance lock": "Longitud m\xE1x. {n}, distancia fija r\xEDgida",
+  "Max length {n}, stiffness {s}": "Longitud m\xE1x. {n}, rigidez {s}",
+  "Modes": "Modos",
+  "Move spawn cursor": "Mover el cursor de colocaci\xF3n",
+  "Move the spawn cursor": "Mover el cursor de colocaci\xF3n",
+  "Name": "Nombre",
+  "New local best! (previous {n})": "\xA1Nuevo mejor local! (anterior {n})",
+  "Next chamber": "Siguiente c\xE1mara",
+  "Next daily in {h}h {m}m": "Pr\xF3ximo reto en {h} h {m} min",
+  "Next lesson": "Siguiente lecci\xF3n",
+  "No entries yet. Be the first.": "A\xFAn no hay registros. S\xE9 el primero.",
+  "No local daily runs yet.": "A\xFAn no hay retos diarios locales.",
+  "No local journey bests yet.": "A\xFAn no hay mejores locales de la traves\xEDa.",
+  "No unlocked levels at this difficulty yet.": "A\xFAn no hay niveles desbloqueados en esta dificultad.",
+  "No \u2014 unranked": "No \u2014 sin clasificaci\xF3n",
+  "Nothing to undo": "No hay nada que deshacer",
+  "One shared chamber per day": "Una c\xE1mara compartida al d\xEDa",
+  "Other": "Otros",
+  "Pause (Esc)": "Pausa (Esc)",
+  "Pause / cancel joint mode": "Pausa / cancelar modo uni\xF3n",
+  "Paused": "En pausa",
+  "Payload delivered": "Carga entregada",
+  "Phase: {phase}": "Fase: {phase}",
+  "Phase: {phase} (paused)": "Fase: {phase} (en pausa)",
+  "Play": "Jugar",
+  "Player": "Jugador",
+  "Playing as {name} \u2014 progress syncs to your account ({status}).": "Juegas como {name} \u2014 el progreso se sincroniza con tu cuenta ({status}).",
+  "Profile": "Perfil",
+  "Profile & settings": "Perfil y ajustes",
+  "Progression": "Progreso",
+  "Ranked": "Clasificatoria",
+  "Ranked run recorded on this device.": "Partida clasificatoria guardada en este dispositivo.",
+  "Re-frame camera": "Reencuadrar c\xE1mara",
+  "Reason: {reason}": "Motivo: {reason}",
+  "Remove selected body": "Eliminar el cuerpo seleccionado",
+  "Replay tutorial": "Repetir tutorial",
+  "Reset to build phase": "De vuelta a la fase de construcci\xF3n",
+  "Restart chamber": "Reiniciar c\xE1mara",
+  "Resume": "Continuar",
+  "Retry": "Reintentar",
+  "Rules": "Reglas",
+  "Run (R)": "Ejecutar (R)",
+  "Run failed": "Ejecuci\xF3n fallida",
+  "Run the simulation": "Ejecutar la simulaci\xF3n",
+  "Running\u2026": "En marcha\u2026",
+  "Score": "Puntuaci\xF3n",
+  "Score breakdown": "Desglose de puntuaci\xF3n",
+  "Select material 1-4": "Elegir material 1\u20134",
+  "Select {material}": "Elegir {material}",
+  "Selected {body}": "{body} seleccionado",
+  "Selected {body} payload": "Carga de {body} seleccionada",
+  "Settings": "Ajustes",
+  "Simulation running": "Simulaci\xF3n en marcha",
+  "Spawn at cursor (Enter)": "Colocar en el cursor (Intro)",
+  "Spawn selected material at cursor": "Colocar el material elegido en el cursor",
+  "Spawns left: {left} / {total}": "Colocaciones restantes: {left} / {total}",
+  "StarHermit leaderboard": "Clasificaci\xF3n de StarHermit",
+  "Test chamber view. Use the action tray or keyboard for all actions.": "Vista de la c\xE1mara de pruebas. Usa la barra de acciones o el teclado para todas las acciones.",
+  "Tight frame": "Encuadre cerrado",
+  "Time left: {time}": "Tiempo restante: {time}",
+  "Today's cast: {date}": "Fundici\xF3n de hoy: {date}",
+  "Toggle (press J)": "Alternar (pulsa J)",
+  "Total": "Total",
+  "Undid {action}": "Se deshizo: {action}",
+  "Undo (U)": "Deshacer (U)",
+  "Undo last build action": "Deshacer la \xFAltima acci\xF3n de construcci\xF3n",
+  "Unranked session \u2014 no leaderboard submission.": "Partida sin clasificaci\xF3n \u2014 no se env\xEDa a la clasificaci\xF3n.",
+  "Won with {n} points": "Ganaste con {n} puntos",
+  "Yes \u2014 verified replays": "S\xED \u2014 repeticiones verificadas",
+  "body": "cuerpo",
+  "local": "local",
+  "online": "en l\xEDnea",
+  "unknown": "desconocido",
+  "{done} / {total} chambers": "{done} / {total} c\xE1maras",
+  "{joint} mode: select two bodies": "Modo {joint}: elige dos cuerpos",
+  "{level} \u2014 deliver 1 payload": "{level} \u2014 entrega 1 carga",
+  "{level} \u2014 deliver {n} payloads": "{level} \u2014 entrega {n} cargas",
+  "{mode} setup": "Configurar: {mode}",
+  "{n} achievements, audio & accessibility": "{n} logros, audio y accesibilidad",
+  "Time bonus": "Bonificaci\xF3n de tiempo",
+  "Material efficiency": "Eficiencia de material",
+  "Spawn efficiency": "Eficiencia de colocaci\xF3n",
+  "Invalid-action penalty": "Penalizaci\xF3n por acciones no v\xE1lidas",
+  "All payloads delivered": "Todas las cargas entregadas",
+  "Time expired": "Se acab\xF3 el tiempo",
+  "Payload destroyed": "Carga destruida",
+  "Learn": "Aprender",
+  "Six interactive lessons; one rule at a time.": "Seis lecciones interactivas; una regla a la vez.",
+  "44 authored chambers with rising complexity.": "44 c\xE1maras dise\xF1adas con complejidad creciente.",
+  "One shared chamber per UTC day, one ranked attempt.": "Una c\xE1mara compartida por d\xEDa UTC, un intento clasificatorio.",
+  "Practice": "Pr\xE1ctica",
+  "Any unlocked level, free restart and undo, unranked.": "Cualquier nivel desbloqueado, reinicio y deshacer libres, sin clasificaci\xF3n.",
+  "Challenge": "Desaf\xEDo",
+  "Four constrained chambers: limits, clocks, altered gravity.": "Cuatro c\xE1maras con restricciones: l\xEDmites, relojes y gravedad alterada.",
+  "Score chase": "Caza de puntos",
+  "Global and daily leaderboards with verified replays.": "Clasificaciones globales y diarias con repeticiones verificadas.",
+  "2-4 min each": "2\u20134 min cada una",
+  "1-3 min per level": "1\u20133 min por nivel",
+  "~2 min": "~2 min",
+  "open-ended": "sin l\xEDmite",
+  "2-5 min": "2\u20135 min",
+  "-": "\u2013",
+  "Music": "M\xFAsica",
+  "Effects": "Efectos",
+  "Ambience": "Ambiente",
+  "Voice": "Voz",
+  "Music volume": "Volumen de la m\xFAsica",
+  "Effects volume": "Volumen de los efectos",
+  "Ambience volume": "Volumen del ambiente",
+  "Voice volume": "Volumen de la voz",
+  "Mute all": "Silenciar todo",
+  "Reduced motion": "Movimiento reducido",
+  "High contrast": "Alto contraste",
+  "Larger text": "Texto m\xE1s grande",
+  "Left-handed action tray": "Barra de acciones para zurdos",
+  "Haptics (vibration)": "H\xE1ptica (vibraci\xF3n)",
+  "Share anonymous usage events": "Compartir eventos de uso an\xF3nimos",
+  "Steel": "Acero",
+  "Wood": "Madera",
+  "Glass": "Vidrio",
+  "Rubber": "Goma",
+  "Pin Joint": "Uni\xF3n de perno",
+  "Spring": "Resorte",
+  "WebGL is unavailable in this browser, so the 3D chamber view is disabled. All menus and the rules remain usable; enable hardware acceleration or try another browser for the full experience.": "WebGL no est\xE1 disponible en este navegador, as\xED que la vista 3D de la c\xE1mara est\xE1 desactivada. Todos los men\xFAs y las reglas siguen disponibles; activa la aceleraci\xF3n por hardware o prueba otro navegador para la experiencia completa.",
+  "First Casting": "Primera fundici\xF3n",
+  "Drop a wood ball anywhere inside the chamber.": "Suelta una bola de madera en cualquier lugar de la c\xE1mara.",
+  "Spawn a wood ball above the floor.": "Coloca una bola de madera sobre el suelo.",
+  "Heavy Stock": "Material pesado",
+  "Steel is dense and barely bounces. Spawn one.": "El acero es denso y casi no rebota. Coloca una bola.",
+  "Spawn a steel ball.": "Coloca una bola de acero.",
+  "Pin and Link": "Perno y enlace",
+  "Pins hold two balls at a fixed distance. Link two balls.": "Los pernos mantienen dos bolas a distancia fija. Une dos bolas.",
+  "Spawn a wood ball near the payload.": "Coloca una bola de madera cerca de la carga.",
+  "Connect two balls with a pin joint.": "Une dos bolas con una uni\xF3n de perno.",
+  "Second Thoughts": "Pens\xE1ndolo mejor",
+  "Remove a ball you no longer need.": "Elimina una bola que ya no necesites.",
+  "Spawn a rubber ball.": "Coloca una bola de goma.",
+  "Delete a ball you spawned.": "Elimina una bola que hayas colocado.",
+  "Let It Run": "D\xE9jalo correr",
+  "Start the simulation and watch the payload fall.": "Inicia la simulaci\xF3n y mira caer la carga.",
+  "Issue the run command.": "Da la orden de ejecutar.",
+  "Full Cycle": "Ciclo completo",
+  "Build, connect, run: the complete foundry loop.": "Construir, unir, ejecutar: el ciclo completo de la fundici\xF3n.",
+  "Spawn any ball.": "Coloca cualquier bola.",
+  "Join two balls with a spring.": "Une dos bolas con un resorte.",
+  "Run the simulation.": "Ejecuta la simulaci\xF3n.",
+  "First Drop": "Primera ca\xEDda",
+  "Run it. Gravity does the work.": "Ejec\xFAtalo. La gravedad hace el trabajo.",
+  "Off the Mark": "Fuera del blanco",
+  "The ramp nudges the payload toward the zone.": "La rampa empuja la carga hacia la zona.",
+  "Steel Nudge": "Empuj\xF3n de acero",
+  "A steel ball can shove the payload sideways.": "Una bola de acero puede empujar la carga hacia un lado.",
+  "Bounce House": "Casa de rebotes",
+  "Rubber keeps energy. Use the ramps.": "La goma conserva la energ\xEDa. Usa las rampas.",
+  "Brittle Cargo": "Carga fr\xE1gil",
+  "Glass shatters above impact speed 6. Cushion the fall.": "El vidrio se rompe con impactos de velocidad mayor que 6. Amortigua la ca\xEDda.",
+  "Two Moves": "Dos movimientos",
+  "Exactly two spawns. Plan them.": "Exactamente dos colocaciones. Plan\xE9alas.",
+  "High Shelf": "Estante alto",
+  "Ramps chain the payload across the chamber.": "Las rampas encadenan la carga a trav\xE9s de la c\xE1mara.",
+  "Mastery: The Crucible": "Maestr\xEDa: El crisol",
+  "Everything so far, one fragile payload.": "Todo lo aprendido, una carga fr\xE1gil.",
+  "First Pin": "Primer perno",
+  "Pin a counterweight to the payload.": "Fija un contrapeso a la carga.",
+  "First Spring": "Primer resorte",
+  "A spring tugs without a rigid lock.": "Un resorte tira sin fijaci\xF3n r\xEDgida.",
+  "Anchor Line": "L\xEDnea de anclaje",
+  "Steel anchors steer bouncy cargo.": "Las anclas de acero gu\xEDan la carga saltarina.",
+  "Twin Links": "Enlaces gemelos",
+  "Two pins shape a falling train.": "Dos pernos forman un tren que cae.",
+  "Elastic Catch": "Atrapada el\xE1stica",
+  "Springs soften what glass cannot take.": "Los resortes suavizan lo que el vidrio no aguanta.",
+  "Mixed Rigging": "Montaje mixto",
+  "Pins and springs in one rig.": "Pernos y resortes en un solo montaje.",
+  "Swing Set": "Columpio",
+  "A pinned pendulum carries momentum sideways.": "Un p\xE9ndulo fijado lleva el impulso hacia un lado.",
+  "Mastery: Rigging Exam": "Maestr\xEDa: Examen de montaje",
+  "Fragile cargo, long traverse, full toolkit.": "Carga fr\xE1gil, recorrido largo, todas las herramientas.",
+  "Hot Floor": "Suelo ardiente",
+  "The left strip melts anything that lands in it.": "La franja izquierda funde todo lo que cae en ella.",
+  "Narrow Slot": "Ranura estrecha",
+  "One safe landing lane between the burn lines.": "Un carril de aterrizaje seguro entre las l\xEDneas de fuego.",
+  "Over the Fire": "Sobre el fuego",
+  "Arc the payload across the hazard.": "Lanza la carga en arco por encima del peligro.",
+  "Glass Over Coals": "Vidrio sobre brasas",
+  "Fragile cargo above a burning floor.": "Carga fr\xE1gil sobre un suelo en llamas.",
+  "Side Burn": "Fuego lateral",
+  "A floating burn strip blocks the direct line.": "Una franja de fuego flotante bloquea la l\xEDnea directa.",
+  "Double Jeopardy": "Doble peligro",
+  "Two hazard zones, one long descent.": "Dos zonas de peligro, un largo descenso.",
+  "The Gauntlet": "La prueba de fuego",
+  "Thread fragile cargo through three burn zones.": "Pasa la carga fr\xE1gil por tres zonas de fuego.",
+  "Mastery: Furnace Walk": "Maestr\xEDa: Paseo por el horno",
+  "Everything you know, under fire.": "Todo lo que sabes, bajo fuego.",
+  "Two Crates": "Dos cajas",
+  "Both payloads must reach a zone.": "Ambas cargas deben llegar a una zona.",
+  "Cross Traffic": "Tr\xE1fico cruzado",
+  "The payloads swap sides.": "Las cargas cambian de lado.",
+  "Shared Zone": "Zona compartida",
+  "One wide zone accepts both.": "Una zona amplia acepta ambas.",
+  "Escort Duty": "Escolta",
+  "A fragile and a sturdy payload, one destination.": "Una carga fr\xE1gil y una resistente, un solo destino.",
+  "Three Deep": "Tres en fila",
+  "Three payloads, three zones.": "Tres cargas, tres zonas.",
+  "Chain Delivery": "Entrega en cadena",
+  "Linked cargo over the burn line.": "Carga enlazada sobre la l\xEDnea de fuego.",
+  "Split Decision": "Decisi\xF3n dividida",
+  "Opposite corners, opposite materials.": "Esquinas opuestas, materiales opuestos.",
+  "Mastery: Freight Master": "Maestr\xEDa: Maestro de carga",
+  "Three payloads, two burn strips, full rig.": "Tres cargas, dos franjas de fuego, montaje completo.",
+  "Short Fuse": "Mecha corta",
+  "The run clock is tight now.": "Ahora el reloj aprieta.",
+  "Quick Rig": "Montaje r\xE1pido",
+  "Rig fast, run faster.": "Monta r\xE1pido, ejecuta m\xE1s r\xE1pido.",
+  "Burning Clock": "Reloj ardiente",
+  "Hazards and a short clock.": "Peligros y poco tiempo.",
+  "Twin Sprint": "Sprint doble",
+  "Two payloads before the clock dies.": "Dos cargas antes de que se acabe el tiempo.",
+  "Precision Window": "Ventana de precisi\xF3n",
+  "A small zone, a soft landing, little time.": "Una zona peque\xF1a, un aterrizaje suave, poco tiempo.",
+  "Assembly Line": "L\xEDnea de montaje",
+  "Converge both lines on one zone, quickly.": "Junta ambas l\xEDneas en una zona, r\xE1pido.",
+  "Final Approach": "Aproximaci\xF3n final",
+  "The hardest traverse, on a clock.": "El recorrido m\xE1s dif\xEDcil, contra reloj.",
+  "Mastery: Shift Supervisor": "Maestr\xEDa: Jefe de turno",
+  "Two cargoes, two clocks' worth of trouble.": "Dos cargas, el doble de presi\xF3n del reloj.",
+  "Wood Only": "Solo madera",
+  "No steel, no rubber. Wood and pins.": "Sin acero ni goma. Madera y pernos.",
+  "Rubber Riot": "Locura de goma",
+  "Everything bounces. Control it anyway.": "Todo rebota. Contr\xF3lalo de todos modos.",
+  "Skeleton Crew": "Equipo m\xEDnimo",
+  "Two steel balls. Nothing else.": "Dos bolas de acero. Nada m\xE1s.",
+  "Mastery: Foundry Master": "Maestr\xEDa: Maestro de la fundici\xF3n",
+  "The final exam of the foundry.": "El examen final de la fundici\xF3n.",
+  "One Ball Only": "Una sola bola",
+  "One steel ball. Make it count.": "Una bola de acero. Que cuente.",
+  "Speedrun Bay": "Bah\xEDa contrarreloj",
+  "Eight seconds of simulation. No more.": "Ocho segundos de simulaci\xF3n. Ni uno m\xE1s.",
+  "No Rigging": "Sin uniones",
+  "Joints are forbidden in this chamber.": "Las uniones est\xE1n prohibidas en esta c\xE1mara.",
+  "Heavy Water": "Agua pesada",
+  "Gravity runs hot here: 16 u/s\xB2.": "Aqu\xED la gravedad aprieta: 16 u/s\xB2.",
+  "One shared chamber for everyone, today only.": "Una c\xE1mara compartida para todos, solo hoy.",
+  "First Completion": "Primera victoria",
+  "Complete any session with every payload delivered.": "Completa una partida con todas las cargas entregadas.",
+  "Mechanic Mastery": "Dominio de mec\xE1nicas",
+  "Complete every Learn mode lesson.": "Completa todas las lecciones del modo Aprender.",
+  "Hot Streak": "Racha ganadora",
+  "Win three sessions in a row.": "Gana tres partidas seguidas.",
+  "Mastery Milestone": "Hito de maestr\xEDa",
+  "Complete every Journey mastery stage.": "Completa todas las pruebas de maestr\xEDa de la traves\xEDa.",
+  "Marathon Builder": "Constructor maratoniano",
+  "Spawn 500 bodies over your lifetime.": "Coloca 500 cuerpos en total."
+};
+var ES_ES = {
+  ...ES2,
+  "sync.offline": "sin conexi\xF3n",
+  "online": "en l\xEDnea",
+  "Spring": "Muelle",
+  "First Spring": "Primer muelle",
+  "A spring tugs without a rigid lock.": "Un muelle tira sin fijaci\xF3n r\xEDgida.",
+  "Springs soften what glass cannot take.": "Los muelles suavizan lo que el vidrio no aguanta.",
+  "Pins and springs in one rig.": "Pernos y muelles en un solo montaje.",
+  "Join two balls with a spring.": "Une dos bolas con un muelle.",
+  "Rubber": "Goma",
+  "Ranked": "Clasificatoria",
+  "Score": "Puntuaci\xF3n",
+  "Daily already attempted today \u2014 playing unranked practice run": "Ya has jugado el reto diario hoy \u2014 partida de pr\xE1ctica sin clasificaci\xF3n",
+  "Won with {n} points": "Has ganado con {n} puntos",
+  "Lost with {n} points": "Has perdido con {n} puntos",
+  "Playing as {name} \u2014 progress syncs to your account ({status}).": "Juegas como {name} \u2014 el progreso se sincroniza con tu cuenta ({status})."
+};
+var FR2 = {
+  "sync.synced": "synchronis\xE9",
+  "sync.saving": "enregistrement",
+  "sync.offline": "hors ligne",
+  "phase.build": "construction",
+  "phase.run": "simulation",
+  "phase.won": "gagn\xE9e",
+  "phase.lost": "perdue",
+  "action.spawn": "placement",
+  "action.joint": "liaison",
+  "action.delete": "suppression",
+  "screen.title": "Accueil",
+  "screen.modes": "Modes",
+  "screen.play": "Chambre",
+  "screen.results": "R\xE9sultats",
+  "screen.progression": "Progression",
+  "screen.help": "Comment jouer",
+  "screen.scores": "Classements",
+  "reason.already-running": "la simulation est d\xE9j\xE0 lanc\xE9e",
+  "reason.session-over": "la partie est termin\xE9e",
+  "reason.material-unknown": "mat\xE9riau inconnu",
+  "reason.material-not-allowed": "ce mat\xE9riau n\u2019est pas autoris\xE9 ici",
+  "reason.budget-exhausted": "plus aucun placement disponible",
+  "reason.joint-unknown": "liaison inconnue",
+  "reason.joint-not-allowed": "cette liaison n\u2019est pas autoris\xE9e ici",
+  "reason.need-two-bodies": "il faut deux corps",
+  "reason.nothing-to-delete": "rien \xE0 supprimer",
+  "reason.nothing-to-undo": "rien \xE0 annuler",
+  "reason.bad-bodies": "choisissez deux corps diff\xE9rents",
+  "reason.bad-position": "position non valide",
+  "reason.not-found": "corps introuvable",
+  "reason.out-of-bounds": "hors de la chambre",
+  "reason.payload-locked": "les charges ne peuvent pas \xEAtre supprim\xE9es",
+  "reason.too-far": "les corps sont trop \xE9loign\xE9s",
+  "reason.malformed-command": "commande mal form\xE9e",
+  "reason.unknown-command": "commande inconnue",
+  "Achievement unlocked: {name}": "Succ\xE8s d\xE9bloqu\xE9 : {name}",
+  "Achievements": "Succ\xE8s",
+  "Achievements: {list}": "Succ\xE8s : {list}",
+  "Actions": "Actions",
+  "All difficulties": "Toutes les difficult\xE9s",
+  "All modes": "Tous les modes",
+  "Audio": "Audio",
+  "Back": "Retour",
+  "Best": "Record",
+  "Board error: {error}": "Erreur du classement : {error}",
+  "Build phase: spawn balls and connect them with joints. Run phase: gravity takes over \u2014 deliver every payload (outlined ball) into a pulsing target ring. Glass shatters on hard impacts; hazard strips destroy anything.": "Phase de construction : placez des billes et reliez-les par des liaisons. Phase de simulation : la gravit\xE9 prend le relais \u2014 amenez chaque charge (bille cercl\xE9e) dans un anneau cible pulsant. Le verre se brise sous les chocs violents ; les bandes de danger d\xE9truisent tout.",
+  "Camera default": "Cam\xE9ra par d\xE9faut",
+  "Camera re-framed": "Cam\xE9ra recadr\xE9e",
+  "Cannot connect: {reason}": "Liaison impossible : {reason}",
+  "Cannot delete: {reason}": "Suppression impossible : {reason}",
+  "Cannot run: {reason}": "Lancement impossible : {reason}",
+  "Cannot spawn: {reason}": "Placement impossible : {reason}",
+  "Cast materials, rig joints, run the chamber, deliver every payload.": "Coulez des mat\xE9riaux, montez des liaisons, lancez la chambre, livrez chaque charge.",
+  "Chamber": "Chambre",
+  "Chamber actions": "Actions de la chambre",
+  "Choose a mode": "Choisissez un mode",
+  "Controls": "Commandes",
+  "Cursor down": "Curseur vers le bas",
+  "Cursor left": "Curseur vers la gauche",
+  "Cursor right": "Curseur vers la droite",
+  "Cursor up": "Curseur vers le haut",
+  "Cursor {x}, {y}": "Curseur {x}, {y}",
+  "Daily": "Quotidien",
+  "Daily already attempted today \u2014 playing unranked practice run": "D\xE9fi du jour d\xE9j\xE0 tent\xE9 \u2014 partie d\u2019entra\xEEnement non class\xE9e",
+  "Daily challenge": "D\xE9fi du jour",
+  "Daily Cast {date}": "Coul\xE9e du jour {date}",
+  "Day": "Jour",
+  "Delete selected (Del)": "Supprimer la s\xE9lection (Suppr)",
+  "Delivered: {done} / {total}": "Livr\xE9es : {done} / {total}",
+  "Delivery complete": "Livraison termin\xE9e",
+  "Density {d}, bounce {b}": "Densit\xE9 {d}, rebond {b}",
+  "Density {d}, bounce {b}, shatters above impact {s}": "Densit\xE9 {d}, rebond {b}, se brise au-del\xE0 d\u2019un impact de {s}",
+  "Difficulty filter": "Filtre de difficult\xE9",
+  "Difficulty {n}": "Difficult\xE9 {n}",
+  "Display": "Affichage",
+  "Done": "Termin\xE9",
+  "Expected duration": "Dur\xE9e pr\xE9vue",
+  "First body selected; pick a second body": "Premier corps choisi ; choisissez-en un second",
+  "Full chamber": "Chambre enti\xE8re",
+  "Global (Journey)": "Mondial (Parcours)",
+  "Goal": "Objectif",
+  "Help": "Aide",
+  "Hold (hold J)": "Maintenir (maintenir J)",
+  "How to play": "Comment jouer",
+  "Illegal action: {reason}": "Action interdite : {reason}",
+  "Industrial physics sandbox": "Bac \xE0 sable de physique industrielle",
+  "Joint mode": "Mode liaison",
+  "Joint mode (hold), then pick two bodies": "Mode liaison (maintenir), puis choisir deux corps",
+  "Joint mode (toggle), then pick two bodies": "Mode liaison (bascule), puis choisir deux corps",
+  "Joint mode behavior": "Comportement du mode liaison",
+  "Joint mode off": "Mode liaison d\xE9sactiv\xE9",
+  "Joints": "Liaisons",
+  "Journey": "Parcours",
+  "Journey ({summary})": "Parcours ({summary})",
+  "Leaderboards": "Classements",
+  "Learn, Practice, Challenge, Score chase": "Apprendre, Entra\xEEnement, D\xE9fi, Chasse aux points",
+  "Leave chamber": "Quitter la chambre",
+  "Lesson complete! Finish the delivery or move on.": "Le\xE7on termin\xE9e ! Finissez la livraison ou passez \xE0 la suite.",
+  "Lesson complete: {name}": "Le\xE7on termin\xE9e : {name}",
+  "Lesson {n}": "Le\xE7on {n}",
+  "Lesson {n}/{total}": "Le\xE7on {n}/{total}",
+  "Lessons": "Le\xE7ons",
+  "Lifetime spawns: {spawns} \xB7 Wins: {wins} \xB7 Current streak: {streak}": "Placements au total : {spawns} \xB7 Victoires : {wins} \xB7 S\xE9rie en cours : {streak}",
+  "Local best: {n}": "Record local : {n}",
+  "Local bests (Journey)": "Records locaux (Parcours)",
+  "Local guest profile \u2014 progress stays in this browser.": "Profil invit\xE9 local \u2014 la progression reste dans ce navigateur.",
+  "Lost with {n} points": "Perdu avec {n} points",
+  "Materials": "Mat\xE9riaux",
+  "Max length {n}, rigid distance lock": "Longueur max. {n}, distance fixe rigide",
+  "Max length {n}, stiffness {s}": "Longueur max. {n}, raideur {s}",
+  "Modes": "Modes",
+  "Move spawn cursor": "D\xE9placer le curseur de placement",
+  "Move the spawn cursor": "D\xE9placer le curseur de placement",
+  "Name": "Nom",
+  "New local best! (previous {n})": "Nouveau record local ! (pr\xE9c\xE9dent : {n})",
+  "Next chamber": "Chambre suivante",
+  "Next daily in {h}h {m}m": "Prochain d\xE9fi dans {h} h {m} min",
+  "Next lesson": "Le\xE7on suivante",
+  "No entries yet. Be the first.": "Aucune entr\xE9e pour l\u2019instant. Soyez le premier.",
+  "No local daily runs yet.": "Aucun d\xE9fi du jour local pour l\u2019instant.",
+  "No local journey bests yet.": "Aucun record local du parcours pour l\u2019instant.",
+  "No unlocked levels at this difficulty yet.": "Aucun niveau d\xE9bloqu\xE9 \xE0 cette difficult\xE9 pour l\u2019instant.",
+  "No \u2014 unranked": "Non \u2014 non class\xE9",
+  "Nothing to undo": "Rien \xE0 annuler",
+  "One shared chamber per day": "Une chambre commune par jour",
+  "Other": "Autres",
+  "Pause (Esc)": "Pause (\xC9chap)",
+  "Pause / cancel joint mode": "Pause / annuler le mode liaison",
+  "Paused": "En pause",
+  "Payload delivered": "Charge livr\xE9e",
+  "Phase: {phase}": "Phase : {phase}",
+  "Phase: {phase} (paused)": "Phase : {phase} (en pause)",
+  "Play": "Jouer",
+  "Player": "Joueur",
+  "Playing as {name} \u2014 progress syncs to your account ({status}).": "Vous jouez en tant que {name} \u2014 la progression est synchronis\xE9e avec votre compte ({status}).",
+  "Profile": "Profil",
+  "Profile & settings": "Profil et param\xE8tres",
+  "Progression": "Progression",
+  "Ranked": "Class\xE9",
+  "Ranked run recorded on this device.": "Partie class\xE9e enregistr\xE9e sur cet appareil.",
+  "Re-frame camera": "Recadrer la cam\xE9ra",
+  "Reason: {reason}": "Raison : {reason}",
+  "Remove selected body": "Supprimer le corps s\xE9lectionn\xE9",
+  "Replay tutorial": "Revoir le tutoriel",
+  "Reset to build phase": "Retour \xE0 la phase de construction",
+  "Restart chamber": "Recommencer la chambre",
+  "Resume": "Reprendre",
+  "Retry": "R\xE9essayer",
+  "Rules": "R\xE8gles",
+  "Run (R)": "Lancer (R)",
+  "Run failed": "\xC9chec",
+  "Run the simulation": "Lancer la simulation",
+  "Running\u2026": "En cours\u2026",
+  "Score": "Score",
+  "Score breakdown": "D\xE9tail du score",
+  "Select material 1-4": "Choisir le mat\xE9riau 1\u20134",
+  "Select {material}": "Choisir : {material}",
+  "Selected {body}": "S\xE9lection : {body}",
+  "Selected {body} payload": "S\xE9lection : charge ({body})",
+  "Settings": "Param\xE8tres",
+  "Simulation running": "Simulation en cours",
+  "Spawn at cursor (Enter)": "Placer au curseur (Entr\xE9e)",
+  "Spawn selected material at cursor": "Placer le mat\xE9riau choisi au curseur",
+  "Spawns left: {left} / {total}": "Placements restants : {left} / {total}",
+  "StarHermit leaderboard": "Classement StarHermit",
+  "Test chamber view. Use the action tray or keyboard for all actions.": "Vue de la chambre d\u2019essai. Utilisez la barre d\u2019actions ou le clavier pour toutes les actions.",
+  "Tight frame": "Cadrage serr\xE9",
+  "Time left: {time}": "Temps restant : {time}",
+  "Today's cast: {date}": "Coul\xE9e du jour : {date}",
+  "Toggle (press J)": "Bascule (appuyer sur J)",
+  "Total": "Total",
+  "Undid {action}": "Annul\xE9 : {action}",
+  "Undo (U)": "Annuler (U)",
+  "Undo last build action": "Annuler la derni\xE8re action de construction",
+  "Unranked session \u2014 no leaderboard submission.": "Partie non class\xE9e \u2014 aucun envoi au classement.",
+  "Won with {n} points": "Gagn\xE9 avec {n} points",
+  "Yes \u2014 verified replays": "Oui \u2014 rediffusions v\xE9rifi\xE9es",
+  "body": "corps",
+  "local": "local",
+  "online": "en ligne",
+  "unknown": "inconnue",
+  "{done} / {total} chambers": "{done} / {total} chambres",
+  "{joint} mode: select two bodies": "Mode {joint} : choisissez deux corps",
+  "{level} \u2014 deliver 1 payload": "{level} \u2014 livrer 1 charge",
+  "{level} \u2014 deliver {n} payloads": "{level} \u2014 livrer {n} charges",
+  "{mode} setup": "Configuration : {mode}",
+  "{n} achievements, audio & accessibility": "{n} succ\xE8s, audio et accessibilit\xE9",
+  "Time bonus": "Bonus de temps",
+  "Material efficiency": "Efficacit\xE9 mat\xE9rielle",
+  "Spawn efficiency": "Efficacit\xE9 des placements",
+  "Invalid-action penalty": "P\xE9nalit\xE9 d\u2019actions interdites",
+  "All payloads delivered": "Toutes les charges livr\xE9es",
+  "Time expired": "Temps \xE9coul\xE9",
+  "Payload destroyed": "Charge d\xE9truite",
+  "Learn": "Apprendre",
+  "Six interactive lessons; one rule at a time.": "Six le\xE7ons interactives ; une r\xE8gle \xE0 la fois.",
+  "44 authored chambers with rising complexity.": "44 chambres con\xE7ues \xE0 la main, de plus en plus complexes.",
+  "One shared chamber per UTC day, one ranked attempt.": "Une chambre commune par jour UTC, une tentative class\xE9e.",
+  "Practice": "Entra\xEEnement",
+  "Any unlocked level, free restart and undo, unranked.": "Tout niveau d\xE9bloqu\xE9, recommencer et annuler \xE0 volont\xE9, non class\xE9.",
+  "Challenge": "D\xE9fi",
+  "Four constrained chambers: limits, clocks, altered gravity.": "Quatre chambres sous contraintes : limites, chronos, gravit\xE9 modifi\xE9e.",
+  "Score chase": "Chasse aux points",
+  "Global and daily leaderboards with verified replays.": "Classements mondiaux et quotidiens avec rediffusions v\xE9rifi\xE9es.",
+  "2-4 min each": "2 \xE0 4 min chacune",
+  "1-3 min per level": "1 \xE0 3 min par niveau",
+  "~2 min": "~2 min",
+  "open-ended": "sans limite",
+  "2-5 min": "2 \xE0 5 min",
+  "-": "\u2013",
+  "Music": "Musique",
+  "Effects": "Effets",
+  "Ambience": "Ambiance",
+  "Voice": "Voix",
+  "Music volume": "Volume de la musique",
+  "Effects volume": "Volume des effets",
+  "Ambience volume": "Volume de l\u2019ambiance",
+  "Voice volume": "Volume des voix",
+  "Mute all": "Tout couper",
+  "Reduced motion": "Animations r\xE9duites",
+  "High contrast": "Contraste \xE9lev\xE9",
+  "Larger text": "Texte plus grand",
+  "Left-handed action tray": "Barre d\u2019actions pour gauchers",
+  "Haptics (vibration)": "Retour haptique (vibration)",
+  "Share anonymous usage events": "Partager des donn\xE9es d\u2019utilisation anonymes",
+  "Steel": "Acier",
+  "Wood": "Bois",
+  "Glass": "Verre",
+  "Rubber": "Caoutchouc",
+  "Pin Joint": "Liaison pivot",
+  "Spring": "Ressort",
+  "WebGL is unavailable in this browser, so the 3D chamber view is disabled. All menus and the rules remain usable; enable hardware acceleration or try another browser for the full experience.": "WebGL n\u2019est pas disponible dans ce navigateur : la vue 3D de la chambre est d\xE9sactiv\xE9e. Les menus et les r\xE8gles restent utilisables ; activez l\u2019acc\xE9l\xE9ration mat\xE9rielle ou essayez un autre navigateur pour l\u2019exp\xE9rience compl\xE8te.",
+  "First Casting": "Premi\xE8re coul\xE9e",
+  "Drop a wood ball anywhere inside the chamber.": "L\xE2chez une bille de bois n\u2019importe o\xF9 dans la chambre.",
+  "Spawn a wood ball above the floor.": "Placez une bille de bois au-dessus du sol.",
+  "Heavy Stock": "Mati\xE8re lourde",
+  "Steel is dense and barely bounces. Spawn one.": "L\u2019acier est dense et rebondit \xE0 peine. Placez-en une bille.",
+  "Spawn a steel ball.": "Placez une bille d\u2019acier.",
+  "Pin and Link": "Pivot et lien",
+  "Pins hold two balls at a fixed distance. Link two balls.": "Les pivots maintiennent deux billes \xE0 distance fixe. Reliez deux billes.",
+  "Spawn a wood ball near the payload.": "Placez une bille de bois pr\xE8s de la charge.",
+  "Connect two balls with a pin joint.": "Reliez deux billes par une liaison pivot.",
+  "Second Thoughts": "Changement d\u2019avis",
+  "Remove a ball you no longer need.": "Supprimez une bille dont vous n\u2019avez plus besoin.",
+  "Spawn a rubber ball.": "Placez une bille de caoutchouc.",
+  "Delete a ball you spawned.": "Supprimez une bille que vous avez plac\xE9e.",
+  "Let It Run": "Laissez tourner",
+  "Start the simulation and watch the payload fall.": "Lancez la simulation et regardez la charge tomber.",
+  "Issue the run command.": "Donnez l\u2019ordre de lancement.",
+  "Full Cycle": "Cycle complet",
+  "Build, connect, run: the complete foundry loop.": "Construire, relier, lancer : la boucle compl\xE8te de la fonderie.",
+  "Spawn any ball.": "Placez une bille, peu importe laquelle.",
+  "Join two balls with a spring.": "Reliez deux billes par un ressort.",
+  "Run the simulation.": "Lancez la simulation.",
+  "First Drop": "Premi\xE8re chute",
+  "Run it. Gravity does the work.": "Lancez. La gravit\xE9 fait le travail.",
+  "Off the Mark": "\xC0 c\xF4t\xE9 de la cible",
+  "The ramp nudges the payload toward the zone.": "La rampe pousse la charge vers la zone.",
+  "Steel Nudge": "Pouss\xE9e d\u2019acier",
+  "A steel ball can shove the payload sideways.": "Une bille d\u2019acier peut pousser la charge sur le c\xF4t\xE9.",
+  "Bounce House": "Ch\xE2teau gonflable",
+  "Rubber keeps energy. Use the ramps.": "Le caoutchouc garde son \xE9nergie. Servez-vous des rampes.",
+  "Brittle Cargo": "Cargaison fragile",
+  "Glass shatters above impact speed 6. Cushion the fall.": "Le verre se brise au-del\xE0 d\u2019une vitesse d\u2019impact de 6. Amortissez la chute.",
+  "Two Moves": "Deux coups",
+  "Exactly two spawns. Plan them.": "Exactement deux placements. Planifiez-les.",
+  "High Shelf": "\xC9tag\xE8re haute",
+  "Ramps chain the payload across the chamber.": "Les rampes font traverser la chambre \xE0 la charge.",
+  "Mastery: The Crucible": "Ma\xEEtrise : le creuset",
+  "Everything so far, one fragile payload.": "Tout ce que vous savez, une charge fragile.",
+  "First Pin": "Premier pivot",
+  "Pin a counterweight to the payload.": "Fixez un contrepoids \xE0 la charge.",
+  "First Spring": "Premier ressort",
+  "A spring tugs without a rigid lock.": "Un ressort tire sans blocage rigide.",
+  "Anchor Line": "Ligne d\u2019ancrage",
+  "Steel anchors steer bouncy cargo.": "Des ancres d\u2019acier guident la cargaison rebondissante.",
+  "Twin Links": "Liens jumeaux",
+  "Two pins shape a falling train.": "Deux pivots forment un train qui tombe.",
+  "Elastic Catch": "R\xE9ception \xE9lastique",
+  "Springs soften what glass cannot take.": "Les ressorts amortissent ce que le verre ne supporte pas.",
+  "Mixed Rigging": "Montage mixte",
+  "Pins and springs in one rig.": "Pivots et ressorts dans un m\xEAme montage.",
+  "Swing Set": "Balan\xE7oire",
+  "A pinned pendulum carries momentum sideways.": "Un pendule fix\xE9 transmet l\u2019\xE9lan sur le c\xF4t\xE9.",
+  "Mastery: Rigging Exam": "Ma\xEEtrise : examen de montage",
+  "Fragile cargo, long traverse, full toolkit.": "Cargaison fragile, longue travers\xE9e, tous les outils.",
+  "Hot Floor": "Sol br\xFBlant",
+  "The left strip melts anything that lands in it.": "La bande de gauche fait fondre tout ce qui y tombe.",
+  "Narrow Slot": "Fente \xE9troite",
+  "One safe landing lane between the burn lines.": "Un seul couloir d\u2019atterrissage s\xFBr entre les lignes de feu.",
+  "Over the Fire": "Au-dessus du feu",
+  "Arc the payload across the hazard.": "Faites passer la charge en arc au-dessus du danger.",
+  "Glass Over Coals": "Verre sur les braises",
+  "Fragile cargo above a burning floor.": "Cargaison fragile au-dessus d\u2019un sol en feu.",
+  "Side Burn": "Feu lat\xE9ral",
+  "A floating burn strip blocks the direct line.": "Une bande de feu flottante bloque la ligne directe.",
+  "Double Jeopardy": "Double danger",
+  "Two hazard zones, one long descent.": "Deux zones de danger, une longue descente.",
+  "The Gauntlet": "L\u2019\xE9preuve",
+  "Thread fragile cargo through three burn zones.": "Faites passer une cargaison fragile \xE0 travers trois zones de feu.",
+  "Mastery: Furnace Walk": "Ma\xEEtrise : travers\xE9e du four",
+  "Everything you know, under fire.": "Tout ce que vous savez, sous le feu.",
+  "Two Crates": "Deux caisses",
+  "Both payloads must reach a zone.": "Les deux charges doivent atteindre une zone.",
+  "Cross Traffic": "Circulation crois\xE9e",
+  "The payloads swap sides.": "Les charges changent de c\xF4t\xE9.",
+  "Shared Zone": "Zone commune",
+  "One wide zone accepts both.": "Une large zone accepte les deux.",
+  "Escort Duty": "Escorte",
+  "A fragile and a sturdy payload, one destination.": "Une charge fragile et une robuste, une seule destination.",
+  "Three Deep": "Trois de front",
+  "Three payloads, three zones.": "Trois charges, trois zones.",
+  "Chain Delivery": "Livraison en cha\xEEne",
+  "Linked cargo over the burn line.": "Cargaison li\xE9e au-dessus de la ligne de feu.",
+  "Split Decision": "D\xE9cision partag\xE9e",
+  "Opposite corners, opposite materials.": "Coins oppos\xE9s, mat\xE9riaux oppos\xE9s.",
+  "Mastery: Freight Master": "Ma\xEEtrise : ma\xEEtre du fret",
+  "Three payloads, two burn strips, full rig.": "Trois charges, deux bandes de feu, montage complet.",
+  "Short Fuse": "M\xE8che courte",
+  "The run clock is tight now.": "Le chrono est serr\xE9 maintenant.",
+  "Quick Rig": "Montage express",
+  "Rig fast, run faster.": "Montez vite, lancez plus vite.",
+  "Burning Clock": "Chrono br\xFBlant",
+  "Hazards and a short clock.": "Des dangers et peu de temps.",
+  "Twin Sprint": "Sprint double",
+  "Two payloads before the clock dies.": "Deux charges avant la fin du chrono.",
+  "Precision Window": "Fen\xEAtre de pr\xE9cision",
+  "A small zone, a soft landing, little time.": "Une petite zone, un atterrissage en douceur, peu de temps.",
+  "Assembly Line": "Cha\xEEne de montage",
+  "Converge both lines on one zone, quickly.": "Faites converger les deux lignes vers une zone, vite.",
+  "Final Approach": "Approche finale",
+  "The hardest traverse, on a clock.": "La travers\xE9e la plus dure, contre la montre.",
+  "Mastery: Shift Supervisor": "Ma\xEEtrise : chef d\u2019\xE9quipe",
+  "Two cargoes, two clocks' worth of trouble.": "Deux cargaisons, deux fois plus de pression.",
+  "Wood Only": "Bois seulement",
+  "No steel, no rubber. Wood and pins.": "Ni acier ni caoutchouc. Du bois et des pivots.",
+  "Rubber Riot": "Folie de caoutchouc",
+  "Everything bounces. Control it anyway.": "Tout rebondit. Gardez le contr\xF4le quand m\xEAme.",
+  "Skeleton Crew": "\xC9quipe r\xE9duite",
+  "Two steel balls. Nothing else.": "Deux billes d\u2019acier. Rien d\u2019autre.",
+  "Mastery: Foundry Master": "Ma\xEEtrise : ma\xEEtre fondeur",
+  "The final exam of the foundry.": "L\u2019examen final de la fonderie.",
+  "One Ball Only": "Une seule bille",
+  "One steel ball. Make it count.": "Une bille d\u2019acier. Faites-la compter.",
+  "Speedrun Bay": "Baie du sprint",
+  "Eight seconds of simulation. No more.": "Huit secondes de simulation. Pas plus.",
+  "No Rigging": "Sans liaisons",
+  "Joints are forbidden in this chamber.": "Les liaisons sont interdites dans cette chambre.",
+  "Heavy Water": "Eau lourde",
+  "Gravity runs hot here: 16 u/s\xB2.": "Ici, la gravit\xE9 est forte : 16 u/s\xB2.",
+  "One shared chamber for everyone, today only.": "Une chambre commune pour tous, aujourd\u2019hui seulement.",
+  "First Completion": "Premi\xE8re r\xE9ussite",
+  "Complete any session with every payload delivered.": "Terminez une partie en livrant toutes les charges.",
+  "Mechanic Mastery": "Ma\xEEtrise des m\xE9caniques",
+  "Complete every Learn mode lesson.": "Terminez toutes les le\xE7ons du mode Apprendre.",
+  "Hot Streak": "S\xE9rie gagnante",
+  "Win three sessions in a row.": "Gagnez trois parties d\u2019affil\xE9e.",
+  "Mastery Milestone": "Palier de ma\xEEtrise",
+  "Complete every Journey mastery stage.": "Terminez toutes les \xE9preuves de ma\xEEtrise du parcours.",
+  "Marathon Builder": "B\xE2tisseur marathonien",
+  "Spawn 500 bodies over your lifetime.": "Placez 500 corps au total."
+};
+var FR_CA = {
+  ...FR2,
+  "Achievements": "R\xE9alisations",
+  "Achievements: {list}": "R\xE9alisations : {list}",
+  "Achievement unlocked: {name}": "R\xE9alisation d\xE9bloqu\xE9e : {name}",
+  "{n} achievements, audio & accessibility": "{n} r\xE9alisations, audio et accessibilit\xE9",
+  "No entries yet. Be the first.": "Aucune entr\xE9e pour le moment. Soyez le premier.",
+  "Pause (Esc)": "Pause (\xC9chap)",
+  "Score": "Pointage",
+  "Score breakdown": "D\xE9tail du pointage",
+  "Score chase": "Course aux points",
+  "Learn, Practice, Challenge, Score chase": "Apprendre, Entra\xEEnement, D\xE9fi, Course aux points",
+  "Bounce House": "Jeu gonflable"
+};
+var PT2 = {
+  "sync.synced": "sincronizado",
+  "sync.saving": "salvando",
+  "sync.offline": "offline",
+  "phase.build": "constru\xE7\xE3o",
+  "phase.run": "execu\xE7\xE3o",
+  "phase.won": "vit\xF3ria",
+  "phase.lost": "derrota",
+  "action.spawn": "colocar",
+  "action.joint": "junta",
+  "action.delete": "remover",
+  "screen.title": "In\xEDcio",
+  "screen.modes": "Modos",
+  "screen.play": "C\xE2mara",
+  "screen.results": "Resultados",
+  "screen.progression": "Progresso",
+  "screen.help": "Como jogar",
+  "screen.scores": "Placares",
+  "reason.already-running": "a simula\xE7\xE3o j\xE1 est\xE1 rodando",
+  "reason.session-over": "a partida terminou",
+  "reason.material-unknown": "material desconhecido",
+  "reason.material-not-allowed": "esse material n\xE3o \xE9 permitido aqui",
+  "reason.budget-exhausted": "n\xE3o h\xE1 mais coloca\xE7\xF5es",
+  "reason.joint-unknown": "junta desconhecida",
+  "reason.joint-not-allowed": "essa junta n\xE3o \xE9 permitida aqui",
+  "reason.need-two-bodies": "s\xE3o necess\xE1rios dois corpos",
+  "reason.nothing-to-delete": "nada para remover",
+  "reason.nothing-to-undo": "nada para desfazer",
+  "reason.bad-bodies": "escolha dois corpos diferentes",
+  "reason.bad-position": "posi\xE7\xE3o inv\xE1lida",
+  "reason.not-found": "corpo n\xE3o encontrado",
+  "reason.out-of-bounds": "fora da c\xE2mara",
+  "reason.payload-locked": "cargas n\xE3o podem ser removidas",
+  "reason.too-far": "os corpos est\xE3o longe demais",
+  "reason.malformed-command": "comando malformado",
+  "reason.unknown-command": "comando desconhecido",
+  "Achievement unlocked: {name}": "Conquista desbloqueada: {name}",
+  "Achievements": "Conquistas",
+  "Achievements: {list}": "Conquistas: {list}",
+  "Actions": "A\xE7\xF5es",
+  "All difficulties": "Todas as dificuldades",
+  "All modes": "Todos os modos",
+  "Audio": "\xC1udio",
+  "Back": "Voltar",
+  "Best": "Recorde",
+  "Board error: {error}": "Erro no placar: {error}",
+  "Build phase: spawn balls and connect them with joints. Run phase: gravity takes over \u2014 deliver every payload (outlined ball) into a pulsing target ring. Glass shatters on hard impacts; hazard strips destroy anything.": "Fase de constru\xE7\xE3o: coloque bolas e ligue-as com juntas. Fase de execu\xE7\xE3o: a gravidade assume \u2014 leve cada carga (bola contornada) at\xE9 um anel-alvo pulsante. O vidro quebra em impactos fortes; as faixas de perigo destroem tudo.",
+  "Camera default": "C\xE2mera padr\xE3o",
+  "Camera re-framed": "C\xE2mera reenquadrada",
+  "Cannot connect: {reason}": "N\xE3o \xE9 poss\xEDvel ligar: {reason}",
+  "Cannot delete: {reason}": "N\xE3o \xE9 poss\xEDvel remover: {reason}",
+  "Cannot run: {reason}": "N\xE3o \xE9 poss\xEDvel executar: {reason}",
+  "Cannot spawn: {reason}": "N\xE3o \xE9 poss\xEDvel colocar: {reason}",
+  "Cast materials, rig joints, run the chamber, deliver every payload.": "Funda materiais, monte juntas, execute a c\xE2mara e entregue cada carga.",
+  "Chamber": "C\xE2mara",
+  "Chamber actions": "A\xE7\xF5es da c\xE2mara",
+  "Choose a mode": "Escolha um modo",
+  "Controls": "Controles",
+  "Cursor down": "Cursor para baixo",
+  "Cursor left": "Cursor para a esquerda",
+  "Cursor right": "Cursor para a direita",
+  "Cursor up": "Cursor para cima",
+  "Cursor {x}, {y}": "Cursor {x}, {y}",
+  "Daily": "Di\xE1rio",
+  "Daily already attempted today \u2014 playing unranked practice run": "Desafio di\xE1rio j\xE1 jogado hoje \u2014 partida de treino sem ranking",
+  "Daily challenge": "Desafio di\xE1rio",
+  "Daily Cast {date}": "Fundi\xE7\xE3o di\xE1ria {date}",
+  "Day": "Dia",
+  "Delete selected (Del)": "Remover sele\xE7\xE3o (Del)",
+  "Delivered: {done} / {total}": "Entregues: {done} / {total}",
+  "Delivery complete": "Entrega conclu\xEDda",
+  "Density {d}, bounce {b}": "Densidade {d}, quique {b}",
+  "Density {d}, bounce {b}, shatters above impact {s}": "Densidade {d}, quique {b}, quebra com impacto acima de {s}",
+  "Difficulty filter": "Filtro de dificuldade",
+  "Difficulty {n}": "Dificuldade {n}",
+  "Display": "Tela",
+  "Done": "Conclu\xEDdo",
+  "Expected duration": "Dura\xE7\xE3o prevista",
+  "First body selected; pick a second body": "Primeiro corpo selecionado; escolha um segundo",
+  "Full chamber": "C\xE2mara inteira",
+  "Global (Journey)": "Global (Jornada)",
+  "Goal": "Objetivo",
+  "Help": "Ajuda",
+  "Hold (hold J)": "Segurar (segure J)",
+  "How to play": "Como jogar",
+  "Illegal action: {reason}": "A\xE7\xE3o proibida: {reason}",
+  "Industrial physics sandbox": "Sandbox de f\xEDsica industrial",
+  "Joint mode": "Modo junta",
+  "Joint mode (hold), then pick two bodies": "Modo junta (segurar) e depois escolha dois corpos",
+  "Joint mode (toggle), then pick two bodies": "Modo junta (alternar) e depois escolha dois corpos",
+  "Joint mode behavior": "Comportamento do modo junta",
+  "Joint mode off": "Modo junta desligado",
+  "Joints": "Juntas",
+  "Journey": "Jornada",
+  "Journey ({summary})": "Jornada ({summary})",
+  "Leaderboards": "Placares",
+  "Learn, Practice, Challenge, Score chase": "Aprender, Treino, Desafio, Ca\xE7a aos pontos",
+  "Leave chamber": "Sair da c\xE2mara",
+  "Lesson complete! Finish the delivery or move on.": "Li\xE7\xE3o conclu\xEDda! Termine a entrega ou siga em frente.",
+  "Lesson complete: {name}": "Li\xE7\xE3o conclu\xEDda: {name}",
+  "Lesson {n}": "Li\xE7\xE3o {n}",
+  "Lesson {n}/{total}": "Li\xE7\xE3o {n}/{total}",
+  "Lessons": "Li\xE7\xF5es",
+  "Lifetime spawns: {spawns} \xB7 Wins: {wins} \xB7 Current streak: {streak}": "Coloca\xE7\xF5es no total: {spawns} \xB7 Vit\xF3rias: {wins} \xB7 Sequ\xEAncia atual: {streak}",
+  "Local best: {n}": "Recorde local: {n}",
+  "Local bests (Journey)": "Recordes locais (Jornada)",
+  "Local guest profile \u2014 progress stays in this browser.": "Perfil de convidado local \u2014 o progresso fica neste navegador.",
+  "Lost with {n} points": "Derrota com {n} pontos",
+  "Materials": "Materiais",
+  "Max length {n}, rigid distance lock": "Comprimento m\xE1x. {n}, dist\xE2ncia fixa r\xEDgida",
+  "Max length {n}, stiffness {s}": "Comprimento m\xE1x. {n}, rigidez {s}",
+  "Modes": "Modos",
+  "Move spawn cursor": "Mover o cursor de coloca\xE7\xE3o",
+  "Move the spawn cursor": "Mover o cursor de coloca\xE7\xE3o",
+  "Name": "Nome",
+  "New local best! (previous {n})": "Novo recorde local! (anterior {n})",
+  "Next chamber": "Pr\xF3xima c\xE2mara",
+  "Next daily in {h}h {m}m": "Pr\xF3ximo desafio em {h} h {m} min",
+  "Next lesson": "Pr\xF3xima li\xE7\xE3o",
+  "No entries yet. Be the first.": "Ainda n\xE3o h\xE1 registros. Seja o primeiro.",
+  "No local daily runs yet.": "Ainda n\xE3o h\xE1 desafios di\xE1rios locais.",
+  "No local journey bests yet.": "Ainda n\xE3o h\xE1 recordes locais da jornada.",
+  "No unlocked levels at this difficulty yet.": "Ainda n\xE3o h\xE1 n\xEDveis desbloqueados nesta dificuldade.",
+  "No \u2014 unranked": "N\xE3o \u2014 sem ranking",
+  "Nothing to undo": "Nada para desfazer",
+  "One shared chamber per day": "Uma c\xE2mara compartilhada por dia",
+  "Other": "Outros",
+  "Pause (Esc)": "Pausar (Esc)",
+  "Pause / cancel joint mode": "Pausar / cancelar modo junta",
+  "Paused": "Pausado",
+  "Payload delivered": "Carga entregue",
+  "Phase: {phase}": "Fase: {phase}",
+  "Phase: {phase} (paused)": "Fase: {phase} (pausado)",
+  "Play": "Jogar",
+  "Player": "Jogador",
+  "Playing as {name} \u2014 progress syncs to your account ({status}).": "Jogando como {name} \u2014 o progresso \xE9 sincronizado com sua conta ({status}).",
+  "Profile": "Perfil",
+  "Profile & settings": "Perfil e configura\xE7\xF5es",
+  "Progression": "Progresso",
+  "Ranked": "Ranqueado",
+  "Ranked run recorded on this device.": "Partida ranqueada registrada neste dispositivo.",
+  "Re-frame camera": "Reenquadrar c\xE2mera",
+  "Reason: {reason}": "Motivo: {reason}",
+  "Remove selected body": "Remover o corpo selecionado",
+  "Replay tutorial": "Rever tutorial",
+  "Reset to build phase": "De volta \xE0 fase de constru\xE7\xE3o",
+  "Restart chamber": "Reiniciar c\xE2mara",
+  "Resume": "Continuar",
+  "Retry": "Tentar de novo",
+  "Rules": "Regras",
+  "Run (R)": "Executar (R)",
+  "Run failed": "Execu\xE7\xE3o falhou",
+  "Run the simulation": "Executar a simula\xE7\xE3o",
+  "Running\u2026": "Executando\u2026",
+  "Score": "Pontua\xE7\xE3o",
+  "Score breakdown": "Detalhes da pontua\xE7\xE3o",
+  "Select material 1-4": "Escolher material 1\u20134",
+  "Select {material}": "Escolher {material}",
+  "Selected {body}": "{body} selecionado",
+  "Selected {body} payload": "Carga de {body} selecionada",
+  "Settings": "Configura\xE7\xF5es",
+  "Simulation running": "Simula\xE7\xE3o em execu\xE7\xE3o",
+  "Spawn at cursor (Enter)": "Colocar no cursor (Enter)",
+  "Spawn selected material at cursor": "Colocar o material escolhido no cursor",
+  "Spawns left: {left} / {total}": "Coloca\xE7\xF5es restantes: {left} / {total}",
+  "StarHermit leaderboard": "Placar do StarHermit",
+  "Test chamber view. Use the action tray or keyboard for all actions.": "Vis\xE3o da c\xE2mara de testes. Use a barra de a\xE7\xF5es ou o teclado para todas as a\xE7\xF5es.",
+  "Tight frame": "Enquadramento fechado",
+  "Time left: {time}": "Tempo restante: {time}",
+  "Today's cast: {date}": "Fundi\xE7\xE3o de hoje: {date}",
+  "Toggle (press J)": "Alternar (aperte J)",
+  "Total": "Total",
+  "Undid {action}": "Desfeito: {action}",
+  "Undo (U)": "Desfazer (U)",
+  "Undo last build action": "Desfazer a \xFAltima a\xE7\xE3o de constru\xE7\xE3o",
+  "Unranked session \u2014 no leaderboard submission.": "Partida sem ranking \u2014 nada \xE9 enviado ao placar.",
+  "Won with {n} points": "Vit\xF3ria com {n} pontos",
+  "Yes \u2014 verified replays": "Sim \u2014 replays verificados",
+  "body": "corpo",
+  "local": "local",
+  "online": "online",
+  "unknown": "desconhecido",
+  "{done} / {total} chambers": "{done} / {total} c\xE2maras",
+  "{joint} mode: select two bodies": "Modo {joint}: escolha dois corpos",
+  "{level} \u2014 deliver 1 payload": "{level} \u2014 entregue 1 carga",
+  "{level} \u2014 deliver {n} payloads": "{level} \u2014 entregue {n} cargas",
+  "{mode} setup": "Configurar: {mode}",
+  "{n} achievements, audio & accessibility": "{n} conquistas, \xE1udio e acessibilidade",
+  "Time bonus": "B\xF4nus de tempo",
+  "Material efficiency": "Efici\xEAncia de material",
+  "Spawn efficiency": "Efici\xEAncia de coloca\xE7\xE3o",
+  "Invalid-action penalty": "Penalidade por a\xE7\xF5es inv\xE1lidas",
+  "All payloads delivered": "Todas as cargas entregues",
+  "Time expired": "Tempo esgotado",
+  "Payload destroyed": "Carga destru\xEDda",
+  "Learn": "Aprender",
+  "Six interactive lessons; one rule at a time.": "Seis li\xE7\xF5es interativas; uma regra por vez.",
+  "44 authored chambers with rising complexity.": "44 c\xE2maras criadas \xE0 m\xE3o com complexidade crescente.",
+  "One shared chamber per UTC day, one ranked attempt.": "Uma c\xE2mara compartilhada por dia UTC, uma tentativa ranqueada.",
+  "Practice": "Treino",
+  "Any unlocked level, free restart and undo, unranked.": "Qualquer n\xEDvel desbloqueado, reiniciar e desfazer \xE0 vontade, sem ranking.",
+  "Challenge": "Desafio",
+  "Four constrained chambers: limits, clocks, altered gravity.": "Quatro c\xE2maras com restri\xE7\xF5es: limites, rel\xF3gios, gravidade alterada.",
+  "Score chase": "Ca\xE7a aos pontos",
+  "Global and daily leaderboards with verified replays.": "Placares globais e di\xE1rios com replays verificados.",
+  "2-4 min each": "2\u20134 min cada",
+  "1-3 min per level": "1\u20133 min por n\xEDvel",
+  "~2 min": "~2 min",
+  "open-ended": "sem limite",
+  "2-5 min": "2\u20135 min",
+  "-": "\u2013",
+  "Music": "M\xFAsica",
+  "Effects": "Efeitos",
+  "Ambience": "Ambiente",
+  "Voice": "Voz",
+  "Music volume": "Volume da m\xFAsica",
+  "Effects volume": "Volume dos efeitos",
+  "Ambience volume": "Volume do ambiente",
+  "Voice volume": "Volume da voz",
+  "Mute all": "Silenciar tudo",
+  "Reduced motion": "Movimento reduzido",
+  "High contrast": "Alto contraste",
+  "Larger text": "Texto maior",
+  "Left-handed action tray": "Barra de a\xE7\xF5es para canhotos",
+  "Haptics (vibration)": "Resposta t\xE1til (vibra\xE7\xE3o)",
+  "Share anonymous usage events": "Compartilhar eventos de uso an\xF4nimos",
+  "Steel": "A\xE7o",
+  "Wood": "Madeira",
+  "Glass": "Vidro",
+  "Rubber": "Borracha",
+  "Pin Joint": "Junta de pino",
+  "Spring": "Mola",
+  "WebGL is unavailable in this browser, so the 3D chamber view is disabled. All menus and the rules remain usable; enable hardware acceleration or try another browser for the full experience.": "O WebGL n\xE3o est\xE1 dispon\xEDvel neste navegador, ent\xE3o a vis\xE3o 3D da c\xE2mara est\xE1 desativada. Todos os menus e as regras continuam dispon\xEDveis; ative a acelera\xE7\xE3o de hardware ou tente outro navegador para a experi\xEAncia completa.",
+  "First Casting": "Primeira fundi\xE7\xE3o",
+  "Drop a wood ball anywhere inside the chamber.": "Solte uma bola de madeira em qualquer lugar da c\xE2mara.",
+  "Spawn a wood ball above the floor.": "Coloque uma bola de madeira acima do ch\xE3o.",
+  "Heavy Stock": "Material pesado",
+  "Steel is dense and barely bounces. Spawn one.": "O a\xE7o \xE9 denso e quase n\xE3o quica. Coloque uma bola.",
+  "Spawn a steel ball.": "Coloque uma bola de a\xE7o.",
+  "Pin and Link": "Pino e elo",
+  "Pins hold two balls at a fixed distance. Link two balls.": "Pinos mant\xEAm duas bolas a uma dist\xE2ncia fixa. Ligue duas bolas.",
+  "Spawn a wood ball near the payload.": "Coloque uma bola de madeira perto da carga.",
+  "Connect two balls with a pin joint.": "Ligue duas bolas com uma junta de pino.",
+  "Second Thoughts": "Pensando melhor",
+  "Remove a ball you no longer need.": "Remova uma bola de que voc\xEA n\xE3o precisa mais.",
+  "Spawn a rubber ball.": "Coloque uma bola de borracha.",
+  "Delete a ball you spawned.": "Remova uma bola que voc\xEA colocou.",
+  "Let It Run": "Deixe rolar",
+  "Start the simulation and watch the payload fall.": "Inicie a simula\xE7\xE3o e veja a carga cair.",
+  "Issue the run command.": "D\xEA o comando de executar.",
+  "Full Cycle": "Ciclo completo",
+  "Build, connect, run: the complete foundry loop.": "Construir, ligar, executar: o ciclo completo da fundi\xE7\xE3o.",
+  "Spawn any ball.": "Coloque qualquer bola.",
+  "Join two balls with a spring.": "Ligue duas bolas com uma mola.",
+  "Run the simulation.": "Execute a simula\xE7\xE3o.",
+  "First Drop": "Primeira queda",
+  "Run it. Gravity does the work.": "Execute. A gravidade faz o trabalho.",
+  "Off the Mark": "Fora do alvo",
+  "The ramp nudges the payload toward the zone.": "A rampa empurra a carga em dire\xE7\xE3o \xE0 zona.",
+  "Steel Nudge": "Empurr\xE3o de a\xE7o",
+  "A steel ball can shove the payload sideways.": "Uma bola de a\xE7o pode empurrar a carga para o lado.",
+  "Bounce House": "Pula-pula",
+  "Rubber keeps energy. Use the ramps.": "A borracha conserva energia. Use as rampas.",
+  "Brittle Cargo": "Carga fr\xE1gil",
+  "Glass shatters above impact speed 6. Cushion the fall.": "O vidro quebra com impacto acima da velocidade 6. Amorte\xE7a a queda.",
+  "Two Moves": "Dois lances",
+  "Exactly two spawns. Plan them.": "Exatamente duas coloca\xE7\xF5es. Planeje-as.",
+  "High Shelf": "Prateleira alta",
+  "Ramps chain the payload across the chamber.": "As rampas levam a carga de um lado ao outro da c\xE2mara.",
+  "Mastery: The Crucible": "Maestria: O cadinho",
+  "Everything so far, one fragile payload.": "Tudo at\xE9 aqui, uma carga fr\xE1gil.",
+  "First Pin": "Primeiro pino",
+  "Pin a counterweight to the payload.": "Prenda um contrapeso \xE0 carga.",
+  "First Spring": "Primeira mola",
+  "A spring tugs without a rigid lock.": "Uma mola puxa sem travamento r\xEDgido.",
+  "Anchor Line": "Linha de \xE2ncora",
+  "Steel anchors steer bouncy cargo.": "\xC2ncoras de a\xE7o guiam a carga saltitante.",
+  "Twin Links": "Elos g\xEAmeos",
+  "Two pins shape a falling train.": "Dois pinos formam um trem em queda.",
+  "Elastic Catch": "Pegada el\xE1stica",
+  "Springs soften what glass cannot take.": "As molas amortecem o que o vidro n\xE3o aguenta.",
+  "Mixed Rigging": "Montagem mista",
+  "Pins and springs in one rig.": "Pinos e molas em uma s\xF3 montagem.",
+  "Swing Set": "Balan\xE7o",
+  "A pinned pendulum carries momentum sideways.": "Um p\xEAndulo preso leva o impulso para o lado.",
+  "Mastery: Rigging Exam": "Maestria: Exame de montagem",
+  "Fragile cargo, long traverse, full toolkit.": "Carga fr\xE1gil, travessia longa, todas as ferramentas.",
+  "Hot Floor": "Ch\xE3o quente",
+  "The left strip melts anything that lands in it.": "A faixa da esquerda derrete tudo o que cai nela.",
+  "Narrow Slot": "Fenda estreita",
+  "One safe landing lane between the burn lines.": "Uma pista de pouso segura entre as linhas de fogo.",
+  "Over the Fire": "Sobre o fogo",
+  "Arc the payload across the hazard.": "Lance a carga em arco por cima do perigo.",
+  "Glass Over Coals": "Vidro sobre brasas",
+  "Fragile cargo above a burning floor.": "Carga fr\xE1gil sobre um ch\xE3o em chamas.",
+  "Side Burn": "Fogo lateral",
+  "A floating burn strip blocks the direct line.": "Uma faixa de fogo flutuante bloqueia o caminho direto.",
+  "Double Jeopardy": "Perigo duplo",
+  "Two hazard zones, one long descent.": "Duas zonas de perigo, uma longa descida.",
+  "The Gauntlet": "A prova\xE7\xE3o",
+  "Thread fragile cargo through three burn zones.": "Passe a carga fr\xE1gil por tr\xEAs zonas de fogo.",
+  "Mastery: Furnace Walk": "Maestria: Caminhada na fornalha",
+  "Everything you know, under fire.": "Tudo o que voc\xEA sabe, sob fogo.",
+  "Two Crates": "Duas caixas",
+  "Both payloads must reach a zone.": "As duas cargas precisam chegar a uma zona.",
+  "Cross Traffic": "Tr\xE1fego cruzado",
+  "The payloads swap sides.": "As cargas trocam de lado.",
+  "Shared Zone": "Zona compartilhada",
+  "One wide zone accepts both.": "Uma zona larga aceita as duas.",
+  "Escort Duty": "Escolta",
+  "A fragile and a sturdy payload, one destination.": "Uma carga fr\xE1gil e uma resistente, um s\xF3 destino.",
+  "Three Deep": "Tr\xEAs em fila",
+  "Three payloads, three zones.": "Tr\xEAs cargas, tr\xEAs zonas.",
+  "Chain Delivery": "Entrega em cadeia",
+  "Linked cargo over the burn line.": "Carga ligada sobre a linha de fogo.",
+  "Split Decision": "Decis\xE3o dividida",
+  "Opposite corners, opposite materials.": "Cantos opostos, materiais opostos.",
+  "Mastery: Freight Master": "Maestria: Mestre do frete",
+  "Three payloads, two burn strips, full rig.": "Tr\xEAs cargas, duas faixas de fogo, montagem completa.",
+  "Short Fuse": "Pavio curto",
+  "The run clock is tight now.": "Agora o rel\xF3gio est\xE1 apertado.",
+  "Quick Rig": "Montagem r\xE1pida",
+  "Rig fast, run faster.": "Monte r\xE1pido, execute mais r\xE1pido.",
+  "Burning Clock": "Rel\xF3gio em chamas",
+  "Hazards and a short clock.": "Perigos e pouco tempo.",
+  "Twin Sprint": "Corrida dupla",
+  "Two payloads before the clock dies.": "Duas cargas antes que o tempo acabe.",
+  "Precision Window": "Janela de precis\xE3o",
+  "A small zone, a soft landing, little time.": "Uma zona pequena, um pouso suave, pouco tempo.",
+  "Assembly Line": "Linha de montagem",
+  "Converge both lines on one zone, quickly.": "Junte as duas linhas em uma zona, r\xE1pido.",
+  "Final Approach": "Aproxima\xE7\xE3o final",
+  "The hardest traverse, on a clock.": "A travessia mais dif\xEDcil, contra o rel\xF3gio.",
+  "Mastery: Shift Supervisor": "Maestria: Supervisor de turno",
+  "Two cargoes, two clocks' worth of trouble.": "Duas cargas, o dobro de press\xE3o do rel\xF3gio.",
+  "Wood Only": "S\xF3 madeira",
+  "No steel, no rubber. Wood and pins.": "Sem a\xE7o, sem borracha. Madeira e pinos.",
+  "Rubber Riot": "Farra de borracha",
+  "Everything bounces. Control it anyway.": "Tudo quica. Controle mesmo assim.",
+  "Skeleton Crew": "Equipe m\xEDnima",
+  "Two steel balls. Nothing else.": "Duas bolas de a\xE7o. Nada mais.",
+  "Mastery: Foundry Master": "Maestria: Mestre da fundi\xE7\xE3o",
+  "The final exam of the foundry.": "O exame final da fundi\xE7\xE3o.",
+  "One Ball Only": "Uma bola s\xF3",
+  "One steel ball. Make it count.": "Uma bola de a\xE7o. Fa\xE7a valer.",
+  "Speedrun Bay": "Ba\xEDa contra o rel\xF3gio",
+  "Eight seconds of simulation. No more.": "Oito segundos de simula\xE7\xE3o. Nada mais.",
+  "No Rigging": "Sem juntas",
+  "Joints are forbidden in this chamber.": "Juntas s\xE3o proibidas nesta c\xE2mara.",
+  "Heavy Water": "\xC1gua pesada",
+  "Gravity runs hot here: 16 u/s\xB2.": "Aqui a gravidade \xE9 forte: 16 u/s\xB2.",
+  "One shared chamber for everyone, today only.": "Uma c\xE2mara compartilhada para todos, s\xF3 hoje.",
+  "First Completion": "Primeira conclus\xE3o",
+  "Complete any session with every payload delivered.": "Conclua uma partida com todas as cargas entregues.",
+  "Mechanic Mastery": "Dom\xEDnio das mec\xE2nicas",
+  "Complete every Learn mode lesson.": "Conclua todas as li\xE7\xF5es do modo Aprender.",
+  "Hot Streak": "Sequ\xEAncia quente",
+  "Win three sessions in a row.": "Ven\xE7a tr\xEAs partidas seguidas.",
+  "Mastery Milestone": "Marco de maestria",
+  "Complete every Journey mastery stage.": "Conclua todas as provas de maestria da jornada.",
+  "Marathon Builder": "Construtor maratonista",
+  "Spawn 500 bodies over your lifetime.": "Coloque 500 corpos no total."
+};
+var IT2 = {
+  "sync.synced": "sincronizzato",
+  "sync.saving": "salvataggio",
+  "sync.offline": "offline",
+  "phase.build": "costruzione",
+  "phase.run": "simulazione",
+  "phase.won": "vinta",
+  "phase.lost": "persa",
+  "action.spawn": "posizionamento",
+  "action.joint": "giunto",
+  "action.delete": "rimozione",
+  "screen.title": "Inizio",
+  "screen.modes": "Modalit\xE0",
+  "screen.play": "Camera",
+  "screen.results": "Risultati",
+  "screen.progression": "Progressi",
+  "screen.help": "Come si gioca",
+  "screen.scores": "Classifiche",
+  "reason.already-running": "la simulazione \xE8 gi\xE0 in corso",
+  "reason.session-over": "la partita \xE8 finita",
+  "reason.material-unknown": "materiale sconosciuto",
+  "reason.material-not-allowed": "questo materiale non \xE8 consentito qui",
+  "reason.budget-exhausted": "posizionamenti esauriti",
+  "reason.joint-unknown": "giunto sconosciuto",
+  "reason.joint-not-allowed": "questo giunto non \xE8 consentito qui",
+  "reason.need-two-bodies": "servono due corpi",
+  "reason.nothing-to-delete": "niente da rimuovere",
+  "reason.nothing-to-undo": "niente da annullare",
+  "reason.bad-bodies": "scegli due corpi diversi",
+  "reason.bad-position": "posizione non valida",
+  "reason.not-found": "corpo non trovato",
+  "reason.out-of-bounds": "fuori dalla camera",
+  "reason.payload-locked": "i carichi non si possono rimuovere",
+  "reason.too-far": "i corpi sono troppo lontani",
+  "reason.malformed-command": "comando non valido",
+  "reason.unknown-command": "comando sconosciuto",
+  "Achievement unlocked: {name}": "Obiettivo sbloccato: {name}",
+  "Achievements": "Obiettivi",
+  "Achievements: {list}": "Obiettivi: {list}",
+  "Actions": "Azioni",
+  "All difficulties": "Tutte le difficolt\xE0",
+  "All modes": "Tutte le modalit\xE0",
+  "Audio": "Audio",
+  "Back": "Indietro",
+  "Best": "Record",
+  "Board error: {error}": "Errore della classifica: {error}",
+  "Build phase: spawn balls and connect them with joints. Run phase: gravity takes over \u2014 deliver every payload (outlined ball) into a pulsing target ring. Glass shatters on hard impacts; hazard strips destroy anything.": "Fase di costruzione: posiziona sfere e collegale con giunti. Fase di simulazione: la gravit\xE0 prende il comando \u2014 porta ogni carico (sfera contornata) in un anello bersaglio pulsante. Il vetro si rompe negli urti violenti; le strisce di pericolo distruggono tutto.",
+  "Camera default": "Inquadratura predefinita",
+  "Camera re-framed": "Inquadratura ripristinata",
+  "Cannot connect: {reason}": "Impossibile collegare: {reason}",
+  "Cannot delete: {reason}": "Impossibile rimuovere: {reason}",
+  "Cannot run: {reason}": "Impossibile avviare: {reason}",
+  "Cannot spawn: {reason}": "Impossibile posizionare: {reason}",
+  "Cast materials, rig joints, run the chamber, deliver every payload.": "Fondi materiali, monta giunti, avvia la camera e consegna ogni carico.",
+  "Chamber": "Camera",
+  "Chamber actions": "Azioni della camera",
+  "Choose a mode": "Scegli una modalit\xE0",
+  "Controls": "Comandi",
+  "Cursor down": "Cursore gi\xF9",
+  "Cursor left": "Cursore a sinistra",
+  "Cursor right": "Cursore a destra",
+  "Cursor up": "Cursore su",
+  "Cursor {x}, {y}": "Cursore {x}, {y}",
+  "Daily": "Giornaliera",
+  "Daily already attempted today \u2014 playing unranked practice run": "Sfida giornaliera gi\xE0 tentata oggi \u2014 partita di allenamento non classificata",
+  "Daily challenge": "Sfida giornaliera",
+  "Daily Cast {date}": "Colata del giorno {date}",
+  "Day": "Giorno",
+  "Delete selected (Del)": "Rimuovi selezione (Canc)",
+  "Delivered: {done} / {total}": "Consegnati: {done} / {total}",
+  "Delivery complete": "Consegna completata",
+  "Density {d}, bounce {b}": "Densit\xE0 {d}, rimbalzo {b}",
+  "Density {d}, bounce {b}, shatters above impact {s}": "Densit\xE0 {d}, rimbalzo {b}, si rompe oltre un urto di {s}",
+  "Difficulty filter": "Filtro difficolt\xE0",
+  "Difficulty {n}": "Difficolt\xE0 {n}",
+  "Display": "Schermo",
+  "Done": "Fatto",
+  "Expected duration": "Durata prevista",
+  "First body selected; pick a second body": "Primo corpo selezionato; scegline un secondo",
+  "Full chamber": "Camera intera",
+  "Global (Journey)": "Globale (Percorso)",
+  "Goal": "Obiettivo",
+  "Help": "Aiuto",
+  "Hold (hold J)": "Tieni premuto (tieni J)",
+  "How to play": "Come si gioca",
+  "Illegal action: {reason}": "Azione non consentita: {reason}",
+  "Industrial physics sandbox": "Sandbox di fisica industriale",
+  "Joint mode": "Modalit\xE0 giunto",
+  "Joint mode (hold), then pick two bodies": "Modalit\xE0 giunto (tieni premuto), poi scegli due corpi",
+  "Joint mode (toggle), then pick two bodies": "Modalit\xE0 giunto (attiva/disattiva), poi scegli due corpi",
+  "Joint mode behavior": "Comportamento della modalit\xE0 giunto",
+  "Joint mode off": "Modalit\xE0 giunto disattivata",
+  "Joints": "Giunti",
+  "Journey": "Percorso",
+  "Journey ({summary})": "Percorso ({summary})",
+  "Leaderboards": "Classifiche",
+  "Learn, Practice, Challenge, Score chase": "Impara, Allenamento, Sfida, Caccia ai punti",
+  "Leave chamber": "Esci dalla camera",
+  "Lesson complete! Finish the delivery or move on.": "Lezione completata! Termina la consegna o vai avanti.",
+  "Lesson complete: {name}": "Lezione completata: {name}",
+  "Lesson {n}": "Lezione {n}",
+  "Lesson {n}/{total}": "Lezione {n}/{total}",
+  "Lessons": "Lezioni",
+  "Lifetime spawns: {spawns} \xB7 Wins: {wins} \xB7 Current streak: {streak}": "Posizionamenti totali: {spawns} \xB7 Vittorie: {wins} \xB7 Serie attuale: {streak}",
+  "Local best: {n}": "Record locale: {n}",
+  "Local bests (Journey)": "Record locali (Percorso)",
+  "Local guest profile \u2014 progress stays in this browser.": "Profilo ospite locale \u2014 i progressi restano in questo browser.",
+  "Lost with {n} points": "Sconfitta con {n} punti",
+  "Materials": "Materiali",
+  "Max length {n}, rigid distance lock": "Lunghezza max {n}, distanza fissa rigida",
+  "Max length {n}, stiffness {s}": "Lunghezza max {n}, rigidit\xE0 {s}",
+  "Modes": "Modalit\xE0",
+  "Move spawn cursor": "Sposta il cursore di posizionamento",
+  "Move the spawn cursor": "Sposta il cursore di posizionamento",
+  "Name": "Nome",
+  "New local best! (previous {n})": "Nuovo record locale! (precedente {n})",
+  "Next chamber": "Camera successiva",
+  "Next daily in {h}h {m}m": "Prossima sfida tra {h} h {m} min",
+  "Next lesson": "Lezione successiva",
+  "No entries yet. Be the first.": "Ancora nessun risultato. Sii il primo.",
+  "No local daily runs yet.": "Ancora nessuna sfida giornaliera locale.",
+  "No local journey bests yet.": "Ancora nessun record locale del percorso.",
+  "No unlocked levels at this difficulty yet.": "Ancora nessun livello sbloccato a questa difficolt\xE0.",
+  "No \u2014 unranked": "No \u2014 non classificata",
+  "Nothing to undo": "Niente da annullare",
+  "One shared chamber per day": "Una camera condivisa al giorno",
+  "Other": "Altro",
+  "Pause (Esc)": "Pausa (Esc)",
+  "Pause / cancel joint mode": "Pausa / annulla modalit\xE0 giunto",
+  "Paused": "In pausa",
+  "Payload delivered": "Carico consegnato",
+  "Phase: {phase}": "Fase: {phase}",
+  "Phase: {phase} (paused)": "Fase: {phase} (in pausa)",
+  "Play": "Gioca",
+  "Player": "Giocatore",
+  "Playing as {name} \u2014 progress syncs to your account ({status}).": "Giochi come {name} \u2014 i progressi si sincronizzano con il tuo account ({status}).",
+  "Profile": "Profilo",
+  "Profile & settings": "Profilo e impostazioni",
+  "Progression": "Progressi",
+  "Ranked": "Classificata",
+  "Ranked run recorded on this device.": "Partita classificata registrata su questo dispositivo.",
+  "Re-frame camera": "Ripristina inquadratura",
+  "Reason: {reason}": "Motivo: {reason}",
+  "Remove selected body": "Rimuovi il corpo selezionato",
+  "Replay tutorial": "Ripeti il tutorial",
+  "Reset to build phase": "Ritorno alla fase di costruzione",
+  "Restart chamber": "Ricomincia la camera",
+  "Resume": "Riprendi",
+  "Retry": "Riprova",
+  "Rules": "Regole",
+  "Run (R)": "Avvia (R)",
+  "Run failed": "Simulazione fallita",
+  "Run the simulation": "Avvia la simulazione",
+  "Running\u2026": "In corso\u2026",
+  "Score": "Punteggio",
+  "Score breakdown": "Dettaglio del punteggio",
+  "Select material 1-4": "Scegli materiale 1\u20134",
+  "Select {material}": "Scegli {material}",
+  "Selected {body}": "Selezionato: {body}",
+  "Selected {body} payload": "Selezionato: carico ({body})",
+  "Settings": "Impostazioni",
+  "Simulation running": "Simulazione in corso",
+  "Spawn at cursor (Enter)": "Posiziona sul cursore (Invio)",
+  "Spawn selected material at cursor": "Posiziona il materiale scelto sul cursore",
+  "Spawns left: {left} / {total}": "Posizionamenti rimasti: {left} / {total}",
+  "StarHermit leaderboard": "Classifica StarHermit",
+  "Test chamber view. Use the action tray or keyboard for all actions.": "Vista della camera di prova. Usa la barra delle azioni o la tastiera per tutte le azioni.",
+  "Tight frame": "Inquadratura stretta",
+  "Time left: {time}": "Tempo rimasto: {time}",
+  "Today's cast: {date}": "Colata di oggi: {date}",
+  "Toggle (press J)": "Attiva/disattiva (premi J)",
+  "Total": "Totale",
+  "Undid {action}": "Annullato: {action}",
+  "Undo (U)": "Annulla (U)",
+  "Undo last build action": "Annulla l\u2019ultima azione di costruzione",
+  "Unranked session \u2014 no leaderboard submission.": "Partita non classificata \u2014 nessun invio in classifica.",
+  "Won with {n} points": "Vittoria con {n} punti",
+  "Yes \u2014 verified replays": "S\xEC \u2014 replay verificati",
+  "body": "corpo",
+  "local": "locale",
+  "online": "online",
+  "unknown": "sconosciuto",
+  "{done} / {total} chambers": "{done} / {total} camere",
+  "{joint} mode: select two bodies": "Modalit\xE0 {joint}: scegli due corpi",
+  "{level} \u2014 deliver 1 payload": "{level} \u2014 consegna 1 carico",
+  "{level} \u2014 deliver {n} payloads": "{level} \u2014 consegna {n} carichi",
+  "{mode} setup": "Configura: {mode}",
+  "{n} achievements, audio & accessibility": "{n} obiettivi, audio e accessibilit\xE0",
+  "Time bonus": "Bonus tempo",
+  "Material efficiency": "Efficienza dei materiali",
+  "Spawn efficiency": "Efficienza dei posizionamenti",
+  "Invalid-action penalty": "Penalit\xE0 per azioni non valide",
+  "All payloads delivered": "Tutti i carichi consegnati",
+  "Time expired": "Tempo scaduto",
+  "Payload destroyed": "Carico distrutto",
+  "Learn": "Impara",
+  "Six interactive lessons; one rule at a time.": "Sei lezioni interattive; una regola alla volta.",
+  "44 authored chambers with rising complexity.": "44 camere progettate a mano, sempre pi\xF9 complesse.",
+  "One shared chamber per UTC day, one ranked attempt.": "Una camera condivisa per giorno UTC, un tentativo classificato.",
+  "Practice": "Allenamento",
+  "Any unlocked level, free restart and undo, unranked.": "Qualsiasi livello sbloccato, ricomincia e annulla liberamente, non classificata.",
+  "Challenge": "Sfida",
+  "Four constrained chambers: limits, clocks, altered gravity.": "Quattro camere con vincoli: limiti, cronometri, gravit\xE0 alterata.",
+  "Score chase": "Caccia ai punti",
+  "Global and daily leaderboards with verified replays.": "Classifiche globali e giornaliere con replay verificati.",
+  "2-4 min each": "2\u20134 min ciascuna",
+  "1-3 min per level": "1\u20133 min per livello",
+  "~2 min": "~2 min",
+  "open-ended": "senza limiti",
+  "2-5 min": "2\u20135 min",
+  "-": "\u2013",
+  "Music": "Musica",
+  "Effects": "Effetti",
+  "Ambience": "Ambiente",
+  "Voice": "Voce",
+  "Music volume": "Volume della musica",
+  "Effects volume": "Volume degli effetti",
+  "Ambience volume": "Volume dell\u2019ambiente",
+  "Voice volume": "Volume della voce",
+  "Mute all": "Silenzia tutto",
+  "Reduced motion": "Movimento ridotto",
+  "High contrast": "Contrasto elevato",
+  "Larger text": "Testo pi\xF9 grande",
+  "Left-handed action tray": "Barra delle azioni per mancini",
+  "Haptics (vibration)": "Feedback aptico (vibrazione)",
+  "Share anonymous usage events": "Condividi eventi d\u2019uso anonimi",
+  "Steel": "Acciaio",
+  "Wood": "Legno",
+  "Glass": "Vetro",
+  "Rubber": "Gomma",
+  "Pin Joint": "Giunto a perno",
+  "Spring": "Molla",
+  "WebGL is unavailable in this browser, so the 3D chamber view is disabled. All menus and the rules remain usable; enable hardware acceleration or try another browser for the full experience.": "WebGL non \xE8 disponibile in questo browser, quindi la vista 3D della camera \xE8 disattivata. Tutti i menu e le regole restano utilizzabili; attiva l\u2019accelerazione hardware o prova un altro browser per l\u2019esperienza completa.",
+  "First Casting": "Prima colata",
+  "Drop a wood ball anywhere inside the chamber.": "Lascia cadere una sfera di legno in un punto qualsiasi della camera.",
+  "Spawn a wood ball above the floor.": "Posiziona una sfera di legno sopra il pavimento.",
+  "Heavy Stock": "Materiale pesante",
+  "Steel is dense and barely bounces. Spawn one.": "L\u2019acciaio \xE8 denso e rimbalza appena. Posizionane una sfera.",
+  "Spawn a steel ball.": "Posiziona una sfera d\u2019acciaio.",
+  "Pin and Link": "Perno e collegamento",
+  "Pins hold two balls at a fixed distance. Link two balls.": "I perni tengono due sfere a distanza fissa. Collega due sfere.",
+  "Spawn a wood ball near the payload.": "Posiziona una sfera di legno vicino al carico.",
+  "Connect two balls with a pin joint.": "Collega due sfere con un giunto a perno.",
+  "Second Thoughts": "Ripensamenti",
+  "Remove a ball you no longer need.": "Rimuovi una sfera che non ti serve pi\xF9.",
+  "Spawn a rubber ball.": "Posiziona una sfera di gomma.",
+  "Delete a ball you spawned.": "Rimuovi una sfera che hai posizionato.",
+  "Let It Run": "Lascia correre",
+  "Start the simulation and watch the payload fall.": "Avvia la simulazione e guarda cadere il carico.",
+  "Issue the run command.": "Dai il comando di avvio.",
+  "Full Cycle": "Ciclo completo",
+  "Build, connect, run: the complete foundry loop.": "Costruisci, collega, avvia: il ciclo completo della fonderia.",
+  "Spawn any ball.": "Posiziona una sfera qualsiasi.",
+  "Join two balls with a spring.": "Collega due sfere con una molla.",
+  "Run the simulation.": "Avvia la simulazione.",
+  "First Drop": "Prima caduta",
+  "Run it. Gravity does the work.": "Avvia. La gravit\xE0 fa il resto.",
+  "Off the Mark": "Fuori bersaglio",
+  "The ramp nudges the payload toward the zone.": "La rampa spinge il carico verso la zona.",
+  "Steel Nudge": "Spinta d\u2019acciaio",
+  "A steel ball can shove the payload sideways.": "Una sfera d\u2019acciaio pu\xF2 spingere il carico di lato.",
+  "Bounce House": "Gonfiabile",
+  "Rubber keeps energy. Use the ramps.": "La gomma conserva l\u2019energia. Usa le rampe.",
+  "Brittle Cargo": "Carico fragile",
+  "Glass shatters above impact speed 6. Cushion the fall.": "Il vetro si rompe oltre una velocit\xE0 d\u2019urto di 6. Attutisci la caduta.",
+  "Two Moves": "Due mosse",
+  "Exactly two spawns. Plan them.": "Esattamente due posizionamenti. Pianificali.",
+  "High Shelf": "Scaffale alto",
+  "Ramps chain the payload across the chamber.": "Le rampe portano il carico da un lato all\u2019altro della camera.",
+  "Mastery: The Crucible": "Maestria: Il crogiolo",
+  "Everything so far, one fragile payload.": "Tutto quello visto finora, un carico fragile.",
+  "First Pin": "Primo perno",
+  "Pin a counterweight to the payload.": "Fissa un contrappeso al carico.",
+  "First Spring": "Prima molla",
+  "A spring tugs without a rigid lock.": "Una molla tira senza un blocco rigido.",
+  "Anchor Line": "Linea d\u2019ancoraggio",
+  "Steel anchors steer bouncy cargo.": "Le ancore d\u2019acciaio guidano il carico rimbalzante.",
+  "Twin Links": "Collegamenti gemelli",
+  "Two pins shape a falling train.": "Due perni formano un treno in caduta.",
+  "Elastic Catch": "Presa elastica",
+  "Springs soften what glass cannot take.": "Le molle attutiscono ci\xF2 che il vetro non regge.",
+  "Mixed Rigging": "Montaggio misto",
+  "Pins and springs in one rig.": "Perni e molle in un unico montaggio.",
+  "Swing Set": "Altalena",
+  "A pinned pendulum carries momentum sideways.": "Un pendolo fissato porta lo slancio di lato.",
+  "Mastery: Rigging Exam": "Maestria: Esame di montaggio",
+  "Fragile cargo, long traverse, full toolkit.": "Carico fragile, lunga traversata, tutti gli strumenti.",
+  "Hot Floor": "Pavimento rovente",
+  "The left strip melts anything that lands in it.": "La striscia a sinistra fonde tutto ci\xF2 che ci cade.",
+  "Narrow Slot": "Fessura stretta",
+  "One safe landing lane between the burn lines.": "Una sola corsia d\u2019atterraggio sicura tra le linee di fuoco.",
+  "Over the Fire": "Sopra il fuoco",
+  "Arc the payload across the hazard.": "Fai passare il carico ad arco sopra il pericolo.",
+  "Glass Over Coals": "Vetro sulla brace",
+  "Fragile cargo above a burning floor.": "Carico fragile sopra un pavimento in fiamme.",
+  "Side Burn": "Fuoco laterale",
+  "A floating burn strip blocks the direct line.": "Una striscia di fuoco sospesa blocca la linea diretta.",
+  "Double Jeopardy": "Doppio pericolo",
+  "Two hazard zones, one long descent.": "Due zone di pericolo, una lunga discesa.",
+  "The Gauntlet": "La prova del fuoco",
+  "Thread fragile cargo through three burn zones.": "Fai passare il carico fragile attraverso tre zone di fuoco.",
+  "Mastery: Furnace Walk": "Maestria: Passeggiata nella fornace",
+  "Everything you know, under fire.": "Tutto ci\xF2 che sai, sotto il fuoco.",
+  "Two Crates": "Due casse",
+  "Both payloads must reach a zone.": "Entrambi i carichi devono raggiungere una zona.",
+  "Cross Traffic": "Traffico incrociato",
+  "The payloads swap sides.": "I carichi si scambiano di lato.",
+  "Shared Zone": "Zona condivisa",
+  "One wide zone accepts both.": "Una zona ampia li accoglie entrambi.",
+  "Escort Duty": "Scorta",
+  "A fragile and a sturdy payload, one destination.": "Un carico fragile e uno robusto, una sola destinazione.",
+  "Three Deep": "Tre in fila",
+  "Three payloads, three zones.": "Tre carichi, tre zone.",
+  "Chain Delivery": "Consegna a catena",
+  "Linked cargo over the burn line.": "Carico collegato sopra la linea di fuoco.",
+  "Split Decision": "Decisione divisa",
+  "Opposite corners, opposite materials.": "Angoli opposti, materiali opposti.",
+  "Mastery: Freight Master": "Maestria: Maestro dei carichi",
+  "Three payloads, two burn strips, full rig.": "Tre carichi, due strisce di fuoco, montaggio completo.",
+  "Short Fuse": "Miccia corta",
+  "The run clock is tight now.": "Ora il tempo stringe.",
+  "Quick Rig": "Montaggio rapido",
+  "Rig fast, run faster.": "Monta in fretta, avvia ancora pi\xF9 in fretta.",
+  "Burning Clock": "Cronometro rovente",
+  "Hazards and a short clock.": "Pericoli e poco tempo.",
+  "Twin Sprint": "Doppio sprint",
+  "Two payloads before the clock dies.": "Due carichi prima che scada il tempo.",
+  "Precision Window": "Finestra di precisione",
+  "A small zone, a soft landing, little time.": "Una zona piccola, un atterraggio morbido, poco tempo.",
+  "Assembly Line": "Catena di montaggio",
+  "Converge both lines on one zone, quickly.": "Fai convergere entrambe le linee su una zona, in fretta.",
+  "Final Approach": "Avvicinamento finale",
+  "The hardest traverse, on a clock.": "La traversata pi\xF9 difficile, contro il tempo.",
+  "Mastery: Shift Supervisor": "Maestria: Capoturno",
+  "Two cargoes, two clocks' worth of trouble.": "Due carichi, il doppio della pressione del tempo.",
+  "Wood Only": "Solo legno",
+  "No steel, no rubber. Wood and pins.": "Niente acciaio, niente gomma. Legno e perni.",
+  "Rubber Riot": "Caos di gomma",
+  "Everything bounces. Control it anyway.": "Tutto rimbalza. Controllalo comunque.",
+  "Skeleton Crew": "Squadra ridotta",
+  "Two steel balls. Nothing else.": "Due sfere d\u2019acciaio. Nient\u2019altro.",
+  "Mastery: Foundry Master": "Maestria: Maestro fonditore",
+  "The final exam of the foundry.": "L\u2019esame finale della fonderia.",
+  "One Ball Only": "Una sola sfera",
+  "One steel ball. Make it count.": "Una sfera d\u2019acciaio. Falla valere.",
+  "Speedrun Bay": "Baia dello speedrun",
+  "Eight seconds of simulation. No more.": "Otto secondi di simulazione. Non di pi\xF9.",
+  "No Rigging": "Niente giunti",
+  "Joints are forbidden in this chamber.": "I giunti sono vietati in questa camera.",
+  "Heavy Water": "Acqua pesante",
+  "Gravity runs hot here: 16 u/s\xB2.": "Qui la gravit\xE0 \xE8 forte: 16 u/s\xB2.",
+  "One shared chamber for everyone, today only.": "Una camera condivisa per tutti, solo oggi.",
+  "First Completion": "Primo completamento",
+  "Complete any session with every payload delivered.": "Completa una partita consegnando tutti i carichi.",
+  "Mechanic Mastery": "Padronanza delle meccaniche",
+  "Complete every Learn mode lesson.": "Completa tutte le lezioni della modalit\xE0 Impara.",
+  "Hot Streak": "Serie vincente",
+  "Win three sessions in a row.": "Vinci tre partite di fila.",
+  "Mastery Milestone": "Traguardo di maestria",
+  "Complete every Journey mastery stage.": "Completa tutte le prove di maestria del percorso.",
+  "Marathon Builder": "Costruttore maratoneta",
+  "Spawn 500 bodies over your lifetime.": "Posiziona 500 corpi in totale."
+};
+var EN_GB = {
+  "Joint mode behavior": "Joint mode behaviour",
+  "Color grade": "Colour grade"
+};
+var STRINGS2 = {
+  "en-US": {},
+  "en-GB": EN_GB,
+  "es-419": ES2,
+  "es-ES": ES_ES,
+  "de-DE": DE2,
+  "fr-FR": FR2,
+  "fr-CA": FR_CA,
+  "pt-BR": PT2,
+  "it-IT": IT2
+};
+
+// src/i18n.js
+var LOCALES2 = ["en-US", "en-GB", "es-419", "es-ES", "de-DE", "fr-FR", "fr-CA", "pt-BR", "it-IT"];
+var EN2 = {
+  "sync.synced": "synced",
+  "sync.saving": "saving",
+  "sync.offline": "offline",
+  "phase.build": "build",
+  "phase.run": "run",
+  "phase.won": "won",
+  "phase.lost": "lost",
+  "action.spawn": "spawn",
+  "action.joint": "joint",
+  "action.delete": "delete",
+  "screen.title": "Title",
+  "screen.modes": "Modes",
+  "screen.play": "Chamber",
+  "screen.results": "Results",
+  "screen.progression": "Progression",
+  "screen.help": "How to play",
+  "screen.scores": "Leaderboards",
+  "reason.already-running": "the simulation is already running",
+  "reason.session-over": "the session is over",
+  "reason.material-unknown": "unknown material",
+  "reason.material-not-allowed": "that material is not allowed here",
+  "reason.budget-exhausted": "no spawns left",
+  "reason.joint-unknown": "unknown joint",
+  "reason.joint-not-allowed": "that joint is not allowed here",
+  "reason.need-two-bodies": "needs two bodies",
+  "reason.nothing-to-delete": "nothing to delete",
+  "reason.nothing-to-undo": "nothing to undo",
+  "reason.bad-bodies": "pick two different bodies",
+  "reason.bad-position": "invalid position",
+  "reason.not-found": "body not found",
+  "reason.out-of-bounds": "outside the chamber",
+  "reason.payload-locked": "payloads cannot be removed",
+  "reason.too-far": "the bodies are too far apart",
+  "reason.malformed-command": "malformed command",
+  "reason.unknown-command": "unknown command"
+};
+var locale = "en-US";
+var table = STRINGS2["en-US"];
+var listeners = /* @__PURE__ */ new Set();
+function t(key, vars) {
+  let s = table[key] ?? STRINGS2["en-US"][key] ?? EN2[key] ?? key;
+  if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => k in vars ? String(vars[k]) : m);
+  return s;
 }
+function getLocale() {
+  return locale;
+}
+function onLocaleChange(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+function setLocale(next) {
+  const resolved = LOCALES2.includes(next) ? next : "en-US";
+  const changed = resolved !== locale;
+  locale = resolved;
+  table = STRINGS2[locale] || STRINGS2["en-US"];
+  if (typeof document !== "undefined") document.documentElement.lang = locale;
+  if (changed) for (const fn of listeners) {
+    try {
+      fn(locale);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
+function levelName(level) {
+  const m = /^Daily Cast (.+)$/.exec(level && level.name || "");
+  return m ? t("Daily Cast {date}", { date: m[1] }) : t(level ? level.name : "");
+}
+function reasonText(code) {
+  const key = "reason." + code;
+  return EN2[key] ? t(key) : String(code || "");
+}
+var language = typeof window !== "undefined" && window.StarHermitLanguage ? window.StarHermitLanguage.create({ game: "physics-foundry", supported: LOCALES2, apply: setLocale }) : null;
+if (!language) setLocale("en-US");
 
 // src/ui.js
 var gpuProbe = null;
@@ -26926,7 +28913,13 @@ function el(tag, attrs = {}, children = []) {
   for (const [k, v] of Object.entries(attrs)) {
     if (k === "class") n.className = v;
     else if (k === "text") n.textContent = v;
-    else if (k === "html") n.innerHTML = v;
+    else if (k === "i18n") {
+      n.dataset.i18n = v;
+      n.textContent = t(v);
+    } else if (k === "i18nAria") {
+      n.dataset.i18nAria = v;
+      n.setAttribute("aria-label", t(v));
+    } else if (k === "html") n.innerHTML = v;
     else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
     else if (k === "disabled") n.disabled = !!v;
     else n.setAttribute(k, v);
@@ -26957,15 +28950,15 @@ function init(deps) {
     const net = document.getElementById("pf-net");
     if (!net) return;
     const bits = [];
-    if (platform.isHosted()) bits.push(platform.getNickname() || "Player");
-    bits.push(platform.isOffline() ? "local" : "online");
-    if (platform.isHosted()) bits.push(platform.getSyncStatus());
+    if (platform.isHosted()) bits.push(platform.getNickname() || t("Player"));
+    bits.push(platform.isOffline() ? t("local") : t("online"));
+    if (platform.isHosted()) bits.push(t("sync." + platform.getSyncStatus()));
     net.textContent = bits.join(" \xB7 ");
   }
-  function applyRemoteDoc(doc) {
+  function applyRemoteDoc(doc, { keepLocalSettings = false } = {}) {
     if (!doc || typeof doc !== "object") return;
-    if (doc.settings && typeof doc.settings === "object") Object.assign(settings, doc.settings);
-    if (doc.progress && typeof doc.progress === "object") Object.assign(progress, doc.progress);
+    if (!keepLocalSettings && doc.settings && typeof doc.settings === "object") Object.assign(settings, doc.settings);
+    if (doc.progress && typeof doc.progress === "object") Object.assign(progress, mergeProgress(doc.progress, progress));
     saveSettings();
     saveProgress();
     audio.setBusVolume("music", settings.music);
@@ -26989,7 +28982,7 @@ function init(deps) {
   const toastRegion = el("div", { class: "pf-toasts", "aria-live": "polite" });
   const header = el("header", { class: "pf-top" }, [
     el("h1", { class: "pf-logo", text: "Physics Foundry" }),
-    el("span", { class: "pf-net-status", id: "pf-net", text: platform.isOffline() ? "local" : "" })
+    el("span", { class: "pf-net-status", id: "pf-net", text: platform.isOffline() ? t("local") : "" })
   ]);
   const main = el("main", { class: "pf-main", id: "pf-main" });
   root.append(header, main, live, alertLive, toastRegion);
@@ -27002,11 +28995,11 @@ function init(deps) {
     alertLive.textContent = msg;
   }
   function toast(msg, kind = "info") {
-    const t = el("div", { class: "pf-toast pf-toast-" + kind, role: "status", text: msg });
-    toastRegion.append(t);
-    setTimeout(() => t.remove(), 4500);
+    const t2 = el("div", { class: "pf-toast pf-toast-" + kind, role: "status", text: msg });
+    toastRegion.append(t2);
+    setTimeout(() => t2.remove(), 4500);
   }
-  const tg = translator(typeof navigator !== "undefined" ? navigator.language : "en-US");
+  const tg = (key, vars) => translator(getLocale())(key, vars);
   function gfxSaved() {
     if (!settings.graphics || typeof settings.graphics !== "object") settings.graphics = { preset: "auto" };
     return settings.graphics;
@@ -27055,7 +29048,7 @@ function init(deps) {
   let dailyInfo = null;
   applyGraphics();
   const canvasWrap = el("div", { class: "pf-canvas-wrap" });
-  const canvas = el("canvas", { class: "pf-canvas", "aria-label": "Test chamber view. Use the action tray or keyboard for all actions." });
+  const canvas = el("canvas", { class: "pf-canvas", i18nAria: "Test chamber view. Use the action tray or keyboard for all actions." });
   canvasWrap.append(canvas);
   function ensureRenderer() {
     if (renderer || !createRenderer) return renderer;
@@ -27081,7 +29074,7 @@ function init(deps) {
     }
   }
   function makeScreen(name) {
-    const s = el("section", { class: "pf-screen pf-screen-" + name, "aria-label": name });
+    const s = el("section", { class: "pf-screen pf-screen-" + name, i18nAria: "screen." + name });
     s.hidden = true;
     screens[name] = s;
     main.append(s);
@@ -27090,29 +29083,29 @@ function init(deps) {
   const titleScreen = makeScreen("title");
   function journeyProgressSummary() {
     const done = JOURNEY_LEVELS.filter((l) => progress.completed[l.id]).length;
-    return done + " / " + JOURNEY_LEVELS.length + " chambers";
+    return t("{done} / {total} chambers", { done, total: JOURNEY_LEVELS.length });
   }
   function renderTitle() {
     titleScreen.innerHTML = "";
     const playBtn = el("button", {
       class: "pf-btn pf-btn-primary pf-btn-big",
-      text: "Play",
+      text: t("Play"),
       onclick: () => {
         audio.play("ui-select");
         quickPlay();
       }
     });
     titleScreen.append(
-      el("h2", { class: "pf-title-head", text: "Industrial physics sandbox" }),
-      el("p", { class: "pf-tag", text: "Cast materials, rig joints, run the chamber, deliver every payload." }),
+      el("h2", { class: "pf-title-head", text: t("Industrial physics sandbox") }),
+      el("p", { class: "pf-tag", text: t("Cast materials, rig joints, run the chamber, deliver every payload.") }),
       playBtn,
       el("div", { class: "pf-title-grid" }, [
         el("button", { class: "pf-card", onclick: () => {
           audio.play("ui-select");
           startDaily();
         } }, [
-          el("strong", { text: "Daily challenge" }),
-          el("span", { text: dailyInfo ? "Today's cast: " + dailyInfo.date : "One shared chamber per day" }),
+          el("strong", { text: t("Daily challenge") }),
+          el("span", { text: dailyInfo ? t("Today's cast: {date}", { date: dailyInfo.date }) : t("One shared chamber per day") }),
           el("span", { class: "pf-daily-countdown", id: "pf-daily-cd", text: "" })
         ]),
         el("button", { class: "pf-card", onclick: () => {
@@ -27120,28 +29113,28 @@ function init(deps) {
           renderProgression();
           showScreen("progression");
         } }, [
-          el("strong", { text: "Journey" }),
+          el("strong", { text: t("Journey") }),
           el("span", { text: journeyProgressSummary() })
         ]),
         el("button", { class: "pf-card", onclick: () => {
           audio.play("ui-select");
           openSettings();
         } }, [
-          el("strong", { text: "Profile & settings" }),
-          el("span", { text: progress.achievements.length + " achievements, audio & accessibility" })
+          el("strong", { text: t("Profile & settings") }),
+          el("span", { text: t("{n} achievements, audio & accessibility", { n: progress.achievements.length }) })
         ]),
         el("button", { class: "pf-card", onclick: () => {
           audio.play("ui-select");
           renderModes();
           showScreen("modes");
         } }, [
-          el("strong", { text: "All modes" }),
-          el("span", { text: "Learn, Practice, Challenge, Score chase" })
+          el("strong", { text: t("All modes") }),
+          el("span", { text: t("Learn, Practice, Challenge, Score chase") })
         ])
       ]),
       el("div", { class: "pf-title-foot" }, [
-        el("button", { class: "pf-btn pf-btn-secondary", text: "How to play", onclick: () => openHelp("title") }),
-        el("button", { class: "pf-btn pf-btn-secondary", text: "Leaderboards", onclick: () => {
+        el("button", { class: "pf-btn pf-btn-secondary", text: t("How to play"), onclick: () => openHelp("title") }),
+        el("button", { class: "pf-btn pf-btn-secondary", text: t("Leaderboards"), onclick: () => {
           renderScores();
           showScreen("scores");
         } }),
@@ -27151,7 +29144,7 @@ function init(deps) {
     );
     updateDailyCountdown();
   }
-  const ps = currentPlatformStrings();
+  const ps = new Proxy({}, { get: (_, key) => platformStrings(pickPlatformLocale(getLocale()))[key] });
   async function inviteFriend() {
     const link = platform.inviteLink();
     if (!link) return;
@@ -27184,10 +29177,12 @@ function init(deps) {
     return LEARN_LESSONS.length - 1;
   }
   const modesScreen = makeScreen("modes");
+  let openSetup = null;
   function renderModes() {
     modesScreen.innerHTML = "";
+    openSetup = null;
     modesScreen.append(
-      el("h2", { text: "Choose a mode" }),
+      el("h2", { text: t("Choose a mode") }),
       el(
         "div",
         { class: "pf-mode-grid" },
@@ -27198,12 +29193,12 @@ function init(deps) {
             selectMode(m.id);
           }
         }, [
-          el("strong", { text: m.name }),
-          el("span", { text: m.desc })
+          el("strong", { text: t(m.name) }),
+          el("span", { text: t(m.desc) })
         ]))
       ),
       el("div", { class: "pf-setup", id: "pf-setup", hidden: true }),
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Back", onclick: () => {
+      el("button", { class: "pf-btn pf-btn-secondary", text: t("Back"), onclick: () => {
         audio.play("ui-back");
         renderTitle();
         showScreen("title");
@@ -27229,23 +29224,24 @@ function init(deps) {
     }
     setup.innerHTML = "";
     setup.hidden = false;
+    openSetup = id;
     const def = MODE_DEFS.find((m) => m.id === id);
     setup.append(
-      el("h3", { text: def.name + " setup" }),
+      el("h3", { text: t("{mode} setup", { mode: t(def.name) }) }),
       el("dl", { class: "pf-setup-facts" }, [
-        el("dt", { text: "Rules" }),
-        el("dd", { text: def.desc }),
-        el("dt", { text: "Expected duration" }),
-        el("dd", { text: def.duration }),
-        el("dt", { text: "Ranked" }),
-        el("dd", { text: def.ranked ? "Yes \u2014 verified replays" : "No \u2014 unranked" })
+        el("dt", { text: t("Rules") }),
+        el("dd", { text: t(def.desc) }),
+        el("dt", { text: t("Expected duration") }),
+        el("dd", { text: t(def.duration) }),
+        el("dt", { text: t("Ranked") }),
+        el("dd", { text: def.ranked ? t("Yes \u2014 verified replays") : t("No \u2014 unranked") })
       ])
     );
     if (id === "practice") {
       const filter = el(
         "select",
-        { class: "pf-input", "aria-label": "Difficulty filter" },
-        [el("option", { value: "0", text: "All difficulties" })].concat([1, 2, 3, 4, 5].map((d) => el("option", { value: String(d), text: "Difficulty " + d })))
+        { class: "pf-input", "aria-label": t("Difficulty filter") },
+        [el("option", { value: "0", text: t("All difficulties") })].concat([1, 2, 3, 4, 5].map((d) => el("option", { value: String(d), text: t("Difficulty {n}", { n: d }) })))
       );
       const list = el("div", { class: "pf-level-list" });
       const renderList = () => {
@@ -27255,14 +29251,14 @@ function init(deps) {
         for (const l of unlocked2) {
           list.append(el("button", {
             class: "pf-chip",
-            text: l.name,
+            text: levelName(l),
             onclick: () => {
               audio.play("ui-select");
               startLevel(l, "practice", { practice: true });
             }
           }));
         }
-        if (!unlocked2.length) list.append(el("p", { text: "No unlocked levels at this difficulty yet." }));
+        if (!unlocked2.length) list.append(el("p", { text: t("No unlocked levels at this difficulty yet.") }));
       };
       filter.addEventListener("change", renderList);
       renderList();
@@ -27273,7 +29269,7 @@ function init(deps) {
       for (const l of CHALLENGE_LEVELS) {
         list.append(el("button", {
           class: "pf-chip",
-          text: l.name + (progress.completed[l.id] ? " \u2713" : ""),
+          text: levelName(l) + (progress.completed[l.id] ? " \u2713" : ""),
           onclick: () => {
             audio.play("ui-select");
             startLevel(l, "challenge", {});
@@ -27292,7 +29288,7 @@ function init(deps) {
   const hudPhase = el("p", { class: "pf-hud-line pf-phase", id: "pf-phase" });
   const hudError = el("p", { class: "pf-error", id: "pf-error", role: "status" });
   const lessonBanner = el("div", { class: "pf-lesson", id: "pf-lesson", hidden: true });
-  const tray = el("div", { class: "pf-tray", role: "toolbar", "aria-label": "Chamber actions" });
+  const tray = el("div", { class: "pf-tray", role: "toolbar", i18nAria: "Chamber actions" });
   playScreen.append(
     el("aside", { class: "pf-rail pf-rail-left" }, [
       hudObjective,
@@ -27301,8 +29297,8 @@ function init(deps) {
       hudTime,
       hudPhase,
       hudError,
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Pause (Esc)", onclick: () => pauseGame() }),
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Help", onclick: () => openHelp("play") })
+      el("button", { class: "pf-btn pf-btn-secondary", i18n: "Pause (Esc)", onclick: () => pauseGame() }),
+      el("button", { class: "pf-btn pf-btn-secondary", i18n: "Help", onclick: () => openHelp("play") })
     ]),
     canvasWrap,
     el("aside", { class: "pf-rail pf-rail-right" }, [lessonBanner, tray])
@@ -27314,13 +29310,13 @@ function init(deps) {
   function refreshHud() {
     if (!session) return;
     const st = session.state;
-    hudObjective.textContent = currentLevel.name + " \u2014 deliver " + st.goals.total + " payload" + (st.goals.total > 1 ? "s" : "");
-    hudProgress.textContent = "Delivered: " + st.goals.delivered + " / " + st.goals.total;
-    hudBudget.textContent = "Spawns left: " + (st.spawnBudget - st.movesUsed) + " / " + st.spawnBudget;
-    hudPhase.textContent = "Phase: " + st.phase + (session.paused ? " (paused)" : "");
+    hudObjective.textContent = t(st.goals.total > 1 ? "{level} \u2014 deliver {n} payloads" : "{level} \u2014 deliver 1 payload", { level: levelName(currentLevel), n: st.goals.total });
+    hudProgress.textContent = t("Delivered: {done} / {total}", { done: st.goals.delivered, total: st.goals.total });
+    hudBudget.textContent = t("Spawns left: {left} / {total}", { left: st.spawnBudget - st.movesUsed, total: st.spawnBudget });
+    hudPhase.textContent = t(session.paused ? "Phase: {phase} (paused)" : "Phase: {phase}", { phase: t("phase." + st.phase) });
     if (st.phase === "run" && st.runStartTick !== null) {
       hudTime.hidden = false;
-      hudTime.textContent = "Time left: " + fmtTime(currentLevel.timeLimitTicks - (st.tick - st.runStartTick));
+      hudTime.textContent = t("Time left: {time}", { time: fmtTime(currentLevel.timeLimitTicks - (st.tick - st.runStartTick)) });
     } else {
       hudTime.hidden = st.phase !== "run";
     }
@@ -27349,14 +29345,14 @@ function init(deps) {
     for (const a of session.legal()) legal[a.type + ":" + (a.material || a.joint || "")] = a;
     tray.innerHTML = "";
     const building = st.phase === "build";
-    const matRow = el("div", { class: "pf-tray-row", role: "group", "aria-label": "Materials" });
+    const matRow = el("div", { class: "pf-tray-row", role: "group", "aria-label": t("Materials") });
     currentLevel.allowedMaterials.forEach((m, i) => {
       const a = legal["spawn:" + m] || { ok: false };
       const b = el("button", {
         class: "pf-btn pf-mat" + (selectedMaterial === m ? " pf-selected" : ""),
-        text: MATERIALS[m].name + " (" + (i + 1) + ")",
+        text: t(MATERIALS[m].name) + " (" + (i + 1) + ")",
         "aria-pressed": selectedMaterial === m ? "true" : "false",
-        title: a.ok ? "Select " + MATERIALS[m].name : a.reason || "",
+        title: a.ok ? t("Select {material}", { material: t(MATERIALS[m].name) }) : a.reason ? reasonText(a.reason) : "",
         onclick: (ev) => {
           selectedMaterial = m;
           audio.play("ui-select");
@@ -27369,26 +29365,26 @@ function init(deps) {
     });
     const spawnBtn = el("button", {
       class: "pf-btn pf-btn-primary",
-      text: "Spawn at cursor (Enter)",
+      text: t("Spawn at cursor (Enter)"),
       disabled: !building,
       onclick: (ev) => {
         guard(ev.currentTarget);
         trySpawn(cursor.x, cursor.y);
       }
     });
-    const actRow = el("div", { class: "pf-tray-row", role: "group", "aria-label": "Actions" });
+    const actRow = el("div", { class: "pf-tray-row", role: "group", "aria-label": t("Actions") });
     if (currentLevel.allowedJoints.length) {
       for (const j of currentLevel.allowedJoints) {
         actRow.append(el("button", {
           class: "pf-btn" + (jointMode && selectedJoint === j ? " pf-selected" : ""),
-          text: JOINT_TYPES[j].name + " (J)",
+          text: t(JOINT_TYPES[j].name) + " (J)",
           "aria-pressed": jointMode && selectedJoint === j ? "true" : "false",
           onclick: () => {
             selectedJoint = j;
             jointMode = !(jointMode && selectedJoint === j);
             jointAnchor = null;
             audio.play("ui-select");
-            announce(jointMode ? JOINT_TYPES[j].name + " mode: select two bodies" : "Joint mode off");
+            announce(jointMode ? t("{joint} mode: select two bodies", { joint: t(JOINT_TYPES[j].name) }) : t("Joint mode off"));
             renderTray();
           }
         }));
@@ -27397,7 +29393,7 @@ function init(deps) {
     actRow.append(
       el("button", {
         class: "pf-btn",
-        text: "Delete selected (Del)",
+        text: t("Delete selected (Del)"),
         disabled: !building || !selectedBody,
         onclick: (ev) => {
           guard(ev.currentTarget);
@@ -27406,7 +29402,7 @@ function init(deps) {
       }),
       el("button", {
         class: "pf-btn",
-        text: "Undo (U)",
+        text: t("Undo (U)"),
         disabled: !session.canUndo,
         onclick: (ev) => {
           guard(ev.currentTarget);
@@ -27415,7 +29411,7 @@ function init(deps) {
       }),
       el("button", {
         class: "pf-btn pf-btn-go",
-        text: building ? "Run (R)" : "Running\u2026",
+        text: building ? t("Run (R)") : t("Running\u2026"),
         disabled: !building,
         onclick: (ev) => {
           guard(ev.currentTarget);
@@ -27423,15 +29419,15 @@ function init(deps) {
         }
       })
     );
-    const cursorRow = el("div", { class: "pf-tray-row pf-cursor-ctl", role: "group", "aria-label": "Move spawn cursor" });
+    const cursorRow = el("div", { class: "pf-tray-row pf-cursor-ctl", role: "group", "aria-label": t("Move spawn cursor") });
     const move = (dx, dy) => () => {
       moveCursor(dx, dy);
     };
     cursorRow.append(
-      el("button", { class: "pf-btn pf-btn-sm pf-cur-l", text: "\u2190", "aria-label": "Cursor left", onclick: move(-1, 0) }),
-      el("button", { class: "pf-btn pf-btn-sm pf-cur-u", text: "\u2191", "aria-label": "Cursor up", onclick: move(0, 1) }),
-      el("button", { class: "pf-btn pf-btn-sm pf-cur-d", text: "\u2193", "aria-label": "Cursor down", onclick: move(0, -1) }),
-      el("button", { class: "pf-btn pf-btn-sm pf-cur-r", text: "\u2192", "aria-label": "Cursor right", onclick: move(1, 0) })
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-l", text: "\u2190", "aria-label": t("Cursor left"), onclick: move(-1, 0) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-u", text: "\u2191", "aria-label": t("Cursor up"), onclick: move(0, 1) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-d", text: "\u2193", "aria-label": t("Cursor down"), onclick: move(0, -1) }),
+      el("button", { class: "pf-btn pf-btn-sm pf-cur-r", text: "\u2192", "aria-label": t("Cursor right"), onclick: move(1, 0) })
     );
     tray.append(matRow, spawnBtn, actRow, cursorRow);
   }
@@ -27442,7 +29438,7 @@ function init(deps) {
       renderer.setCursor(cursor.x, cursor.y);
       updateGhost();
     }
-    announce("Cursor " + cursor.x.toFixed(1) + ", " + cursor.y.toFixed(1));
+    announce(t("Cursor {x}, {y}", { x: cursor.x.toFixed(1), y: cursor.y.toFixed(1) }));
   }
   function updateGhost() {
     if (!renderer || !session || session.state.phase !== "build") {
@@ -27455,22 +29451,22 @@ function init(deps) {
   function trySpawn(x, y) {
     if (!session || session.state.phase !== "build") return;
     const res = session.dispatch({ type: "spawn", material: selectedMaterial, x: Math.round(x * 4) / 4, y: Math.round(y * 4) / 4 });
-    if (res.error) flashError("Cannot spawn: " + res.error.message);
+    if (res.error) flashError(t("Cannot spawn: {reason}", { reason: reasonText(res.error.message) }));
     return res;
   }
   function deleteSelected() {
     if (!session || !selectedBody) return;
     const res = session.dispatch({ type: "delete", target: selectedBody });
-    if (res.error) flashError("Cannot delete: " + res.error.message);
+    if (res.error) flashError(t("Cannot delete: {reason}", { reason: reasonText(res.error.message) }));
     else selectedBody = null;
   }
   function doUndo() {
     if (!session) return;
     const r = session.undo();
-    if (!r.ok) flashError("Nothing to undo");
+    if (!r.ok) flashError(t("Nothing to undo"));
     else {
       audio.play("undo");
-      announce("Undid " + r.undone.type);
+      announce(t("Undid {action}", { action: t("action." + r.undone.type) }));
       refreshHud();
     }
   }
@@ -27478,7 +29474,7 @@ function init(deps) {
     if (!session) return;
     const res = session.dispatch({ type: "run" });
     if (res.error) {
-      flashError("Cannot run: " + res.error.message);
+      flashError(t("Cannot run: {reason}", { reason: reasonText(res.error.message) }));
       return;
     }
     runStartWall = performance.now();
@@ -27489,7 +29485,7 @@ function init(deps) {
     jointAnchor = null;
     audio.play("run-start");
     audio.setPhase("run");
-    announce("Simulation running");
+    announce(t("Simulation running"));
   }
   function handlePick(pick, ev) {
     if (!session || session.state.phase !== "build") return;
@@ -27501,10 +29497,10 @@ function init(deps) {
           selectedBody = pick.id;
           if (renderer) renderer.setSelection(pick.id);
           audio.play("ui-select");
-          announce("First body selected; pick a second body");
+          announce(t("First body selected; pick a second body"));
         } else {
           const res = session.dispatch({ type: "joint", joint: selectedJoint, a: jointAnchor, b: pick.id });
-          if (res.error) flashError("Cannot joint: " + res.error.message);
+          if (res.error) flashError(t("Cannot connect: {reason}", { reason: reasonText(res.error.message) }));
           else {
             audio.play("joint");
           }
@@ -27518,7 +29514,7 @@ function init(deps) {
         if (renderer) renderer.setSelection(pick.id);
         audio.play("ui-select");
         const b = session.state.bodies.find((x) => x.id === pick.id);
-        announce("Selected " + (b ? MATERIALS[b.material].name : "body") + (b && b.kind === "payload" ? " payload" : ""));
+        announce(t(b && b.kind === "payload" ? "Selected {body} payload" : "Selected {body}", { body: b ? t(MATERIALS[b.material].name) : t("body") }));
         renderTray();
       }
       return;
@@ -27643,7 +29639,7 @@ function init(deps) {
       if (currentLevel.allowedJoints.length) {
         jointMode = true;
         jointAnchor = null;
-        announce(JOINT_TYPES[selectedJoint].name + " mode: select two bodies");
+        announce(t("{joint} mode: select two bodies", { joint: t(JOINT_TYPES[selectedJoint].name) }));
         renderTray();
       }
     } else if (k === "delete") {
@@ -27665,7 +29661,7 @@ function init(deps) {
     } else if (k === "reframe") {
       handled();
       if (renderer && renderer.frameChamber) renderer.frameChamber();
-      announce("Camera re-framed");
+      announce(t("Camera re-framed"));
     } else if (/^material_[1-4]$/.test(k || "")) {
       const i = Number(k.slice(-1)) - 1;
       if (currentLevel.allowedMaterials[i]) {
@@ -27695,13 +29691,13 @@ function init(deps) {
             saveProgress();
           } else if (e.type === "joint") audio.play("joint");
           else if (e.type === "delete") audio.play("delete");
-          else if (e.type === "reset") announce("Reset to build phase");
+          else if (e.type === "reset") announce(t("Reset to build phase"));
         }
         checkLessonProgress(ev.cmd);
         refreshHud();
         updateGhost();
       } else if (ev.type === "command-error") {
-        flashError("Illegal action: " + ev.error.message);
+        flashError(t("Illegal action: {reason}", { reason: reasonText(ev.error.message) }));
         refreshHud();
       } else if (ev.type === "step") {
         for (const e of ev.events) {
@@ -27710,7 +29706,7 @@ function init(deps) {
           else if (e.type === "destroyed") audio.play("impact", { material: "steel", strength: 8, avSeed: s.state.tick });
           else if (e.type === "delivered") {
             audio.play("goal");
-            announce("Payload delivered");
+            announce(t("Payload delivered"));
           }
         }
       } else if (ev.type === "terminal") {
@@ -27730,31 +29726,35 @@ function init(deps) {
     analytics2("tutorial-step", { lesson: currentLevel.id, step: lessonStep });
     audio.play("ui-select");
     if (lessonStep >= currentLevel.steps.length) {
-      lessonBanner.innerHTML = "";
-      lessonBanner.append(
-        el("p", { text: "Lesson complete! Finish the delivery or move on." }),
-        el("button", { class: "pf-btn pf-btn-primary", text: "Next lesson", onclick: () => startLearn((currentCtx.lessonIndex + 1) % LEARN_LESSONS.length) })
-      );
+      renderLessonBanner();
       if (!progress.lessonsDone[currentLevel.id]) {
         progress.lessonsDone[currentLevel.id] = true;
         saveProgress();
-        toast("Lesson complete: " + currentLevel.name, "ok");
+        toast(t("Lesson complete: {name}", { name: levelName(currentLevel) }), "ok");
         if (LEARN_LESSONS.every((l) => progress.lessonsDone[l.id])) unlockAchievement("mechanic-mastery");
       }
     } else {
       renderLessonBanner();
     }
   }
-  function renderLessonBanner() {
+  function renderLessonBanner(quiet) {
     const step = currentLevel.steps[lessonStep];
-    lessonBanner.hidden = !step;
     lessonBanner.innerHTML = "";
+    if (lessonStep >= currentLevel.steps.length) {
+      lessonBanner.hidden = false;
+      lessonBanner.append(
+        el("p", { text: t("Lesson complete! Finish the delivery or move on.") }),
+        el("button", { class: "pf-btn pf-btn-primary", text: t("Next lesson"), onclick: () => startLearn((currentCtx.lessonIndex + 1) % LEARN_LESSONS.length) })
+      );
+      return;
+    }
+    lessonBanner.hidden = !step;
     if (step) {
       lessonBanner.append(
-        el("strong", { text: "Lesson " + (currentCtx.lessonIndex + 1) + "/" + LEARN_LESSONS.length }),
-        el("p", { text: step.text })
+        el("strong", { text: t("Lesson {n}/{total}", { n: currentCtx.lessonIndex + 1, total: LEARN_LESSONS.length }) }),
+        el("p", { text: t(step.text) })
       );
-      announce(step.text);
+      if (!quiet) announce(t(step.text));
     }
   }
   function onTerminal(ev) {
@@ -27790,7 +29790,9 @@ function init(deps) {
     if (newBest) progress.bests[levelId] = score.total;
     saveProgress();
     analytics2("round-end", { level: levelId, won, score: score.total });
-    renderResults({ won, score, durationMs, prevBest, newBest, firstWin, reason: st.terminalReason });
+    lastResults = { won, score, durationMs, prevBest, newBest, firstWin, reason: st.terminalReason, lb: null };
+    submitResult(lastResults);
+    renderResults(lastResults);
     setTimeout(() => showScreen("results"), 900);
   }
   function unlockAchievement(key) {
@@ -27798,14 +29800,32 @@ function init(deps) {
     progress.achievements.push(key);
     saveProgress();
     const a = ACHIEVEMENTS[key];
-    toast("Achievement unlocked: " + (a ? a.name : key), "ok");
+    toast(t("Achievement unlocked: {name}", { name: a ? t(a.name) : key }), "ok");
     audio.play("achievement");
   }
   const resultsScreen = makeScreen("results");
-  let lbSeq = 0;
+  let lastResults = null;
+  function isRankedPost() {
+    const ranked = (currentMode === "journey" || currentMode === "daily" || currentMode === "challenge") && !currentCtx.practice;
+    return ranked && (currentMode === "journey" || currentMode === "daily");
+  }
+  function submitResult(r) {
+    if (!isRankedPost() || !platform.isHosted() || typeof platform.submitScore !== "function") return;
+    r.lb = { state: "posting" };
+    platform.submitScore(r.score.total).then((res) => {
+      r.lb = !res.posted ? { state: "notPosted" } : res.rank ? { state: "rank", rank: res.rank } : { state: "posted" };
+      const line = r === lastResults && resultsScreen.querySelector(".pf-lb");
+      if (line) line.textContent = lbText(r.lb);
+    });
+  }
+  function lbText(lb) {
+    if (lb.state === "posting") return ps.lbPosting;
+    if (lb.state === "notPosted") return ps.lbNotPosted;
+    if (lb.state === "rank") return ps.lbRank.replace("{rank}", lb.rank);
+    return ps.lbPosted;
+  }
   function renderResults(r) {
     resultsScreen.innerHTML = "";
-    const st = session.state;
     const c = r.score.components;
     const rows = [
       ["Goal", c.goal],
@@ -27814,41 +29834,30 @@ function init(deps) {
       ["Spawn efficiency", c.spawnEfficiency],
       ["Invalid-action penalty", c.invalidPenalty]
     ];
-    const table = el("table", { class: "pf-score-table" }, [
-      el("caption", { text: "Score breakdown" }),
-      ...rows.map(([k, v]) => el("tr", {}, [el("th", { scope: "row", text: k }), el("td", { text: String(v) })])),
-      el("tr", { class: "pf-total" }, [el("th", { scope: "row", text: "Total" }), el("td", { text: String(r.score.total) })])
+    const table2 = el("table", { class: "pf-score-table" }, [
+      el("caption", { text: t("Score breakdown") }),
+      ...rows.map(([k, v]) => el("tr", {}, [el("th", { scope: "row", text: t(k) }), el("td", { text: String(v) })])),
+      el("tr", { class: "pf-total" }, [el("th", { scope: "row", text: t("Total") }), el("td", { text: String(r.score.total) })])
     ]);
     const earned = progress.achievements.slice(-3).map((k) => ACHIEVEMENTS[k]).filter(Boolean);
-    const ranked = (currentMode === "journey" || currentMode === "daily" || currentMode === "challenge") && !currentCtx.practice;
     const submitWrap = el("div", { class: "pf-submit" });
-    if (ranked && (currentMode === "journey" || currentMode === "daily")) {
-      if (platform.isHosted() && typeof platform.submitScore === "function") {
-        const ps2 = currentPlatformStrings();
-        const line = el("p", { class: "pf-note pf-lb", text: ps2.lbPosting });
-        submitWrap.append(line);
-        const seq = ++lbSeq;
-        platform.submitScore(r.score.total).then((res) => {
-          if (seq !== lbSeq) return;
-          line.textContent = !res.posted ? ps2.lbNotPosted : res.rank ? ps2.lbRank.replace("{rank}", res.rank) : ps2.lbPosted;
-        });
-      } else {
-        submitWrap.append(el("p", { class: "pf-note", text: "Ranked run recorded on this device." }));
-      }
+    if (isRankedPost()) {
+      if (r.lb) submitWrap.append(el("p", { class: "pf-note pf-lb", text: lbText(r.lb) }));
+      else submitWrap.append(el("p", { class: "pf-note", text: t("Ranked run recorded on this device.") }));
     } else {
-      submitWrap.append(el("p", { class: "pf-note", text: "Unranked session \u2014 no leaderboard submission." }));
+      submitWrap.append(el("p", { class: "pf-note", text: t("Unranked session \u2014 no leaderboard submission.") }));
     }
     resultsScreen.append(
-      el("h2", { text: r.won ? "Delivery complete" : "Run failed" }),
-      el("p", { class: "pf-note", text: "Reason: " + (TERMINAL_TEXT[r.reason] || r.reason || "unknown") }),
-      table,
-      el("p", { class: "pf-note", text: r.newBest ? "New local best! (previous " + r.prevBest + ")" : "Local best: " + Math.max(r.prevBest, r.score.total) }),
-      earned.length ? el("p", { class: "pf-note", text: "Achievements: " + earned.map((a) => a.name).join(", ") }) : null,
+      el("h2", { text: r.won ? t("Delivery complete") : t("Run failed") }),
+      el("p", { class: "pf-note", text: t("Reason: {reason}", { reason: TERMINAL_TEXT[r.reason] ? t(TERMINAL_TEXT[r.reason]) : r.reason || t("unknown") }) }),
+      table2,
+      el("p", { class: "pf-note", text: r.newBest ? t("New local best! (previous {n})", { n: r.prevBest }) : t("Local best: {n}", { n: Math.max(r.prevBest, r.score.total) }) }),
+      earned.length ? el("p", { class: "pf-note", text: t("Achievements: {list}", { list: earned.map((a) => t(a.name)).join(", ") }) }) : null,
       submitWrap,
       el("div", { class: "pf-btn-row" }, [
         el("button", {
           class: "pf-btn",
-          text: "Retry",
+          text: t("Retry"),
           onclick: () => {
             analytics2("retry", { level: currentLevel.id });
             audio.play("ui-select");
@@ -27858,7 +29867,7 @@ function init(deps) {
         nextActionButton(),
         el("button", {
           class: "pf-btn pf-btn-secondary",
-          text: "Modes",
+          text: t("Modes"),
           onclick: () => {
             audio.play("ui-back");
             teardownPlay();
@@ -27868,13 +29877,16 @@ function init(deps) {
         })
       ])
     );
-    announce((r.won ? "Won" : "Lost") + " with " + r.score.total + " points");
+    if (!r.announced) {
+      r.announced = true;
+      announce(t(r.won ? "Won with {n} points" : "Lost with {n} points", { n: r.score.total }));
+    }
   }
   function nextActionButton() {
     if (currentMode === "learn") {
       return el("button", {
         class: "pf-btn pf-btn-primary",
-        text: "Next lesson",
+        text: t("Next lesson"),
         onclick: () => startLearn((currentCtx.lessonIndex + 1) % LEARN_LESSONS.length)
       });
     }
@@ -27883,7 +29895,7 @@ function init(deps) {
       if (idx >= 0 && idx + 1 < JOURNEY_LEVELS.length) {
         return el("button", {
           class: "pf-btn pf-btn-primary",
-          text: "Next chamber",
+          text: t("Next chamber"),
           onclick: () => startJourney(idx + 1)
         });
       }
@@ -27906,7 +29918,7 @@ function init(deps) {
     dailyInfo = d;
     const level = dailyLevel(date);
     if (progress.dailyAttempts[date]) {
-      toast("Daily already attempted today \u2014 playing unranked practice run", "info");
+      toast(t("Daily already attempted today \u2014 playing unranked practice run"), "info");
       return startLevel(level, "daily", { daily: { date }, practice: true });
     }
     startLevel(level, "daily", { daily: { date } });
@@ -27946,7 +29958,7 @@ function init(deps) {
     audio.setPhase("build");
     refreshHud();
     showScreen("play");
-    announce(level.name + ". " + (level.intro || ""));
+    announce(levelName(level) + ". " + (level.intro ? t(level.intro) : ""));
     startLoop();
   }
   function teardownPlay() {
@@ -27959,11 +29971,11 @@ function init(deps) {
   function startLoop() {
     stopLoop();
     lastFrame = 0;
-    const frame = (t) => {
+    const frame = (t2) => {
       rafId = requestAnimationFrame(frame);
       if (!session) return;
-      const dt = lastFrame ? Math.min(0.25, (t - lastFrame) / 1e3) : DT;
-      lastFrame = t;
+      const dt = lastFrame ? Math.min(0.25, (t2 - lastFrame) / 1e3) : DT;
+      lastFrame = t2;
       const st = session.state;
       if (st.phase === "run" && !session.paused) {
         runAccum += dt;
@@ -28029,15 +30041,15 @@ function init(deps) {
   }
   function openPause() {
     closeOverlays();
-    pauseOverlay = el("div", { class: "pf-overlay", role: "dialog", "aria-modal": "true", "aria-label": "Paused" }, [
+    pauseOverlay = el("div", { class: "pf-overlay", role: "dialog", "aria-modal": "true", i18nAria: "Paused" }, [
       el("div", { class: "pf-panel" }, [
-        el("h2", { text: "Paused" }),
-        el("button", { class: "pf-btn pf-btn-primary pf-btn-big", text: "Resume", onclick: resumeGame }),
-        el("button", { class: "pf-btn", text: "Settings", onclick: openSettings }),
-        el("button", { class: "pf-btn", text: "Help", onclick: () => openHelp("pause") }),
+        el("h2", { i18n: "Paused" }),
+        el("button", { class: "pf-btn pf-btn-primary pf-btn-big", i18n: "Resume", onclick: resumeGame }),
+        el("button", { class: "pf-btn", i18n: "Settings", onclick: openSettings }),
+        el("button", { class: "pf-btn", i18n: "Help", onclick: () => openHelp("pause") }),
         el("button", {
           class: "pf-btn",
-          text: "Restart chamber",
+          i18n: "Restart chamber",
           onclick: () => {
             audio.play("ui-select");
             closeOverlays();
@@ -28046,7 +30058,7 @@ function init(deps) {
         }),
         el("button", {
           class: "pf-btn pf-btn-secondary",
-          text: "Leave chamber",
+          i18n: "Leave chamber",
           onclick: () => {
             teardownPlay();
             renderTitle();
@@ -28060,23 +30072,26 @@ function init(deps) {
   }
   function profileNote() {
     if (platform.isHosted()) {
-      return "Playing as " + (platform.getNickname() || "\u2026") + " \u2014 progress syncs to your account (" + platform.getSyncStatus() + ").";
+      return t(
+        "Playing as {name} \u2014 progress syncs to your account ({status}).",
+        { name: platform.getNickname() || "\u2026", status: t("sync." + platform.getSyncStatus()) }
+      );
     }
-    return "Local guest profile \u2014 progress stays in this browser.";
+    return t("Local guest profile \u2014 progress stays in this browser.");
   }
   function buildGraphicsSection() {
     const g = gfxSaved();
     const gpu = probeGpu();
     const tierName = (p) => tg(p);
     const section = el("section", { class: "pf-gfx", id: "pf-gfx-section", "aria-labelledby": "pf-gfx-head" });
-    const presetSel = el("select", { class: "pf-input", id: "pf-gfx-preset", "data-gfx": "preset", "aria-label": tg("quality") });
-    const scaleIn = el("input", { type: "range", id: "pf-gfx-scale", "data-gfx": "render_scale", min: "50", max: "200", step: "5", "aria-label": tg("renderScale") });
+    const presetSel = el("select", { class: "pf-input", id: "pf-gfx-preset", "data-gfx": "preset", "aria-label": tg("quality"), "data-tg-aria": "quality" });
+    const scaleIn = el("input", { type: "range", id: "pf-gfx-scale", "data-gfx": "render_scale", min: "50", max: "200", step: "5", "aria-label": tg("renderScale"), "data-tg-aria": "renderScale" });
     const scaleOut = el("output", { class: "pf-gfx-val", for: "pf-gfx-scale" });
     const catSels = {};
-    const adaptiveIn = el("input", { type: "checkbox", id: "pf-gfx-adaptive", "data-gfx": "adaptive", "aria-label": tg("adaptive") });
-    const fpsIn = el("input", { type: "checkbox", id: "pf-gfx-fps", "data-gfx": "show_fps", "aria-label": tg("showFps") });
+    const adaptiveIn = el("input", { type: "checkbox", id: "pf-gfx-adaptive", "data-gfx": "adaptive", "aria-label": tg("adaptive"), "data-tg-aria": "adaptive" });
+    const fpsIn = el("input", { type: "checkbox", id: "pf-gfx-fps", "data-gfx": "show_fps", "aria-label": tg("showFps"), "data-tg-aria": "showFps" });
     const summary = el("p", { class: "pf-note pf-gfx-summary", id: "pf-gfx-summary", "aria-live": "polite" });
-    const note = el("p", { class: "pf-note pf-gfx-note", id: "pf-gfx-note", text: tg("postFailed") });
+    const note = el("p", { class: "pf-note pf-gfx-note", id: "pf-gfx-note", text: tg("postFailed"), "data-tg": "postFailed" });
     note.hidden = true;
     function fillOptions() {
       const r = resolve(g, gpu.detected);
@@ -28089,7 +30104,7 @@ function init(deps) {
         const tiers = CATEGORIES[cat];
         sel.replaceChildren(
           el("option", { value: "preset", text: tg("fromPreset", { tier: tg("t_" + presetTier(r.preset, cat)) }) }),
-          ...tiers.map((t) => el("option", { value: t, text: tg("t_" + t) }))
+          ...tiers.map((t2) => el("option", { value: t2, text: tg("t_" + t2) }))
         );
         sel.value = tiers.includes(g[cat]) ? g[cat] : "preset";
       }
@@ -28142,27 +30157,33 @@ function init(deps) {
     });
     const rows = [];
     for (const cat of Object.keys(CATEGORIES)) {
-      const sel = el("select", { class: "pf-input", id: "pf-gfx-" + cat, "data-gfx-cat": cat, "aria-label": tg("cat_" + cat) });
+      const sel = el("select", { class: "pf-input", id: "pf-gfx-" + cat, "data-gfx-cat": cat, "aria-label": tg("cat_" + cat), "data-tg-aria": "cat_" + cat });
       sel.addEventListener("change", () => {
         if (sel.value === "preset") delete g[cat];
         else g[cat] = sel.value;
         commit();
       });
       catSels[cat] = sel;
-      rows.push(el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("cat_" + cat) }), sel]));
+      rows.push(el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("cat_" + cat), "data-tg": "cat_" + cat }), sel]));
     }
     section.append(
-      el("h3", { id: "pf-gfx-head", text: tg("graphics") }),
-      el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("quality") }), presetSel]),
-      el("label", { class: "pf-field pf-gfx-row pf-gfx-scale" }, [el("span", { text: tg("renderScale") }), scaleIn, scaleOut]),
+      el("h3", { id: "pf-gfx-head", text: tg("graphics"), "data-tg": "graphics" }),
+      el("label", { class: "pf-field pf-gfx-row" }, [el("span", { text: tg("quality"), "data-tg": "quality" }), presetSel]),
+      el("label", { class: "pf-field pf-gfx-row pf-gfx-scale" }, [el("span", { text: tg("renderScale"), "data-tg": "renderScale" }), scaleIn, scaleOut]),
       ...rows,
-      el("label", { class: "pf-field pf-check" }, [adaptiveIn, el("span", { text: tg("adaptive") })]),
-      el("label", { class: "pf-field pf-check" }, [fpsIn, el("span", { text: tg("showFps") })]),
+      el("label", { class: "pf-field pf-check" }, [adaptiveIn, el("span", { text: tg("adaptive"), "data-tg": "adaptive" })]),
+      el("label", { class: "pf-field pf-check" }, [fpsIn, el("span", { text: tg("showFps"), "data-tg": "showFps" })]),
       summary,
       note
     );
     fillOptions();
     refreshSummary();
+    section.relabel = () => {
+      for (const n of section.querySelectorAll("[data-tg]")) n.textContent = tg(n.dataset.tg);
+      for (const n of section.querySelectorAll("[data-tg-aria]")) n.setAttribute("aria-label", tg(n.dataset.tgAria));
+      fillOptions();
+      refreshSummary();
+    };
     const timer = setInterval(() => {
       if (!section.isConnected) {
         clearInterval(timer);
@@ -28182,7 +30203,7 @@ function init(deps) {
         max: "1",
         step: "0.05",
         value: String(audio.getBusVolume(bus)),
-        "aria-label": label + " volume"
+        i18nAria: label + " volume"
       });
       input.addEventListener("input", () => {
         audio.unlock();
@@ -28190,10 +30211,10 @@ function init(deps) {
         s[bus] = Number(input.value);
         saveSettings();
       });
-      return el("label", { class: "pf-field" }, [el("span", { text: label }), input]);
+      return el("label", { class: "pf-field" }, [el("span", { i18n: label }), input]);
     };
     const toggle = (label, key, onchange) => {
-      const input = el("input", { type: "checkbox", "aria-label": label });
+      const input = el("input", { type: "checkbox", i18nAria: label });
       input.checked = !!s[key];
       input.addEventListener("change", () => {
         s[key] = input.checked;
@@ -28202,13 +30223,13 @@ function init(deps) {
         if (onchange) onchange(input.checked);
         audio.play("ui-select");
       });
-      return el("label", { class: "pf-field pf-check" }, [input, el("span", { text: label })]);
+      return el("label", { class: "pf-field pf-check" }, [input, el("span", { i18n: label })]);
     };
     const gfxSection = buildGraphicsSection();
     const camSel = el(
       "select",
-      { class: "pf-input", "aria-label": "Camera default" },
-      [el("option", { value: "frame", text: "Full chamber" }), el("option", { value: "tight", text: "Tight frame" })]
+      { class: "pf-input", i18nAria: "Camera default" },
+      [el("option", { value: "frame", i18n: "Full chamber" }), el("option", { value: "tight", i18n: "Tight frame" })]
     );
     camSel.value = s.cameraDefault;
     camSel.addEventListener("change", () => {
@@ -28218,42 +30239,42 @@ function init(deps) {
     });
     const jointSel = el(
       "select",
-      { class: "pf-input", "aria-label": "Joint mode behavior" },
-      [el("option", { value: "toggle", text: "Toggle (press J)" }), el("option", { value: "hold", text: "Hold (hold J)" })]
+      { class: "pf-input", i18nAria: "Joint mode behavior" },
+      [el("option", { value: "toggle", i18n: "Toggle (press J)" }), el("option", { value: "hold", i18n: "Hold (hold J)" })]
     );
     jointSel.value = s.jointMode;
     jointSel.addEventListener("change", () => {
       s.jointMode = jointSel.value;
       saveSettings();
     });
-    settingsOverlay = el("div", { class: "pf-overlay", role: "dialog", "aria-modal": "true", "aria-label": "Settings" }, [
+    settingsOverlay = el("div", { class: "pf-overlay", role: "dialog", "aria-modal": "true", i18nAria: "Settings" }, [
       el("div", { class: "pf-panel pf-settings" }, [
-        el("h2", { text: "Settings" }),
-        el("h3", { text: "Profile" }),
-        el("p", { class: "pf-note", text: profileNote() }),
-        el("h3", { text: "Audio" }),
+        el("h2", { i18n: "Settings" }),
+        el("h3", { i18n: "Profile" }),
+        el("p", { class: "pf-note pf-profile-note", text: profileNote() }),
+        el("h3", { i18n: "Audio" }),
         slider("Music", "music"),
         slider("Effects", "effects"),
         slider("Ambience", "ambience"),
         slider("Voice", "voice"),
         toggle("Mute all", "muted", (v) => audio.setMuted(v)),
         gfxSection,
-        el("h3", { text: "Display" }),
-        el("label", { class: "pf-field" }, [el("span", { text: "Camera default" }), camSel]),
+        el("h3", { i18n: "Display" }),
+        el("label", { class: "pf-field" }, [el("span", { i18n: "Camera default" }), camSel]),
         toggle("Reduced motion", "reducedMotion", (v) => {
           if (renderer) renderer.setReducedMotion(v);
         }),
         toggle("High contrast", "highContrast"),
         toggle("Larger text", "largeText"),
-        el("h3", { text: "Controls" }),
+        el("h3", { i18n: "Controls" }),
         toggle("Left-handed action tray", "leftHanded"),
-        el("label", { class: "pf-field" }, [el("span", { text: "Joint mode" }), jointSel]),
+        el("label", { class: "pf-field" }, [el("span", { i18n: "Joint mode" }), jointSel]),
         toggle("Haptics (vibration)", "haptics"),
-        el("h3", { text: "Other" }),
+        el("h3", { i18n: "Other" }),
         toggle("Share anonymous usage events", "consentAnalytics"),
         el("button", {
           class: "pf-btn",
-          text: "Replay tutorial",
+          i18n: "Replay tutorial",
           onclick: () => {
             progress.lessonsDone = {};
             saveProgress();
@@ -28261,7 +30282,7 @@ function init(deps) {
             startLearn(0);
           }
         }),
-        el("button", { class: "pf-btn pf-btn-primary", text: "Done", onclick: () => {
+        el("button", { class: "pf-btn pf-btn-primary", i18n: "Done", onclick: () => {
           closeOverlays();
           if (session && session.paused) openPause();
         } })
@@ -28283,7 +30304,7 @@ function init(deps) {
         el("button", {
           class: "pf-chip",
           disabled: !unlocked2,
-          text: i + 1 + ". " + l.name + (star ? " \u2605" : "") + (mastery ? " \u25C6" : ""),
+          text: i + 1 + ". " + levelName(l) + (star ? " \u2605" : "") + (mastery ? " \u25C6" : ""),
           onclick: () => {
             audio.play("ui-select");
             startJourney(i);
@@ -28297,7 +30318,7 @@ function init(deps) {
       { class: "pf-level-list" },
       LEARN_LESSONS.map((l, i) => el("button", {
         class: "pf-chip",
-        text: "Lesson " + (i + 1) + (progress.lessonsDone[l.id] ? " \u2713" : ""),
+        text: t("Lesson {n}", { n: i + 1 }) + (progress.lessonsDone[l.id] ? " \u2713" : ""),
         onclick: () => {
           audio.play("ui-select");
           startLearn(i);
@@ -28309,19 +30330,19 @@ function init(deps) {
       { class: "pf-ach" },
       Object.values(ACHIEVEMENTS).map((a) => el("li", {
         class: progress.achievements.includes(a.key) ? "pf-ach-on" : "pf-ach-off",
-        text: (progress.achievements.includes(a.key) ? "\u2605 " : "\u2606 ") + a.name + " \u2014 " + a.description
+        text: (progress.achievements.includes(a.key) ? "\u2605 " : "\u2606 ") + t(a.name) + " \u2014 " + t(a.description)
       }))
     );
     progressionScreen.append(
-      el("h2", { text: "Progression" }),
-      el("h3", { text: "Journey (" + journeyProgressSummary() + ")" }),
+      el("h2", { text: t("Progression") }),
+      el("h3", { text: t("Journey ({summary})", { summary: journeyProgressSummary() }) }),
       list,
-      el("h3", { text: "Lessons" }),
+      el("h3", { text: t("Lessons") }),
       lessons,
-      el("h3", { text: "Achievements" }),
+      el("h3", { text: t("Achievements") }),
       achList,
-      el("p", { class: "pf-note", text: "Lifetime spawns: " + progress.counters.spawns + " \xB7 Wins: " + progress.counters.wins + " \xB7 Current streak: " + progress.counters.streak }),
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Back", onclick: () => {
+      el("p", { class: "pf-note", text: t("Lifetime spawns: {spawns} \xB7 Wins: {wins} \xB7 Current streak: {streak}", progress.counters) }),
+      el("button", { class: "pf-btn pf-btn-secondary", text: t("Back"), onclick: () => {
         audio.play("ui-back");
         renderTitle();
         showScreen("title");
@@ -28332,32 +30353,32 @@ function init(deps) {
   function renderHelp() {
     helpScreen.innerHTML = "";
     const keys = [
-      [keysFor("cursor_up", "cursor_left", "cursor_down", "cursor_right"), "Move the spawn cursor"],
-      [keysFor("spawn"), "Spawn selected material at cursor"],
-      [keysFor("material_1", "material_2", "material_3", "material_4"), "Select material 1-4"],
-      [keysFor("joint"), "Joint mode (" + (settings.jointMode === "hold" ? "hold" : "toggle") + "), then pick two bodies"],
-      [keysFor("delete"), "Remove selected body"],
-      [keysFor("run"), "Run the simulation"],
-      [keysFor("undo"), "Undo last build action"],
-      [keysFor("reframe"), "Re-frame camera"],
-      [keysFor("pause"), "Pause / cancel joint mode"]
+      [keysFor("cursor_up", "cursor_left", "cursor_down", "cursor_right"), t("Move the spawn cursor")],
+      [keysFor("spawn"), t("Spawn selected material at cursor")],
+      [keysFor("material_1", "material_2", "material_3", "material_4"), t("Select material 1-4")],
+      [keysFor("joint"), t(settings.jointMode === "hold" ? "Joint mode (hold), then pick two bodies" : "Joint mode (toggle), then pick two bodies")],
+      [keysFor("delete"), t("Remove selected body")],
+      [keysFor("run"), t("Run the simulation")],
+      [keysFor("undo"), t("Undo last build action")],
+      [keysFor("reframe"), t("Re-frame camera")],
+      [keysFor("pause"), t("Pause / cancel joint mode")]
     ];
     helpScreen.append(
-      el("h2", { text: "How to play" }),
-      el("p", { text: "Build phase: spawn balls and connect them with joints. Run phase: gravity takes over \u2014 deliver every payload (outlined ball) into a pulsing target ring. Glass shatters on hard impacts; hazard strips destroy anything." }),
-      el("h3", { text: "Controls" }),
+      el("h2", { text: t("How to play") }),
+      el("p", { text: t("Build phase: spawn balls and connect them with joints. Run phase: gravity takes over \u2014 deliver every payload (outlined ball) into a pulsing target ring. Glass shatters on hard impacts; hazard strips destroy anything.") }),
+      el("h3", { text: t("Controls") }),
       el("div", { class: "pf-cards" }, keys.map(([k, v]) => el("div", { class: "pf-card" }, [el("strong", { text: k }), el("span", { text: v })]))),
-      el("h3", { text: "Materials" }),
+      el("h3", { text: t("Materials") }),
       el("div", { class: "pf-cards" }, Object.values(MATERIALS).map((m) => el("div", { class: "pf-card" }, [
-        el("strong", { text: m.name }),
-        el("span", { text: "Density " + m.density + ", bounce " + m.restitution + (m.shatterSpeed ? ", shatters above impact " + m.shatterSpeed : "") })
+        el("strong", { text: t(m.name) }),
+        el("span", { text: t(m.shatterSpeed ? "Density {d}, bounce {b}, shatters above impact {s}" : "Density {d}, bounce {b}", { d: m.density, b: m.restitution, s: m.shatterSpeed }) })
       ]))),
-      el("h3", { text: "Joints" }),
+      el("h3", { text: t("Joints") }),
       el("div", { class: "pf-cards" }, Object.values(JOINT_TYPES).map((j) => el("div", { class: "pf-card" }, [
-        el("strong", { text: j.name }),
-        el("span", { text: "Max length " + j.maxLength + (j.stiffness ? ", stiffness " + j.stiffness : ", rigid distance lock") })
+        el("strong", { text: t(j.name) }),
+        el("span", { text: t(j.stiffness ? "Max length {n}, stiffness {s}" : "Max length {n}, rigid distance lock", { n: j.maxLength, s: j.stiffness }) })
       ]))),
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Back", onclick: () => {
+      el("button", { class: "pf-btn pf-btn-secondary", text: t("Back"), onclick: () => {
         audio.play("ui-back");
         backFromHelp();
       } })
@@ -28397,14 +30418,15 @@ function init(deps) {
     helpPaused = false;
   }
   const scoresScreen = makeScreen("scores");
+  let scoresSeq = 0;
   function renderLocalDaily(wrap) {
     const days = Object.keys(progress.dailyAttempts || {}).sort().reverse().slice(0, 10);
     if (!days.length) {
-      wrap.append(el("p", { class: "pf-note", text: "No local daily runs yet." }));
+      wrap.append(el("p", { class: "pf-note", text: t("No local daily runs yet.") }));
       return;
     }
     wrap.append(el("table", { class: "pf-score-table" }, [
-      el("tr", {}, [el("th", { text: "Day" }), el("th", { text: "Score" })]),
+      el("tr", {}, [el("th", { text: t("Day") }), el("th", { text: t("Score") })]),
       ...days.map((d) => el("tr", {}, [
         el("td", { text: d }),
         el("td", { text: String((progress.dailyAttempts[d] || {}).score ?? 0) })
@@ -28414,55 +30436,57 @@ function init(deps) {
   function renderLocalBests(wrap) {
     const rows = JOURNEY_LEVELS.filter((l) => progress.bests[l.id]);
     if (!rows.length) {
-      wrap.append(el("p", { class: "pf-note", text: "No local journey bests yet." }));
+      wrap.append(el("p", { class: "pf-note", text: t("No local journey bests yet.") }));
       return;
     }
     wrap.append(el("table", { class: "pf-score-table" }, [
-      el("tr", {}, [el("th", { text: "Chamber" }), el("th", { text: "Best" })]),
-      ...rows.map((l) => el("tr", {}, [el("td", { text: l.name }), el("td", { text: String(progress.bests[l.id]) })]))
+      el("tr", {}, [el("th", { text: t("Chamber") }), el("th", { text: t("Best") })]),
+      ...rows.map((l) => el("tr", {}, [el("td", { text: levelName(l) }), el("td", { text: String(progress.bests[l.id]) })]))
     ]));
   }
   async function renderScores() {
     scoresScreen.innerHTML = "";
-    scoresScreen.append(el("h2", { text: "Leaderboards" }));
+    const seq = ++scoresSeq;
+    scoresScreen.append(el("h2", { text: t("Leaderboards") }));
     const boards = el("div", { class: "pf-boards" });
     scoresScreen.append(
       boards,
-      el("button", { class: "pf-btn pf-btn-secondary", text: "Back", onclick: () => {
+      el("button", { class: "pf-btn pf-btn-secondary", text: t("Back"), onclick: () => {
         audio.play("ui-back");
         renderTitle();
         showScreen("title");
       } })
     );
     for (const board of ["global", "daily"]) {
-      const head = el("h3", { text: board === "global" ? "Global (Journey)" : "Daily" });
+      const head = el("h3", { text: board === "global" ? t2("Global (Journey)") : t2("Daily") });
       const wrap = el("section", { class: "pf-board" }, [head]);
       boards.append(wrap);
       const res = await platform.getLeaderboard(board);
+      if (seq !== scoresSeq) return;
       if (res.error) {
         if (board === "daily") {
           renderLocalDaily(wrap);
           continue;
         }
         if (res.error === "local") {
-          head.textContent = "Local bests (Journey)";
+          head.textContent = t2("Local bests (Journey)");
           renderLocalBests(wrap);
           continue;
         }
-        wrap.append(el("p", { class: "pf-note", text: "Board error: " + res.error }));
+        wrap.append(el("p", { class: "pf-note", text: t2("Board error: {error}", { error: res.error }) }));
         continue;
       }
       if (res.hosted && board === "daily") {
         renderLocalDaily(wrap);
         continue;
       }
-      if (res.hosted) head.textContent = "StarHermit leaderboard";
+      if (res.hosted) head.textContent = t2("StarHermit leaderboard");
       if (!res.entries || !res.entries.length) {
-        wrap.append(el("p", { class: "pf-note", text: "No entries yet. Be the first." }));
+        wrap.append(el("p", { class: "pf-note", text: t2("No entries yet. Be the first.") }));
         continue;
       }
-      const t = el("table", { class: "pf-score-table" }, [
-        el("tr", {}, [el("th", { text: "#" }), el("th", { text: "Name" }), el("th", { text: "Score" }), el("th", { text: "Goal" })]),
+      const t2 = el("table", { class: "pf-score-table" }, [
+        el("tr", {}, [el("th", { text: "#" }), el("th", { text: t2("Name") }), el("th", { text: t2("Score") }), el("th", { text: t2("Goal") })]),
         ...res.entries.map((e, i) => el("tr", {}, [
           el("td", { text: String(i + 1) }),
           el("td", { text: e.name }),
@@ -28470,7 +30494,7 @@ function init(deps) {
           el("td", { text: String(e.goal) })
         ]))
       ]);
-      wrap.append(t);
+      wrap.append(t2);
     }
   }
   function updateDailyCountdown() {
@@ -28481,7 +30505,7 @@ function init(deps) {
     next.setUTCHours(24, 0, 0, 0);
     const ms = next.getTime() - now2;
     const h = Math.floor(ms / 36e5), m = Math.floor(ms % 36e5 / 6e4);
-    node.textContent = "Next daily in " + h + "h " + m + "m";
+    node.textContent = t("Next daily in {h}h {m}m", { h, m });
   }
   setInterval(() => {
     if (!titleScreen.hidden) updateDailyCountdown();
@@ -28502,7 +30526,7 @@ function init(deps) {
     const remote = await platform.loadRemoteSettings();
     const picked = {};
     for (const [k, v] of Object.entries(remote)) {
-      if (k !== "version" && k in settings && v != null && typeof v === typeof settings[k]) picked[k] = v;
+      if (k !== "version" && !k.startsWith("ui.") && k in settings && v != null && typeof v === typeof settings[k]) picked[k] = v;
     }
     if (Object.keys(picked).length) applyRemoteDoc({ settings: picked });
     else platform.syncSettings(settings);
@@ -28510,6 +30534,35 @@ function init(deps) {
   });
   platform.getDaily().then((d) => {
     dailyInfo = d;
+  });
+  platform.onSaveConflict((remote) => {
+    if (remote) applyRemoteDoc(remote, { keepLocalSettings: true });
+    else saveProgress();
+    updateNetStatus();
+  });
+  onLocaleChange(() => {
+    for (const n of document.querySelectorAll("[data-i18n]")) n.textContent = t(n.dataset.i18n);
+    for (const n of document.querySelectorAll("[data-i18n-aria]")) n.setAttribute("aria-label", t(n.dataset.i18nAria));
+    updateNetStatus();
+    if (session && !screens.play.hidden) {
+      refreshHud();
+      if (currentMode === "learn" && currentLevel.steps) renderLessonBanner(true);
+    }
+    if (settingsOverlay) {
+      const note = settingsOverlay.querySelector(".pf-profile-note");
+      if (note) note.textContent = profileNote();
+      const gfx = settingsOverlay.querySelector("#pf-gfx-section");
+      if (gfx && gfx.relabel) gfx.relabel();
+    }
+    if (!screens.title.hidden) renderTitle();
+    else if (!screens.modes.hidden) {
+      const id = openSetup;
+      renderModes();
+      if (id) renderModeSetup(id);
+    } else if (!screens.progression.hidden) renderProgression();
+    else if (!screens.help.hidden) renderHelp();
+    else if (!screens.scores.hidden) renderScores();
+    else if (!screens.results.hidden && lastResults) renderResults(lastResults);
   });
   renderTitle();
   showScreen("title");
@@ -28633,7 +30686,7 @@ function mount() {
     const note = document.createElement("div");
     note.className = "pf-compat";
     note.setAttribute("role", "alert");
-    note.textContent = "WebGL is unavailable in this browser, so the 3D chamber view is disabled. All menus and the rules remain usable; enable hardware acceleration or try another browser for the full experience.";
+    note.textContent = t("WebGL is unavailable in this browser, so the 3D chamber view is disabled. All menus and the rules remain usable; enable hardware acceleration or try another browser for the full experience.");
     document.body.prepend(note);
   }
   init({ audio: audio_exports, platform: platform_exports, storage, createRenderer, analytics });
