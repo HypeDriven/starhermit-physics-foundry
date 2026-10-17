@@ -497,15 +497,29 @@ var init_rules = __esm({
 });
 
 // src/gfx.js
-function detectPreset(gpu, { mobile = false } = {}) {
-  const g = String(gpu || "").toLowerCase();
-  let p = "balanced";
-  if (/swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/.test(g)) p = "low";
-  else if (/nvidia|geforce|rtx|gtx|quadro|radeon rx|radeon pro|amd radeon(?!.*graphics)|apple m\d/.test(g)) p = "high";
-  if (mobile && PRESETS.indexOf(p) > PRESETS.indexOf("balanced")) p = "balanced";
-  return p;
+function detectLevel(gpu, system) {
+  const G = gpuApi();
+  const sys = { webgl: true, webgl2: true, ...system || {}, gpu: String(gpu || "") };
+  if (!gpu) sys.webgl = false;
+  return G ? G.detectLevel(sys) : gpu ? LEVELS.balanced : 0;
 }
-function resolve(saved, detected) {
+function presetForLevel(level) {
+  const G = gpuApi();
+  return G ? G.presetForLevel(level, LEVELS) : PRESETS.filter((p) => LEVELS[p] <= level).pop() || "low";
+}
+function budgetFor(preset, level) {
+  const b = { ...BUDGETS[preset] || BUDGETS.balanced };
+  const G = gpuApi(), floor = LEVELS[preset] || 0;
+  const lv = Math.max(Number.isFinite(level) ? level : floor, floor);
+  const k = G ? Math.min(2, G.scaleBudget(1, lv, floor)) : 1;
+  b.sparks = Math.min(SPARK_MAX, Math.round(b.sparks * k));
+  b.dust = Math.min(DUST_MAX, Math.round(b.dust * k));
+  return b;
+}
+function sparkCap(r) {
+  return r.particles === "high" ? r.budget.sparks : Math.min(PARTICLE_CAP.low, r.budget.sparks);
+}
+function resolve(saved, detected, level) {
   const s = saved || {};
   const auto = !PRESETS.includes(s.preset);
   const preset = auto ? PRESETS.includes(detected) ? detected : "balanced" : s.preset;
@@ -520,6 +534,8 @@ function resolve(saved, detected) {
   for (const [cat, tiers] of Object.entries(CATEGORIES)) {
     out[cat] = tiers.includes(s[cat]) ? s[cat] : row[cat];
   }
+  out.level = Number.isFinite(level) ? level : LEVELS[preset];
+  out.budget = budgetFor(preset, out.level);
   out.adaptive = s.adaptive !== false;
   out.showFps = !!s.show_fps;
   out.post = out.ao !== "off" || out.bloom === "on" || out.grade === "on" || out.antialias === "fxaa" || out.antialias === "smaa";
@@ -548,7 +564,7 @@ function describe(r, pixels) {
 function clamp(v, a, b) {
   return Math.min(b, Math.max(a, v));
 }
-var PRESETS, CATEGORIES, TABLE, SHADOW_MAP, PARTICLE_CAP;
+var PRESETS, CATEGORIES, TABLE, SHADOW_MAP, PARTICLE_CAP, LEVELS, gpuApi, BUDGETS, SPARK_MAX, DUST_MAX;
 var init_gfx = __esm({
   "src/gfx.js"() {
     PRESETS = ["low", "balanced", "high", "ultra"];
@@ -571,6 +587,16 @@ var init_gfx = __esm({
     };
     SHADOW_MAP = { off: 0, low: 1024, medium: 2048, high: 4096 };
     PARTICLE_CAP = { low: 300, high: 2e3 };
+    LEVELS = { low: 0, balanced: 4, high: 10, ultra: 17 };
+    gpuApi = () => globalThis.StarHermitGpu;
+    BUDGETS = {
+      low: { material: "lambert", wallTex: 256, bodyTex: 64, sphere: [16, 12], sparks: 300, dust: 40, bloomRes: 0.5, aoRes: 0.5 },
+      balanced: { material: "standard", wallTex: 512, bodyTex: 128, sphere: [24, 16], sparks: 800, dust: 80, bloomRes: 0.5, aoRes: 0.5 },
+      high: { material: "physical", wallTex: 1024, bodyTex: 256, sphere: [40, 28], sparks: 2e3, dust: 140, bloomRes: 0.5, aoRes: 0.5 },
+      ultra: { material: "physical", wallTex: 2048, bodyTex: 512, sphere: [56, 40], sparks: 3e3, dust: 240, bloomRes: 1, aoRes: 1 }
+    };
+    SPARK_MAX = 6e3;
+    DUST_MAX = 480;
   }
 });
 
@@ -7568,7 +7594,7 @@ function intersectObject(object, raycaster, intersects, recursive) {
     }
   }
 }
-var REVISION, CullFaceNone, CullFaceBack, CullFaceFront, PCFShadowMap, PCFSoftShadowMap, VSMShadowMap, FrontSide, BackSide, DoubleSide, NoBlending, NormalBlending, AdditiveBlending, SubtractiveBlending, MultiplyBlending, CustomBlending, AddEquation, SubtractEquation, ReverseSubtractEquation, MinEquation, MaxEquation, ZeroFactor, OneFactor, SrcColorFactor, OneMinusSrcColorFactor, SrcAlphaFactor, OneMinusSrcAlphaFactor, DstAlphaFactor, OneMinusDstAlphaFactor, DstColorFactor, OneMinusDstColorFactor, SrcAlphaSaturateFactor, ConstantColorFactor, OneMinusConstantColorFactor, ConstantAlphaFactor, OneMinusConstantAlphaFactor, NeverDepth, AlwaysDepth, LessDepth, LessEqualDepth, EqualDepth, GreaterEqualDepth, GreaterDepth, NotEqualDepth, MultiplyOperation, MixOperation, AddOperation, NoToneMapping, LinearToneMapping, ReinhardToneMapping, CineonToneMapping, ACESFilmicToneMapping, CustomToneMapping, AgXToneMapping, UVMapping, CubeReflectionMapping, CubeRefractionMapping, EquirectangularReflectionMapping, EquirectangularRefractionMapping, CubeUVReflectionMapping, RepeatWrapping, ClampToEdgeWrapping, MirroredRepeatWrapping, NearestFilter, NearestMipmapNearestFilter, NearestMipmapLinearFilter, LinearFilter, LinearMipmapNearestFilter, LinearMipmapLinearFilter, UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, FloatType, HalfFloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt248Type, AlphaFormat, RGBAFormat, LuminanceFormat, LuminanceAlphaFormat, DepthFormat, DepthStencilFormat, RedFormat, RedIntegerFormat, RGFormat, RGIntegerFormat, RGBAIntegerFormat, RGB_S3TC_DXT1_Format, RGBA_S3TC_DXT1_Format, RGBA_S3TC_DXT3_Format, RGBA_S3TC_DXT5_Format, RGB_PVRTC_4BPPV1_Format, RGB_PVRTC_2BPPV1_Format, RGBA_PVRTC_4BPPV1_Format, RGBA_PVRTC_2BPPV1_Format, RGB_ETC1_Format, RGB_ETC2_Format, RGBA_ETC2_EAC_Format, RGBA_ASTC_4x4_Format, RGBA_ASTC_5x4_Format, RGBA_ASTC_5x5_Format, RGBA_ASTC_6x5_Format, RGBA_ASTC_6x6_Format, RGBA_ASTC_8x5_Format, RGBA_ASTC_8x6_Format, RGBA_ASTC_8x8_Format, RGBA_ASTC_10x5_Format, RGBA_ASTC_10x6_Format, RGBA_ASTC_10x8_Format, RGBA_ASTC_10x10_Format, RGBA_ASTC_12x10_Format, RGBA_ASTC_12x12_Format, RGBA_BPTC_Format, RGB_BPTC_SIGNED_Format, RGB_BPTC_UNSIGNED_Format, RED_RGTC1_Format, SIGNED_RED_RGTC1_Format, RED_GREEN_RGTC2_Format, SIGNED_RED_GREEN_RGTC2_Format, InterpolateDiscrete, InterpolateLinear, InterpolateSmooth, ZeroCurvatureEnding, ZeroSlopeEnding, WrapAroundEnding, LinearEncoding, sRGBEncoding, BasicDepthPacking, RGBADepthPacking, TangentSpaceNormalMap, ObjectSpaceNormalMap, NoColorSpace, SRGBColorSpace, LinearSRGBColorSpace, DisplayP3ColorSpace, LinearDisplayP3ColorSpace, LinearTransfer, SRGBTransfer, Rec709Primaries, P3Primaries, KeepStencilOp, AlwaysStencilFunc, NeverCompare, LessCompare, EqualCompare, LessEqualCompare, GreaterCompare, NotEqualCompare, GreaterEqualCompare, AlwaysCompare, StaticDrawUsage, GLSL3, _SRGBAFormat, WebGLCoordinateSystem, WebGPUCoordinateSystem, EventDispatcher, _lut, DEG2RAD, RAD2DEG, Vector2, Matrix3, _m3, _cache, LINEAR_SRGB_TO_LINEAR_DISPLAY_P3, LINEAR_DISPLAY_P3_TO_LINEAR_SRGB, COLOR_SPACES, SUPPORTED_WORKING_COLOR_SPACES, ColorManagement, _canvas, ImageUtils, _sourceId, Source, _textureId, Texture, Vector4, RenderTarget, WebGLRenderTarget, DataArrayTexture, Data3DTexture, Quaternion, Vector3, _vector$c, _quaternion$4, Box3, _points, _vector$b, _box$4, _v0$2, _v1$7, _v2$4, _f0, _f1, _f2, _center, _extents, _triangleNormal, _testAxis, _box$3, _v1$6, _v2$3, Sphere, _vector$a, _segCenter, _segDir, _diff, _edge1, _edge2, _normal$1, Ray, Matrix4, _v1$5, _m1$2, _zero, _one, _x, _y, _z, _matrix$1, _quaternion$3, Euler, Layers, _object3DId, _v1$4, _q1, _m1$1, _target, _position$3, _scale$2, _quaternion$2, _xAxis, _yAxis, _zAxis, _addedEvent, _removedEvent, Object3D, _v0$1, _v1$3, _v2$2, _v3$2, _vab, _vac, _vbc, _vap, _vbp, _vcp, Triangle, _colorKeywords, _hslA, _hslB, Color, _color, _materialId, Material, MeshBasicMaterial, _vector$9, _vector2$1, BufferAttribute, Uint16BufferAttribute, Uint32BufferAttribute, Float32BufferAttribute, _id$2, _m1, _obj, _offset, _box$2, _boxMorphTargets, _vector$8, BufferGeometry, _inverseMatrix$3, _ray$3, _sphere$6, _sphereHitAt, _vA$1, _vB$1, _vC$1, _tempA, _morphA, _uvA$1, _uvB$1, _uvC$1, _normalA, _normalB, _normalC, _intersectionPoint, _intersectionPointWorld, Mesh, BoxGeometry, UniformsUtils, default_vertex, default_fragment, ShaderMaterial, Camera, _v3$1, _minTarget, _maxTarget, PerspectiveCamera, fov, aspect, CubeCamera, CubeTexture, WebGLCubeRenderTarget, _vector1, _vector2, _normalMatrix, Plane, _sphere$5, _vector$7, Frustum, PlaneGeometry, alphahash_fragment, alphahash_pars_fragment, alphamap_fragment, alphamap_pars_fragment, alphatest_fragment, alphatest_pars_fragment, aomap_fragment, aomap_pars_fragment, batching_pars_vertex, batching_vertex, begin_vertex, beginnormal_vertex, bsdfs, iridescence_fragment, bumpmap_pars_fragment, clipping_planes_fragment, clipping_planes_pars_fragment, clipping_planes_pars_vertex, clipping_planes_vertex, color_fragment, color_pars_fragment, color_pars_vertex, color_vertex, common, cube_uv_reflection_fragment, defaultnormal_vertex, displacementmap_pars_vertex, displacementmap_vertex, emissivemap_fragment, emissivemap_pars_fragment, colorspace_fragment, colorspace_pars_fragment, envmap_fragment, envmap_common_pars_fragment, envmap_pars_fragment, envmap_pars_vertex, envmap_vertex, fog_vertex, fog_pars_vertex, fog_fragment, fog_pars_fragment, gradientmap_pars_fragment, lightmap_fragment, lightmap_pars_fragment, lights_lambert_fragment, lights_lambert_pars_fragment, lights_pars_begin, envmap_physical_pars_fragment, lights_toon_fragment, lights_toon_pars_fragment, lights_phong_fragment, lights_phong_pars_fragment, lights_physical_fragment, lights_physical_pars_fragment, lights_fragment_begin, lights_fragment_maps, lights_fragment_end, logdepthbuf_fragment, logdepthbuf_pars_fragment, logdepthbuf_pars_vertex, logdepthbuf_vertex, map_fragment, map_pars_fragment, map_particle_fragment, map_particle_pars_fragment, metalnessmap_fragment, metalnessmap_pars_fragment, morphcolor_vertex, morphnormal_vertex, morphtarget_pars_vertex, morphtarget_vertex, normal_fragment_begin, normal_fragment_maps, normal_pars_fragment, normal_pars_vertex, normal_vertex, normalmap_pars_fragment, clearcoat_normal_fragment_begin, clearcoat_normal_fragment_maps, clearcoat_pars_fragment, iridescence_pars_fragment, opaque_fragment, packing, premultiplied_alpha_fragment, project_vertex, dithering_fragment, dithering_pars_fragment, roughnessmap_fragment, roughnessmap_pars_fragment, shadowmap_pars_fragment, shadowmap_pars_vertex, shadowmap_vertex, shadowmask_pars_fragment, skinbase_vertex, skinning_pars_vertex, skinning_vertex, skinnormal_vertex, specularmap_fragment, specularmap_pars_fragment, tonemapping_fragment, tonemapping_pars_fragment, transmission_fragment, transmission_pars_fragment, uv_pars_fragment, uv_pars_vertex, uv_vertex, worldpos_vertex, vertex$h, fragment$h, vertex$g, fragment$g, vertex$f, fragment$f, vertex$e, fragment$e, vertex$d, fragment$d, vertex$c, fragment$c, vertex$b, fragment$b, vertex$a, fragment$a, vertex$9, fragment$9, vertex$8, fragment$8, vertex$7, fragment$7, vertex$6, fragment$6, vertex$5, fragment$5, vertex$4, fragment$4, vertex$3, fragment$3, vertex$2, fragment$2, vertex$1, fragment$1, ShaderChunk, UniformsLib, ShaderLib, _rgb, OrthographicCamera, LOD_MIN, EXTRA_LOD_SIGMA, MAX_SAMPLES, _flatCamera, _clearColor, _oldTarget, _oldActiveCubeFace, _oldActiveMipmapLevel, PHI, INV_PHI, _axisDirections, PMREMGenerator, DepthTexture, emptyTexture, emptyShadowTexture, emptyArrayTexture, empty3dTexture, emptyCubeTexture, arrayCacheF32, arrayCacheI32, mat4array, mat3array, mat2array, SingleUniform, PureArrayUniform, StructuredUniform, RePathPart, WebGLUniforms, COMPLETION_STATUS_KHR, programIdCount, includePattern, shaderChunkMap, unrollLoopPattern, _id$1, WebGLShaderCache, WebGLShaderStage, nextVersion, MeshDepthMaterial, MeshDistanceMaterial, vertex, fragment, ArrayCamera, Group, _moveEvent, WebXRController, _occlusion_vertex, _occlusion_fragment, WebXRDepthSensing, WebXRManager, WebGLRenderer, WebGL1Renderer, Scene, DataTexture, PointsMaterial, _inverseMatrix, _ray, _sphere, _position$2, Points, CanvasTexture, CircleGeometry, CylinderGeometry, RingGeometry, SphereGeometry, TorusGeometry, RawShaderMaterial, MeshStandardMaterial, MeshPhysicalMaterial, MeshNormalMaterial, Interpolant, CubicInterpolant, LinearInterpolant, DiscreteInterpolant, KeyframeTrack, BooleanKeyframeTrack, ColorKeyframeTrack, NumberKeyframeTrack, QuaternionLinearInterpolant, QuaternionKeyframeTrack, StringKeyframeTrack, VectorKeyframeTrack, LoadingManager, DefaultLoadingManager, Loader, Light, HemisphereLight, _projScreenMatrix$1, _lightPositionWorld$1, _lookTarget$1, LightShadow, _projScreenMatrix, _lightPositionWorld, _lookTarget, PointLightShadow, PointLight, DirectionalLightShadow, DirectionalLight, AmbientLight, Clock, _RESERVED_CHARS_RE, _reservedRe, _wordChar, _wordCharOrDot, _directoryRe, _nodeRe, _objectRe, _propertyRe, _trackRe, _supportedObjectNames, Composite, PropertyBinding, _controlInterpolantsResultBuffer, Raycaster;
+var REVISION, CullFaceNone, CullFaceBack, CullFaceFront, PCFShadowMap, PCFSoftShadowMap, VSMShadowMap, FrontSide, BackSide, DoubleSide, NoBlending, NormalBlending, AdditiveBlending, SubtractiveBlending, MultiplyBlending, CustomBlending, AddEquation, SubtractEquation, ReverseSubtractEquation, MinEquation, MaxEquation, ZeroFactor, OneFactor, SrcColorFactor, OneMinusSrcColorFactor, SrcAlphaFactor, OneMinusSrcAlphaFactor, DstAlphaFactor, OneMinusDstAlphaFactor, DstColorFactor, OneMinusDstColorFactor, SrcAlphaSaturateFactor, ConstantColorFactor, OneMinusConstantColorFactor, ConstantAlphaFactor, OneMinusConstantAlphaFactor, NeverDepth, AlwaysDepth, LessDepth, LessEqualDepth, EqualDepth, GreaterEqualDepth, GreaterDepth, NotEqualDepth, MultiplyOperation, MixOperation, AddOperation, NoToneMapping, LinearToneMapping, ReinhardToneMapping, CineonToneMapping, ACESFilmicToneMapping, CustomToneMapping, AgXToneMapping, UVMapping, CubeReflectionMapping, CubeRefractionMapping, EquirectangularReflectionMapping, EquirectangularRefractionMapping, CubeUVReflectionMapping, RepeatWrapping, ClampToEdgeWrapping, MirroredRepeatWrapping, NearestFilter, NearestMipmapNearestFilter, NearestMipmapLinearFilter, LinearFilter, LinearMipmapNearestFilter, LinearMipmapLinearFilter, UnsignedByteType, ByteType, ShortType, UnsignedShortType, IntType, UnsignedIntType, FloatType, HalfFloatType, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt248Type, AlphaFormat, RGBAFormat, LuminanceFormat, LuminanceAlphaFormat, DepthFormat, DepthStencilFormat, RedFormat, RedIntegerFormat, RGFormat, RGIntegerFormat, RGBAIntegerFormat, RGB_S3TC_DXT1_Format, RGBA_S3TC_DXT1_Format, RGBA_S3TC_DXT3_Format, RGBA_S3TC_DXT5_Format, RGB_PVRTC_4BPPV1_Format, RGB_PVRTC_2BPPV1_Format, RGBA_PVRTC_4BPPV1_Format, RGBA_PVRTC_2BPPV1_Format, RGB_ETC1_Format, RGB_ETC2_Format, RGBA_ETC2_EAC_Format, RGBA_ASTC_4x4_Format, RGBA_ASTC_5x4_Format, RGBA_ASTC_5x5_Format, RGBA_ASTC_6x5_Format, RGBA_ASTC_6x6_Format, RGBA_ASTC_8x5_Format, RGBA_ASTC_8x6_Format, RGBA_ASTC_8x8_Format, RGBA_ASTC_10x5_Format, RGBA_ASTC_10x6_Format, RGBA_ASTC_10x8_Format, RGBA_ASTC_10x10_Format, RGBA_ASTC_12x10_Format, RGBA_ASTC_12x12_Format, RGBA_BPTC_Format, RGB_BPTC_SIGNED_Format, RGB_BPTC_UNSIGNED_Format, RED_RGTC1_Format, SIGNED_RED_RGTC1_Format, RED_GREEN_RGTC2_Format, SIGNED_RED_GREEN_RGTC2_Format, InterpolateDiscrete, InterpolateLinear, InterpolateSmooth, ZeroCurvatureEnding, ZeroSlopeEnding, WrapAroundEnding, LinearEncoding, sRGBEncoding, BasicDepthPacking, RGBADepthPacking, TangentSpaceNormalMap, ObjectSpaceNormalMap, NoColorSpace, SRGBColorSpace, LinearSRGBColorSpace, DisplayP3ColorSpace, LinearDisplayP3ColorSpace, LinearTransfer, SRGBTransfer, Rec709Primaries, P3Primaries, KeepStencilOp, AlwaysStencilFunc, NeverCompare, LessCompare, EqualCompare, LessEqualCompare, GreaterCompare, NotEqualCompare, GreaterEqualCompare, AlwaysCompare, StaticDrawUsage, GLSL3, _SRGBAFormat, WebGLCoordinateSystem, WebGPUCoordinateSystem, EventDispatcher, _lut, DEG2RAD, RAD2DEG, Vector2, Matrix3, _m3, _cache, LINEAR_SRGB_TO_LINEAR_DISPLAY_P3, LINEAR_DISPLAY_P3_TO_LINEAR_SRGB, COLOR_SPACES, SUPPORTED_WORKING_COLOR_SPACES, ColorManagement, _canvas, ImageUtils, _sourceId, Source, _textureId, Texture, Vector4, RenderTarget, WebGLRenderTarget, DataArrayTexture, Data3DTexture, Quaternion, Vector3, _vector$c, _quaternion$4, Box3, _points, _vector$b, _box$4, _v0$2, _v1$7, _v2$4, _f0, _f1, _f2, _center, _extents, _triangleNormal, _testAxis, _box$3, _v1$6, _v2$3, Sphere, _vector$a, _segCenter, _segDir, _diff, _edge1, _edge2, _normal$1, Ray, Matrix4, _v1$5, _m1$2, _zero, _one, _x, _y, _z, _matrix$1, _quaternion$3, Euler, Layers, _object3DId, _v1$4, _q1, _m1$1, _target, _position$3, _scale$2, _quaternion$2, _xAxis, _yAxis, _zAxis, _addedEvent, _removedEvent, Object3D, _v0$1, _v1$3, _v2$2, _v3$2, _vab, _vac, _vbc, _vap, _vbp, _vcp, Triangle, _colorKeywords, _hslA, _hslB, Color, _color, _materialId, Material, MeshBasicMaterial, _vector$9, _vector2$1, BufferAttribute, Uint16BufferAttribute, Uint32BufferAttribute, Float32BufferAttribute, _id$2, _m1, _obj, _offset, _box$2, _boxMorphTargets, _vector$8, BufferGeometry, _inverseMatrix$3, _ray$3, _sphere$6, _sphereHitAt, _vA$1, _vB$1, _vC$1, _tempA, _morphA, _uvA$1, _uvB$1, _uvC$1, _normalA, _normalB, _normalC, _intersectionPoint, _intersectionPointWorld, Mesh, BoxGeometry, UniformsUtils, default_vertex, default_fragment, ShaderMaterial, Camera, _v3$1, _minTarget, _maxTarget, PerspectiveCamera, fov, aspect, CubeCamera, CubeTexture, WebGLCubeRenderTarget, _vector1, _vector2, _normalMatrix, Plane, _sphere$5, _vector$7, Frustum, PlaneGeometry, alphahash_fragment, alphahash_pars_fragment, alphamap_fragment, alphamap_pars_fragment, alphatest_fragment, alphatest_pars_fragment, aomap_fragment, aomap_pars_fragment, batching_pars_vertex, batching_vertex, begin_vertex, beginnormal_vertex, bsdfs, iridescence_fragment, bumpmap_pars_fragment, clipping_planes_fragment, clipping_planes_pars_fragment, clipping_planes_pars_vertex, clipping_planes_vertex, color_fragment, color_pars_fragment, color_pars_vertex, color_vertex, common, cube_uv_reflection_fragment, defaultnormal_vertex, displacementmap_pars_vertex, displacementmap_vertex, emissivemap_fragment, emissivemap_pars_fragment, colorspace_fragment, colorspace_pars_fragment, envmap_fragment, envmap_common_pars_fragment, envmap_pars_fragment, envmap_pars_vertex, envmap_vertex, fog_vertex, fog_pars_vertex, fog_fragment, fog_pars_fragment, gradientmap_pars_fragment, lightmap_fragment, lightmap_pars_fragment, lights_lambert_fragment, lights_lambert_pars_fragment, lights_pars_begin, envmap_physical_pars_fragment, lights_toon_fragment, lights_toon_pars_fragment, lights_phong_fragment, lights_phong_pars_fragment, lights_physical_fragment, lights_physical_pars_fragment, lights_fragment_begin, lights_fragment_maps, lights_fragment_end, logdepthbuf_fragment, logdepthbuf_pars_fragment, logdepthbuf_pars_vertex, logdepthbuf_vertex, map_fragment, map_pars_fragment, map_particle_fragment, map_particle_pars_fragment, metalnessmap_fragment, metalnessmap_pars_fragment, morphcolor_vertex, morphnormal_vertex, morphtarget_pars_vertex, morphtarget_vertex, normal_fragment_begin, normal_fragment_maps, normal_pars_fragment, normal_pars_vertex, normal_vertex, normalmap_pars_fragment, clearcoat_normal_fragment_begin, clearcoat_normal_fragment_maps, clearcoat_pars_fragment, iridescence_pars_fragment, opaque_fragment, packing, premultiplied_alpha_fragment, project_vertex, dithering_fragment, dithering_pars_fragment, roughnessmap_fragment, roughnessmap_pars_fragment, shadowmap_pars_fragment, shadowmap_pars_vertex, shadowmap_vertex, shadowmask_pars_fragment, skinbase_vertex, skinning_pars_vertex, skinning_vertex, skinnormal_vertex, specularmap_fragment, specularmap_pars_fragment, tonemapping_fragment, tonemapping_pars_fragment, transmission_fragment, transmission_pars_fragment, uv_pars_fragment, uv_pars_vertex, uv_vertex, worldpos_vertex, vertex$h, fragment$h, vertex$g, fragment$g, vertex$f, fragment$f, vertex$e, fragment$e, vertex$d, fragment$d, vertex$c, fragment$c, vertex$b, fragment$b, vertex$a, fragment$a, vertex$9, fragment$9, vertex$8, fragment$8, vertex$7, fragment$7, vertex$6, fragment$6, vertex$5, fragment$5, vertex$4, fragment$4, vertex$3, fragment$3, vertex$2, fragment$2, vertex$1, fragment$1, ShaderChunk, UniformsLib, ShaderLib, _rgb, OrthographicCamera, LOD_MIN, EXTRA_LOD_SIGMA, MAX_SAMPLES, _flatCamera, _clearColor, _oldTarget, _oldActiveCubeFace, _oldActiveMipmapLevel, PHI, INV_PHI, _axisDirections, PMREMGenerator, DepthTexture, emptyTexture, emptyShadowTexture, emptyArrayTexture, empty3dTexture, emptyCubeTexture, arrayCacheF32, arrayCacheI32, mat4array, mat3array, mat2array, SingleUniform, PureArrayUniform, StructuredUniform, RePathPart, WebGLUniforms, COMPLETION_STATUS_KHR, programIdCount, includePattern, shaderChunkMap, unrollLoopPattern, _id$1, WebGLShaderCache, WebGLShaderStage, nextVersion, MeshDepthMaterial, MeshDistanceMaterial, vertex, fragment, ArrayCamera, Group, _moveEvent, WebXRController, _occlusion_vertex, _occlusion_fragment, WebXRDepthSensing, WebXRManager, WebGLRenderer, WebGL1Renderer, Scene, DataTexture, PointsMaterial, _inverseMatrix, _ray, _sphere, _position$2, Points, CanvasTexture, CircleGeometry, CylinderGeometry, RingGeometry, SphereGeometry, TorusGeometry, RawShaderMaterial, MeshStandardMaterial, MeshPhysicalMaterial, MeshNormalMaterial, MeshLambertMaterial, Interpolant, CubicInterpolant, LinearInterpolant, DiscreteInterpolant, KeyframeTrack, BooleanKeyframeTrack, ColorKeyframeTrack, NumberKeyframeTrack, QuaternionLinearInterpolant, QuaternionKeyframeTrack, StringKeyframeTrack, VectorKeyframeTrack, LoadingManager, DefaultLoadingManager, Loader, Light, HemisphereLight, _projScreenMatrix$1, _lightPositionWorld$1, _lookTarget$1, LightShadow, _projScreenMatrix, _lightPositionWorld, _lookTarget, PointLightShadow, PointLight, DirectionalLightShadow, DirectionalLight, AmbientLight, Clock, _RESERVED_CHARS_RE, _reservedRe, _wordChar, _wordCharOrDot, _directoryRe, _nodeRe, _objectRe, _propertyRe, _trackRe, _supportedObjectNames, Composite, PropertyBinding, _controlInterpolantsResultBuffer, Raycaster;
 var init_three_module = __esm({
   "vendor/three.module.js"() {
     REVISION = "161";
@@ -19225,6 +19251,76 @@ void main() {
         return this;
       }
     };
+    MeshLambertMaterial = class extends Material {
+      constructor(parameters) {
+        super();
+        this.isMeshLambertMaterial = true;
+        this.type = "MeshLambertMaterial";
+        this.color = new Color(16777215);
+        this.map = null;
+        this.lightMap = null;
+        this.lightMapIntensity = 1;
+        this.aoMap = null;
+        this.aoMapIntensity = 1;
+        this.emissive = new Color(0);
+        this.emissiveIntensity = 1;
+        this.emissiveMap = null;
+        this.bumpMap = null;
+        this.bumpScale = 1;
+        this.normalMap = null;
+        this.normalMapType = TangentSpaceNormalMap;
+        this.normalScale = new Vector2(1, 1);
+        this.displacementMap = null;
+        this.displacementScale = 1;
+        this.displacementBias = 0;
+        this.specularMap = null;
+        this.alphaMap = null;
+        this.envMap = null;
+        this.combine = MultiplyOperation;
+        this.reflectivity = 1;
+        this.refractionRatio = 0.98;
+        this.wireframe = false;
+        this.wireframeLinewidth = 1;
+        this.wireframeLinecap = "round";
+        this.wireframeLinejoin = "round";
+        this.flatShading = false;
+        this.fog = true;
+        this.setValues(parameters);
+      }
+      copy(source) {
+        super.copy(source);
+        this.color.copy(source.color);
+        this.map = source.map;
+        this.lightMap = source.lightMap;
+        this.lightMapIntensity = source.lightMapIntensity;
+        this.aoMap = source.aoMap;
+        this.aoMapIntensity = source.aoMapIntensity;
+        this.emissive.copy(source.emissive);
+        this.emissiveMap = source.emissiveMap;
+        this.emissiveIntensity = source.emissiveIntensity;
+        this.bumpMap = source.bumpMap;
+        this.bumpScale = source.bumpScale;
+        this.normalMap = source.normalMap;
+        this.normalMapType = source.normalMapType;
+        this.normalScale.copy(source.normalScale);
+        this.displacementMap = source.displacementMap;
+        this.displacementScale = source.displacementScale;
+        this.displacementBias = source.displacementBias;
+        this.specularMap = source.specularMap;
+        this.alphaMap = source.alphaMap;
+        this.envMap = source.envMap;
+        this.combine = source.combine;
+        this.reflectivity = source.reflectivity;
+        this.refractionRatio = source.refractionRatio;
+        this.wireframe = source.wireframe;
+        this.wireframeLinewidth = source.wireframeLinewidth;
+        this.wireframeLinecap = source.wireframeLinecap;
+        this.wireframeLinejoin = source.wireframeLinejoin;
+        this.flatShading = source.flatShading;
+        this.fog = source.fog;
+        return this;
+      }
+    };
     Interpolant = class {
       constructor(parameterPositions, sampleValues, sampleSize, resultBuffer) {
         this.parameterPositions = parameterPositions;
@@ -23738,12 +23834,13 @@ function canvasTexture(c, srgb = true) {
   tex.anisotropy = 4;
   return tex;
 }
-function makePanelTexture() {
+function makePanelTexture(size = 1024) {
   const W2 = 1024, H2 = 683;
   const c = document.createElement("canvas");
-  c.width = W2;
-  c.height = H2;
+  c.width = size;
+  c.height = Math.round(size * H2 / W2);
   const g = c.getContext("2d");
+  g.scale(size / W2, size / W2);
   const rnd = hashNoise(24301);
   const pw = W2 / 5, ph = H2 / 3;
   for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) {
@@ -23809,11 +23906,12 @@ function makeTreadTexture() {
   tex.wrapS = tex.wrapT = RepeatWrapping;
   return tex;
 }
-function makeBodyTexture(kind) {
+function makeBodyTexture(kind, size = 256) {
   const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 128;
+  c.width = size;
+  c.height = size / 2;
   const g = c.getContext("2d");
+  g.scale(size / 256, size / 256);
   const rnd = hashNoise(kind.length * 977 + kind.charCodeAt(0));
   g.fillStyle = "#ffffff";
   g.fillRect(0, 0, 256, 128);
@@ -23877,6 +23975,12 @@ function makeLightPool() {
   g.fillStyle = grd;
   g.fillRect(0, 0, 128, 64);
   return canvasTexture(c);
+}
+function atScale(pass, k) {
+  if (!(k < 1)) return pass;
+  const setSize = pass.setSize.bind(pass);
+  pass.setSize = (w, h) => setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  return pass;
 }
 function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
@@ -23992,19 +24096,26 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     rubber: { roughness: 0.8, metalness: 0, clearcoat: 0.15, env: 0.4 }
   };
   const bodyMats = {};
-  for (const [id, m] of Object.entries(MATERIALS)) {
-    const look = BODY_LOOK[id] || { roughness: 0.45, metalness: 0.05, clearcoat: 0.4, env: 0.7 };
-    bodyMats[id] = new MeshPhysicalMaterial({
-      color: new Color(m.color),
-      roughness: look.roughness,
-      metalness: look.metalness,
-      clearcoat: look.clearcoat,
-      clearcoatRoughness: look.clearcoatRoughness ?? 0.12,
-      envMapIntensity: look.env,
-      transparent: id === "glass",
-      opacity: look.opacity ?? 1
-    });
+  let bodyTier = "";
+  function buildBodyMats(tier) {
+    if (tier === bodyTier) return false;
+    bodyTier = tier;
+    for (const [id, m] of Object.entries(MATERIALS)) {
+      const look = BODY_LOOK[id] || { roughness: 0.45, metalness: 0.05, clearcoat: 0.4, env: 0.7 };
+      const base = { color: new Color(m.color), transparent: id === "glass", opacity: look.opacity ?? 1 };
+      if (bodyMats[id]) bodyMats[id].dispose();
+      bodyMats[id] = tier === "lambert" ? new MeshLambertMaterial(base) : tier === "standard" ? new MeshStandardMaterial({ ...base, roughness: look.roughness, metalness: look.metalness, envMapIntensity: look.env }) : new MeshPhysicalMaterial({
+        ...base,
+        roughness: look.roughness,
+        metalness: look.metalness,
+        clearcoat: look.clearcoat,
+        clearcoatRoughness: look.clearcoatRoughness ?? 0.12,
+        envMapIntensity: look.env
+      });
+    }
+    return true;
   }
+  buildBodyMats("physical");
   function buildChamber() {
     const back = new Mesh(new BoxGeometry(CH_W + 4, CH_H + 4, 0.4), mats.panel);
     back.position.set(0, 0, -1.2);
@@ -24176,10 +24287,20 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   const interactive = [];
   const bodyGeo = new CylinderGeometry(0.5, 0.5, 0.6, 28);
   bodyGeo.rotateX(Math.PI / 2);
-  const sphereGeo = new SphereGeometry(0.5, 40, 28);
+  let sphereSegs = "40x28";
+  let sphereGeo = new SphereGeometry(0.5, 40, 28);
   sphereGeo.rotateX(Math.PI / 2);
   const payloadRingGeo = new TorusGeometry(0.6, 0.045, 8, 40);
   const currentBodyGeo = () => gfx && gfx.detail === "detailed" ? sphereGeo : bodyGeo;
+  const pickSphere = new Sphere(), pickPoint = new Vector3();
+  function pickBody(raycaster2, intersects) {
+    this.getWorldPosition(pickSphere.center);
+    pickSphere.radius = 0.5;
+    if (!raycaster2.ray.intersectSphere(pickSphere, pickPoint)) return;
+    const distance = raycaster2.ray.origin.distanceTo(pickPoint);
+    if (distance < raycaster2.near || distance > raycaster2.far) return;
+    intersects.push({ distance, point: pickPoint.clone(), object: this });
+  }
   function getBodyView(b) {
     let v = bodyViews.get(b.id);
     if (!v) {
@@ -24189,6 +24310,7 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData = { kind: "body", id: b.id, material: b.material };
+      mesh.raycast = pickBody;
       if (b.kind === "payload") {
         const pr = new Mesh(payloadRingGeo, mats.payloadRing);
         pr.position.z = 0.05;
@@ -24227,7 +24349,7 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     return v;
   }
   const ghostCyl = bodyGeo.clone();
-  const ghostSphere = sphereGeo.clone();
+  let ghostSphere = sphereGeo.clone();
   const ghost = new Mesh(ghostCyl, mats.ghostOk);
   ghost.visible = false;
   overlayGroup.add(ghost);
@@ -24242,8 +24364,8 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   }
   cursorGroup.position.z = 0.5;
   overlayGroup.add(cursorGroup);
-  const MAX_PARTICLES = PARTICLE_CAP.high;
-  let particleCap = PARTICLE_CAP.high;
+  const MAX_PARTICLES = SPARK_MAX;
+  let particleCap = 300;
   let particleBoost = 1;
   const pGeo = new BufferGeometry();
   const pPos = new Float32Array(MAX_PARTICLES * 3);
@@ -24306,7 +24428,8 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     pGeo.attributes.position.needsUpdate = true;
     pGeo.attributes.color.needsUpdate = true;
   }
-  const DUST = 140;
+  const DUST = DUST_MAX;
+  let dustCount = 140;
   const dGeo = new BufferGeometry();
   const dPos = new Float32Array(DUST * 3);
   const dSeed = new Float32Array(DUST * 2);
@@ -24336,7 +24459,7 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   dust.visible = false;
   scene.add(dust);
   function updateDust(dt) {
-    for (let i = 0; i < DUST; i++) {
+    for (let i = 0; i < dustCount; i++) {
       const ph = dSeed[i * 2], sp = dSeed[i * 2 + 1];
       let y = dPos[i * 3 + 1] + sp * dt;
       if (y > CH_CY) y -= CH_H;
@@ -24357,6 +24480,7 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   let gfx = null;
   let gfxSaved = null;
   let detectedPreset = "balanced";
+  let gpuLevel = void 0;
   let composer = null;
   let postKey = null;
   let postFailed = false;
@@ -24372,9 +24496,10 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   function texture(name) {
     if (texCache[name]) return texCache[name];
     let t2;
-    if (name === "panel") t2 = makePanelTexture();
+    const b = gfx ? gfx.budget : { wallTex: 1024, bodyTex: 256 };
+    if (name === "panel") t2 = makePanelTexture(b.wallTex);
     else if (name === "tread") t2 = makeTreadTexture();
-    else t2 = makeBodyTexture(name);
+    else t2 = makeBodyTexture(name, b.bodyTex);
     if (name === "wood") {
       t2.wrapS = t2.wrapT = RepeatWrapping;
     }
@@ -24416,11 +24541,14 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     if (gfx && gfx.post) c.multiplyScalar(2.4);
     scene.background = c;
   }
-  function setGraphics(saved, detected2) {
+  function setGraphics(saved, detected2, level) {
     gfxSaved = saved || {};
     if (detected2) detectedPreset = detected2;
-    gfx = resolve(gfxSaved, detectedPreset);
+    if (Number.isFinite(level)) gpuLevel = level;
+    const prevBudget = gfx ? gfx.budget : null;
+    gfx = resolve(gfxSaved, detectedPreset, gpuLevel);
     canvas.dataset.gfxPreset = gfx.preset;
+    applyBudget(prevBudget, gfx.budget);
     const size = SHADOW_MAP[gfx.shadows];
     renderer.shadowMap.enabled = size > 0;
     key.castShadow = size > 0;
@@ -24435,7 +24563,7 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     scene.environment = refl ? ensureEnv() : null;
     ambient.intensity = refl ? 0.18 : 0.45;
     fill.intensity = refl ? 0.4 : 0.5;
-    particleCap = PARTICLE_CAP[gfx.particles];
+    particleCap = sparkCap(gfx);
     if (pool.length > particleCap) pool.splice(0, pool.length - particleCap);
     if (gfx.particles === "high") {
       pMat.map = softSprite;
@@ -24448,6 +24576,8 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     }
     pMat.needsUpdate = true;
     dust.visible = gfx.background === "animated";
+    dustCount = Math.min(DUST, gfx.budget.dust);
+    dGeo.setDrawRange(0, dustCount);
     applyBackground();
     applyDetail(gfx.detail === "detailed");
     applyEmissiveBoost();
@@ -24461,8 +24591,41 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     });
     for (const v of bodyViews.values()) v.mesh.material.needsUpdate = true;
   }
+  function applyBudget(prev, b) {
+    if (buildBodyMats(b.material)) {
+      for (const v of bodyViews.values()) {
+        const old = v.mesh.material;
+        v.mesh.material = bodyMats[v.mesh.userData.material].clone();
+        v.mesh.material.map = old.map;
+        old.dispose();
+      }
+    }
+    if (prev && (prev.wallTex !== b.wallTex || prev.bodyTex !== b.bodyTex)) {
+      for (const k of Object.keys(texCache)) {
+        const t2 = texCache[k];
+        for (const m of [mats.panel, mats.floor, mats.wall, ...decorMats, ...[...bodyViews.values()].map((v) => v.mesh.material)]) {
+          if (m.map === t2) m.map = null;
+          if (m.bumpMap === t2) m.bumpMap = null;
+        }
+        t2.dispose();
+        delete texCache[k];
+      }
+    }
+    const segs = b.sphere.join("x");
+    if (segs !== sphereSegs) {
+      sphereSegs = segs;
+      const old = sphereGeo, oldGhost = ghostSphere;
+      sphereGeo = new SphereGeometry(0.5, b.sphere[0], b.sphere[1]);
+      sphereGeo.rotateX(Math.PI / 2);
+      ghostSphere = sphereGeo.clone();
+      for (const v of bodyViews.values()) if (v.mesh.geometry === old) v.mesh.geometry = sphereGeo;
+      if (ghost.geometry === oldGhost) ghost.geometry = ghostSphere;
+      old.dispose();
+      oldGhost.dispose();
+    }
+  }
   function applyQuality(tier) {
-    setGraphics({ ...gfxSaved || {}, preset: LEGACY_TIER[tier] || tier }, detectedPreset);
+    setGraphics({ ...gfxSaved || {}, preset: LEGACY_TIER[tier] || tier }, detectedPreset, gpuLevel);
   }
   function showFpsMeter(on) {
     if (on && !fpsEl) {
@@ -24498,10 +24661,10 @@ function initRenderer(canvas, { onPick, graphics, detected } = {}) {
         const hi = gfx.ao === "high";
         ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 1.4, thickness: 1.5, scale: 1, samples: hi ? 16 : 8 });
         ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: hi ? 6 : 4, rings: 2, samples: hi ? 16 : 8 });
-        c.addPass(ao);
+        c.addPass(atScale(ao, gfx.budget.aoRes));
       }
       if (gfx.bloom === "on") {
-        c.addPass(new UnrealBloomPass(new Vector2(w, h), 0.6, 0.5, 0.88));
+        c.addPass(atScale(new UnrealBloomPass(new Vector2(w, h), 0.6, 0.5, 0.88), gfx.budget.bloomRes));
       }
       if (gfx.grade === "on") {
         gradePass = new ShaderPass(GradeShader);
@@ -26518,6 +26681,7 @@ var EN = {
   showFps: "Show frame rate",
   postFailed: "Post-processing is unavailable on this device; the chamber renders without it.",
   unknownGpu: "unknown GPU",
+  level: "Level {n}",
   cat_shadows: "Shadows",
   cat_ao: "Ambient occlusion",
   cat_bloom: "Bloom",
@@ -26561,6 +26725,7 @@ var ES = {
   showFps: "Mostrar fotogramas por segundo",
   postFailed: "El posprocesado no est\xE1 disponible en este dispositivo; la c\xE1mara se dibuja sin \xE9l.",
   unknownGpu: "GPU desconocida",
+  level: "Nivel {n}",
   cat_shadows: "Sombras",
   cat_ao: "Oclusi\xF3n ambiental",
   cat_bloom: "Resplandor",
@@ -26604,6 +26769,7 @@ var DE = {
   showFps: "Bildrate anzeigen",
   postFailed: "Nachbearbeitung ist auf diesem Ger\xE4t nicht verf\xFCgbar; die Kammer wird ohne sie dargestellt.",
   unknownGpu: "unbekannte GPU",
+  level: "Stufe {n}",
   cat_shadows: "Schatten",
   cat_ao: "Umgebungsverdeckung",
   cat_bloom: "Leuchten",
@@ -26647,6 +26813,7 @@ var FR = {
   showFps: "Afficher la fr\xE9quence d\u2019images",
   postFailed: "Le post-traitement n\u2019est pas disponible sur cet appareil ; la chambre est affich\xE9e sans lui.",
   unknownGpu: "GPU inconnu",
+  level: "Niveau {n}",
   cat_shadows: "Ombres",
   cat_ao: "Occlusion ambiante",
   cat_bloom: "Halo lumineux",
@@ -26690,6 +26857,7 @@ var PT = {
   showFps: "Mostrar taxa de quadros",
   postFailed: "O p\xF3s-processamento n\xE3o est\xE1 dispon\xEDvel neste dispositivo; a c\xE2mara \xE9 exibida sem ele.",
   unknownGpu: "GPU desconhecida",
+  level: "N\xEDvel {n}",
   cat_shadows: "Sombras",
   cat_ao: "Oclus\xE3o ambiente",
   cat_bloom: "Brilho",
@@ -26733,6 +26901,7 @@ var IT = {
   showFps: "Mostra frequenza fotogrammi",
   postFailed: "La post-elaborazione non \xE8 disponibile su questo dispositivo; la camera viene mostrata senza.",
   unknownGpu: "GPU sconosciuta",
+  level: "Livello {n}",
   cat_shadows: "Ombre",
   cat_ao: "Occlusione ambientale",
   cat_bloom: "Bagliore",
@@ -28891,7 +29060,17 @@ function probeGpu() {
   } catch {
   }
   const mobile = window.matchMedia && window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(any-pointer: fine)").matches || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "");
-  gpuProbe = { name: String(name || ""), detected: detectPreset(name, { mobile }) };
+  let sys = { mobile };
+  try {
+    const G = globalThis.StarHermitGpu;
+    if (G) {
+      const d = G.detectSystem();
+      sys = { ...d, mobile: mobile || d.mobile };
+    }
+  } catch {
+  }
+  const level = detectLevel(name, sys);
+  gpuProbe = { name: String(name || ""), level, detected: presetForLevel(level) };
   return gpuProbe;
 }
 var MATERIAL_KEYS = Object.keys(MATERIALS);
@@ -29005,10 +29184,10 @@ function init(deps) {
     return settings.graphics;
   }
   function applyGraphics() {
-    const r = resolve(gfxSaved(), probeGpu().detected);
+    const r = resolve(gfxSaved(), probeGpu().detected, probeGpu().level);
     document.body.dataset.gfxPreset = r.preset;
     document.body.dataset.gfxAuto = r.auto ? "1" : "0";
-    if (renderer && renderer.setGraphics) renderer.setGraphics(gfxSaved(), probeGpu().detected);
+    if (renderer && renderer.setGraphics) renderer.setGraphics(gfxSaved(), probeGpu().detected, probeGpu().level);
     return r;
   }
   function applyA11yClasses() {
@@ -30094,7 +30273,7 @@ function init(deps) {
     const note = el("p", { class: "pf-note pf-gfx-note", id: "pf-gfx-note", text: tg("postFailed"), "data-tg": "postFailed" });
     note.hidden = true;
     function fillOptions() {
-      const r = resolve(g, gpu.detected);
+      const r = resolve(g, gpu.detected, gpu.level);
       presetSel.replaceChildren(
         el("option", { value: "auto", text: tg("auto", { tier: tierName(gpu.detected) }) }),
         ...PRESETS.map((p) => el("option", { value: p, text: tierName(p) }))
@@ -30115,7 +30294,7 @@ function init(deps) {
       fpsIn.checked = !!g.show_fps;
     }
     function refreshSummary() {
-      const r = resolve(g, gpu.detected);
+      const r = resolve(g, gpu.detected, gpu.level);
       let pixels;
       let postFailed = false;
       const info = renderer && renderer.graphicsInfo && canvas.clientWidth > 0 ? renderer.graphicsInfo() : null;
@@ -30126,7 +30305,7 @@ function init(deps) {
         const ratio = Math.min(window.devicePixelRatio || 1, r.dprCap) * r.scale;
         pixels = [Math.round(window.innerWidth * ratio), Math.round(window.innerHeight * ratio)];
       }
-      summary.textContent = (gpu.name || tg("unknownGpu")) + " \xB7 " + describeLocalized(tg, r, SHADOW_MAP, pixels) + (info && info.fps ? " \xB7 " + info.fps + " fps" : "");
+      summary.textContent = (gpu.name || tg("unknownGpu")) + " \xB7 " + tg("level", { n: gpu.level }) + " \xB7 " + describeLocalized(tg, r, SHADOW_MAP, pixels) + (info && info.fps ? " \xB7 " + info.fps + " fps" : "");
       note.hidden = !(postFailed && r.post);
     }
     function commit() {

@@ -13,7 +13,7 @@ import { SMAAPass } from "../vendor/three/addons/postprocessing/SMAAPass.js";
 import { FXAAShader } from "../vendor/three/addons/shaders/FXAAShader.js";
 import { RoomEnvironment } from "../vendor/three/addons/environments/RoomEnvironment.js";
 import { CHAMBER, MATERIALS, JOINT_TYPES, makeRng } from "./rules.js";
-import { resolve as resolveGfx, describe as describeGfx, SHADOW_MAP, PARTICLE_CAP } from "./gfx.js";
+import { resolve as resolveGfx, describe as describeGfx, sparkCap, SHADOW_MAP, SPARK_MAX, DUST_MAX } from "./gfx.js";
 
 // Framing: the whole chamber plus MARGIN of breathing room on every side.
 export const FRAMING = Object.freeze({ margin: 0.1 });
@@ -66,11 +66,13 @@ function canvasTexture(c, srgb = true) {
 
 // Back wall: 5x3 brushed-steel panels (matching the seam meshes), per-panel
 // tone, soot gathering toward the floor and stencilled bay numbers.
-function makePanelTexture() {
+// Authored at 1024×683 and drawn into the preset's wallTex budget.
+function makePanelTexture(size = 1024) {
   const W = 1024, H = 683;
   const c = document.createElement("canvas");
-  c.width = W; c.height = H;
+  c.width = size; c.height = Math.round(size * H / W);
   const g = c.getContext("2d");
+  g.scale(size / W, size / W);
   const rnd = hashNoise(0x5eed);
   const pw = W / 5, ph = H / 3;
   for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) {
@@ -135,10 +137,12 @@ function makeTreadTexture() {
 }
 
 // Body surface maps: white-ish so the material colour stays the identity cue.
-function makeBodyTexture(kind) {
+// Authored at 256×128 and drawn into the preset's bodyTex budget.
+function makeBodyTexture(kind, size = 256) {
   const c = document.createElement("canvas");
-  c.width = 256; c.height = 128;
+  c.width = size; c.height = size / 2;
   const g = c.getContext("2d");
+  g.scale(size / 256, size / 256);
   const rnd = hashNoise(kind.length * 977 + kind.charCodeAt(0));
   g.fillStyle = "#ffffff";
   g.fillRect(0, 0, 256, 128);
@@ -224,6 +228,15 @@ const GradeShader = {
       gl_FragColor = vec4(c, src.a);
     }`,
 };
+
+// Run a post pass at a fraction of the frame: EffectComposer.addPass/setSize hand every pass the full
+// frame size, so the pass's own setSize applies the budget's scale (half-res bloom/GTAO below Ultra).
+function atScale(pass, k) {
+  if (!(k < 1)) return pass;
+  const setSize = pass.setSize.bind(pass);
+  pass.setSize = (w, h) => setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  return pass;
+}
 
 // ---------------------------------------------------------------- init
 
@@ -349,20 +362,31 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     glass: { roughness: 0.06, metalness: 0.0, clearcoat: 1.0, env: 1.4, opacity: 0.78 },
     rubber: { roughness: 0.8, metalness: 0.0, clearcoat: 0.15, env: 0.4 },
   };
+  // Shading model per the preset's budget: Lambert on Low, Standard on Balanced, clear-coated
+  // Physical on High/Ultra. Colour, opacity and size are the same on every model.
   const bodyMats = {};
-  for (const [id, m] of Object.entries(MATERIALS)) {
-    const look = BODY_LOOK[id] || { roughness: 0.45, metalness: 0.05, clearcoat: 0.4, env: 0.7 };
-    bodyMats[id] = new THREE.MeshPhysicalMaterial({
-      color: new THREE.Color(m.color),
-      roughness: look.roughness,
-      metalness: look.metalness,
-      clearcoat: look.clearcoat,
-      clearcoatRoughness: look.clearcoatRoughness ?? 0.12,
-      envMapIntensity: look.env,
-      transparent: id === "glass",
-      opacity: look.opacity ?? 1,
-    });
+  let bodyTier = "";
+  function buildBodyMats(tier) {
+    if (tier === bodyTier) return false;
+    bodyTier = tier;
+    for (const [id, m] of Object.entries(MATERIALS)) {
+      const look = BODY_LOOK[id] || { roughness: 0.45, metalness: 0.05, clearcoat: 0.4, env: 0.7 };
+      const base = { color: new THREE.Color(m.color), transparent: id === "glass", opacity: look.opacity ?? 1 };
+      if (bodyMats[id]) bodyMats[id].dispose();
+      bodyMats[id] = tier === "lambert" ? new THREE.MeshLambertMaterial(base)
+        : tier === "standard" ? new THREE.MeshStandardMaterial({ ...base, roughness: look.roughness, metalness: look.metalness, envMapIntensity: look.env })
+        : new THREE.MeshPhysicalMaterial({
+          ...base,
+          roughness: look.roughness,
+          metalness: look.metalness,
+          clearcoat: look.clearcoat,
+          clearcoatRoughness: look.clearcoatRoughness ?? 0.12,
+          envMapIntensity: look.env,
+        });
+    }
+    return true;
   }
+  buildBodyMats("physical");
 
   // -------------------------------------------------------------- chamber shell
   function buildChamber() {
@@ -555,10 +579,23 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   bodyGeo.rotateX(Math.PI / 2); // flat face toward camera
   // Detailed bodies are true spheres (same 0.5 radius, so picking is unchanged):
   // they catch the key light, clear-coat highlight and room reflections.
-  const sphereGeo = new THREE.SphereGeometry(0.5, 40, 28);
+  // Segment count follows the preset's budget (rebuilt in setGraphics).
+  let sphereSegs = "40x28";
+  let sphereGeo = new THREE.SphereGeometry(0.5, 40, 28);
   sphereGeo.rotateX(Math.PI / 2);
   const payloadRingGeo = new THREE.TorusGeometry(0.6, 0.045, 8, 40);
   const currentBodyGeo = () => (gfx && gfx.detail === "detailed" ? sphereGeo : bodyGeo);
+
+  // Bodies are picked as their 0.5-radius disc/sphere, independent of the mesh's segment count.
+  const pickSphere = new THREE.Sphere(), pickPoint = new THREE.Vector3();
+  function pickBody(raycaster, intersects) {
+    this.getWorldPosition(pickSphere.center);
+    pickSphere.radius = 0.5;
+    if (!raycaster.ray.intersectSphere(pickSphere, pickPoint)) return;
+    const distance = raycaster.ray.origin.distanceTo(pickPoint);
+    if (distance < raycaster.near || distance > raycaster.far) return;
+    intersects.push({ distance, point: pickPoint.clone(), object: this });
+  }
 
   function getBodyView(b) {
     let v = bodyViews.get(b.id);
@@ -569,6 +606,7 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.userData = { kind: "body", id: b.id, material: b.material };
+      mesh.raycast = pickBody; // same hit area on every preset and detail level
       // payloads carry an accent ring matching the target rings
       if (b.kind === "payload") {
         const pr = new THREE.Mesh(payloadRingGeo, mats.payloadRing);
@@ -612,7 +650,7 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
 
   // -------------------------------------------------------------- overlay: ghost, selection, cursor
   const ghostCyl = bodyGeo.clone();
-  const ghostSphere = sphereGeo.clone();
+  let ghostSphere = sphereGeo.clone();
   const ghost = new THREE.Mesh(ghostCyl, mats.ghostOk);
   ghost.visible = false;
   overlayGroup.add(ghost);
@@ -631,8 +669,8 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   overlayGroup.add(cursorGroup);
 
   // -------------------------------------------------------------- particles (pooled)
-  const MAX_PARTICLES = PARTICLE_CAP.high;
-  let particleCap = PARTICLE_CAP.high;
+  const MAX_PARTICLES = SPARK_MAX; // pool built at the largest budget; the preset caps it
+  let particleCap = 300;
   let particleBoost = 1; // >1 pushes sparks above the bloom threshold
   const pGeo = new THREE.BufferGeometry();
   const pPos = new Float32Array(MAX_PARTICLES * 3);
@@ -685,7 +723,8 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   }
 
   // Ambient dust drifting through the lamp light (background: animated).
-  const DUST = 140;
+  const DUST = DUST_MAX; // built at the largest budget; the preset draws dustCount of them
+  let dustCount = 140;
   const dGeo = new THREE.BufferGeometry();
   const dPos = new Float32Array(DUST * 3);
   const dSeed = new Float32Array(DUST * 2);
@@ -711,7 +750,7 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   scene.add(dust);
 
   function updateDust(dt) {
-    for (let i = 0; i < DUST; i++) {
+    for (let i = 0; i < dustCount; i++) {
       const ph = dSeed[i * 2], sp = dSeed[i * 2 + 1];
       let y = dPos[i * 3 + 1] + sp * dt;
       if (y > CH_CY) y -= CH_H;
@@ -736,6 +775,7 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   let gfx = null;          // resolved settings (gfx.js)
   let gfxSaved = null;
   let detectedPreset = "balanced";
+  let gpuLevel = undefined; // StarHermit hardware level (ui.js probe)
   let composer = null;
   let postKey = null;
   let postFailed = false;
@@ -752,9 +792,10 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
   function texture(name) {
     if (texCache[name]) return texCache[name];
     let t;
-    if (name === "panel") t = makePanelTexture();
+    const b = gfx ? gfx.budget : { wallTex: 1024, bodyTex: 256 };
+    if (name === "panel") t = makePanelTexture(b.wallTex);
     else if (name === "tread") t = makeTreadTexture();
-    else t = makeBodyTexture(name);
+    else t = makeBodyTexture(name, b.bodyTex);
     if (name === "wood") { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
     texCache[name] = t;
     return t;
@@ -803,11 +844,14 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     scene.background = c;
   }
 
-  function setGraphics(saved, detected) {
+  function setGraphics(saved, detected, level) {
     gfxSaved = saved || {};
     if (detected) detectedPreset = detected;
-    gfx = resolveGfx(gfxSaved, detectedPreset);
+    if (Number.isFinite(level)) gpuLevel = level;
+    const prevBudget = gfx ? gfx.budget : null;
+    gfx = resolveGfx(gfxSaved, detectedPreset, gpuLevel);
     canvas.dataset.gfxPreset = gfx.preset;
+    applyBudget(prevBudget, gfx.budget);
 
     const size = SHADOW_MAP[gfx.shadows];
     renderer.shadowMap.enabled = size > 0;
@@ -823,7 +867,7 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     ambient.intensity = refl ? 0.18 : 0.45;
     fill.intensity = refl ? 0.4 : 0.5;
 
-    particleCap = PARTICLE_CAP[gfx.particles];
+    particleCap = sparkCap(gfx);
     if (pool.length > particleCap) pool.splice(0, pool.length - particleCap);
     if (gfx.particles === "high") {
       pMat.map = softSprite; pMat.size = 0.2; pMat.blending = THREE.AdditiveBlending;
@@ -833,6 +877,8 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     pMat.needsUpdate = true;
 
     dust.visible = gfx.background === "animated";
+    dustCount = Math.min(DUST, gfx.budget.dust);
+    dGeo.setDrawRange(0, dustCount);
     applyBackground();
     applyDetail(gfx.detail === "detailed");
     applyEmissiveBoost();
@@ -849,9 +895,43 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
     for (const v of bodyViews.values()) v.mesh.material.needsUpdate = true;
   }
 
+  // Asset variants for the preset's budget: body shading model, texture sizes and sphere segments.
+  function applyBudget(prev, b) {
+    if (buildBodyMats(b.material)) {
+      for (const v of bodyViews.values()) {
+        const old = v.mesh.material;
+        v.mesh.material = bodyMats[v.mesh.userData.material].clone();
+        v.mesh.material.map = old.map;
+        old.dispose();
+      }
+    }
+    if (prev && (prev.wallTex !== b.wallTex || prev.bodyTex !== b.bodyTex)) {
+      for (const k of Object.keys(texCache)) {
+        const t = texCache[k];
+        for (const m of [mats.panel, mats.floor, mats.wall, ...decorMats, ...[...bodyViews.values()].map((v) => v.mesh.material)]) {
+          if (m.map === t) m.map = null;
+          if (m.bumpMap === t) m.bumpMap = null;
+        }
+        t.dispose();
+        delete texCache[k];
+      }
+    }
+    const segs = b.sphere.join("x");
+    if (segs !== sphereSegs) {
+      sphereSegs = segs;
+      const old = sphereGeo, oldGhost = ghostSphere;
+      sphereGeo = new THREE.SphereGeometry(0.5, b.sphere[0], b.sphere[1]);
+      sphereGeo.rotateX(Math.PI / 2);
+      ghostSphere = sphereGeo.clone();
+      for (const v of bodyViews.values()) if (v.mesh.geometry === old) v.mesh.geometry = sphereGeo;
+      if (ghost.geometry === oldGhost) ghost.geometry = ghostSphere;
+      old.dispose(); oldGhost.dispose();
+    }
+  }
+
   function applyQuality(tier) {
     // legacy API: a bare tier name selects that preset
-    setGraphics({ ...(gfxSaved || {}), preset: LEGACY_TIER[tier] || tier }, detectedPreset);
+    setGraphics({ ...(gfxSaved || {}), preset: LEGACY_TIER[tier] || tier }, detectedPreset, gpuLevel);
   }
 
   function showFpsMeter(on) {
@@ -885,11 +965,11 @@ export function initRenderer(canvas, { onPick, graphics, detected } = {}) {
         const hi = gfx.ao === "high";
         ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 1.4, thickness: 1.5, scale: 1.0, samples: hi ? 16 : 8 });
         ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: hi ? 6 : 4, rings: 2, samples: hi ? 16 : 8 });
-        c.addPass(ao);
+        c.addPass(atScale(ao, gfx.budget.aoRes));
       }
       if (gfx.bloom === "on") {
         // high threshold: only lamps, glowing rings, hazards and sparks bloom
-        c.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.6, 0.5, 0.88));
+        c.addPass(atScale(new UnrealBloomPass(new THREE.Vector2(w, h), 0.6, 0.5, 0.88), gfx.budget.bloomRes));
       }
       if (gfx.grade === "on") {
         gradePass = new ShaderPass(GradeShader);

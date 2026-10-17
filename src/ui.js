@@ -10,7 +10,7 @@ import {
   ACHIEVEMENTS, dailyLevel, getLevel,
 } from "./content.js";
 import { createGameSession } from "./session.js";
-import { PRESETS, CATEGORIES, SHADOW_MAP, detectPreset, resolve as resolveGfx, presetTier, choosePreset } from "./gfx.js";
+import { PRESETS, CATEGORIES, SHADOW_MAP, detectLevel, presetForLevel, resolve as resolveGfx, presetTier, choosePreset } from "./gfx.js";
 import { translator, describeLocalized } from "./gfx-i18n.js";
 import { platformStrings, pickPlatformLocale } from "./platform-i18n.js";
 import { mergeProgress } from "./platform.js";
@@ -33,7 +33,14 @@ function probeGpu() {
   } catch { /* no GPU info; Auto falls back to Balanced */ }
   const mobile = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches && !window.matchMedia("(any-pointer: fine)").matches)
     || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || "");
-  gpuProbe = { name: String(name || ""), detected: detectPreset(name, { mobile }) };
+  // StarHermit hardware level (gpu-level.js): renderer string + device facts (phone/tablet, cores, memory).
+  let sys = { mobile };
+  try {
+    const G = globalThis.StarHermitGpu;
+    if (G) { const d = G.detectSystem(); sys = { ...d, mobile: mobile || d.mobile }; }
+  } catch { /* defaults */ }
+  const level = detectLevel(name, sys);
+  gpuProbe = { name: String(name || ""), level, detected: presetForLevel(level) };
   return gpuProbe;
 }
 
@@ -161,10 +168,10 @@ export function init(deps) {
     return settings.graphics;
   }
   function applyGraphics() {
-    const r = resolveGfx(gfxSaved(), probeGpu().detected);
+    const r = resolveGfx(gfxSaved(), probeGpu().detected, probeGpu().level);
     document.body.dataset.gfxPreset = r.preset;
     document.body.dataset.gfxAuto = r.auto ? "1" : "0";
-    if (renderer && renderer.setGraphics) renderer.setGraphics(gfxSaved(), probeGpu().detected);
+    if (renderer && renderer.setGraphics) renderer.setGraphics(gfxSaved(), probeGpu().detected, probeGpu().level);
     return r;
   }
 
@@ -1206,7 +1213,7 @@ export function init(deps) {
     note.hidden = true;
 
     function fillOptions() {
-      const r = resolveGfx(g, gpu.detected);
+      const r = resolveGfx(g, gpu.detected, gpu.level);
       presetSel.replaceChildren(
         el("option", { value: "auto", text: tg("auto", { tier: tierName(gpu.detected) }) }),
         ...PRESETS.map((p) => el("option", { value: p, text: tierName(p) })));
@@ -1226,7 +1233,7 @@ export function init(deps) {
     }
 
     function refreshSummary() {
-      const r = resolveGfx(g, gpu.detected);
+      const r = resolveGfx(g, gpu.detected, gpu.level);
       let pixels;
       let postFailed = false;
       // live numbers only while the chamber canvas is on screen
@@ -1236,7 +1243,7 @@ export function init(deps) {
         const ratio = Math.min(window.devicePixelRatio || 1, r.dprCap) * r.scale;
         pixels = [Math.round(window.innerWidth * ratio), Math.round(window.innerHeight * ratio)];
       }
-      summary.textContent = (gpu.name || tg("unknownGpu")) + " · " + describeLocalized(tg, r, SHADOW_MAP, pixels)
+      summary.textContent = (gpu.name || tg("unknownGpu")) + " · " + tg("level", { n: gpu.level }) + " · " + describeLocalized(tg, r, SHADOW_MAP, pixels)
         + (info && info.fps ? " · " + info.fps + " fps" : "");
       note.hidden = !(postFailed && r.post);
     }

@@ -110,6 +110,7 @@ async function graphicsPass(page, label) {
     await page.selectOption("#pf-gfx-bloom", "off");
     const summary = await page.textContent("#pf-gfx-summary");
     if (!/shadows/.test(summary) || /bloom/.test(summary) || !/px/.test(summary)) throw new Error("summary not updated: " + summary);
+    if (!/ · Level 0 · /.test(summary)) throw new Error("summary lacks the hardware level: " + summary);
     const g = await savedGraphics(page);
     if (g.preset !== "high" || g.bloom !== "off") throw new Error("graphics not saved: " + JSON.stringify(g));
     // panel fits: the Done button is reachable inside the scrolling panel
@@ -143,8 +144,13 @@ async function graphicsPass(page, label) {
     await waitPhase(page, "run");
     await page.waitForTimeout(600);
     await page.screenshot({ path: SHOT("ultra", label) });
-    await page.click(".pf-screen-play .pf-rail-left .pf-btn:has-text('Pause')");
-    await page.click(".pf-overlay .pf-btn:has-text('Leave chamber')");
+    // The short drop can already be delivered on a fast renderer: leave from the results screen then.
+    const paused = await page.click(".pf-screen-play .pf-rail-left .pf-btn:has-text('Pause')", { timeout: 3000 }).then(() => true, () => false);
+    if (paused) await page.click(".pf-overlay .pf-btn:has-text('Leave chamber')");
+    else {
+      await page.click(".pf-screen-results .pf-btn:has-text('Modes')");
+      await page.click(".pf-screen-modes .pf-btn:has-text('Back')");
+    }
     await page.waitForSelector(".pf-screen-title:not([hidden])");
   });
 }

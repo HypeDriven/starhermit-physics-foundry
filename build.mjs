@@ -27,6 +27,7 @@ copyFileSync(resolve(root, "game-options.js"), resolve(outdir, "game-options.js"
 copyFileSync(resolve(root, "ui-scale.js"), resolve(outdir, "ui-scale.js"));
 copyFileSync(resolve(root, "starhermit-sdk.js"), resolve(outdir, "starhermit-sdk.js"));
 copyFileSync(resolve(root, "sh-language.js"), resolve(outdir, "sh-language.js"));
+copyFileSync(resolve(root, "gpu-level.js"), resolve(outdir, "gpu-level.js"));
 copyFileSync(resolve(root, "coverart.png"), resolve(outdir, "coverart.png"));
 cpSync(resolve(root, "sfx"), resolve(outdir, "sfx"), { recursive: true });
 
@@ -44,6 +45,7 @@ const html = `<!DOCTYPE html>
 <script src="./starhermit-sdk.js"></script>
 <script>StarHermit.init();</script>
 <script src="./sh-language.js"></script>
+<script src="./gpu-level.js"></script>
 <script type="module" src="./bootstrap.js"></script>
 <script src="./browser-guard.js"></script>
 </head>
