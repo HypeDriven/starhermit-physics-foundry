@@ -490,7 +490,6 @@ export function init(deps) {
     const st = session.state;
     const legal = {};
     for (const a of session.legal()) legal[a.type + ":" + (a.material || a.joint || "")] = a;
-    tray.innerHTML = "";
     const building = st.phase === "build";
 
     const matRow = el("div", { class: "pf-tray-row", role: "group", "aria-label": t("Materials") });
@@ -560,7 +559,15 @@ export function init(deps) {
       el("button", { class: "pf-btn pf-btn-sm pf-cur-r", text: "→", "aria-label": t("Cursor right"), onclick: move(1, 0) }),
     );
 
-    tray.append(matRow, spawnBtn, actRow, cursorRow);
+    // The HUD refreshes every frame of a run: swap the tray only when its
+    // controls changed. A swap between press and release would lose the click
+    // (the release lands on a new button), so an unchanged tray keeps its nodes.
+    const next = el("div", {}, [matRow, spawnBtn, actRow, cursorRow]);
+    if (next.innerHTML === tray.innerHTML) return;
+    const focusAt = [...tray.querySelectorAll("button")].indexOf(document.activeElement);
+    tray.replaceChildren(...next.childNodes);
+    // keyboard focus stays on the control in the same place
+    if (focusAt >= 0) tray.querySelectorAll("button")[focusAt]?.focus({ preventScroll: true });
   }
 
   function moveCursor(dx, dy) {

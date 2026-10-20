@@ -29522,7 +29522,6 @@ function init(deps) {
     const st = session.state;
     const legal = {};
     for (const a of session.legal()) legal[a.type + ":" + (a.material || a.joint || "")] = a;
-    tray.innerHTML = "";
     const building = st.phase === "build";
     const matRow = el("div", { class: "pf-tray-row", role: "group", "aria-label": t("Materials") });
     currentLevel.allowedMaterials.forEach((m, i) => {
@@ -29608,7 +29607,11 @@ function init(deps) {
       el("button", { class: "pf-btn pf-btn-sm pf-cur-d", text: "\u2193", "aria-label": t("Cursor down"), onclick: move(0, -1) }),
       el("button", { class: "pf-btn pf-btn-sm pf-cur-r", text: "\u2192", "aria-label": t("Cursor right"), onclick: move(1, 0) })
     );
-    tray.append(matRow, spawnBtn, actRow, cursorRow);
+    const next = el("div", {}, [matRow, spawnBtn, actRow, cursorRow]);
+    if (next.innerHTML === tray.innerHTML) return;
+    const focusAt = [...tray.querySelectorAll("button")].indexOf(document.activeElement);
+    tray.replaceChildren(...next.childNodes);
+    if (focusAt >= 0) tray.querySelectorAll("button")[focusAt]?.focus({ preventScroll: true });
   }
   function moveCursor(dx, dy) {
     cursor.x = Math.max(0.5, Math.min(CHAMBER.w - 0.5, cursor.x + dx * 0.5));
