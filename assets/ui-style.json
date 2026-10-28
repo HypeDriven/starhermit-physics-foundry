@@ -715,6 +715,12 @@
         "weight": "700",
         "align": "center"
       }
+    },
+    ".wrap": {
+      "text": {
+        "size": 16,
+        "align": "center"
+      }
     }
   },
   "animations": {},

@@ -45,6 +45,8 @@ export const app = {
   /** The pause or settings panel (settings also opens over the title). */
   overlay: null as "pause" | "settings" | null,
   openedFrame: 0,
+  /** Frame the full-page screen opened on (its scroll starts at the top for a few frames). */
+  screenFrame: 0,
   focusNext: null as string | null,
   session: null as Session | null,
   level: null as Level | null,
@@ -98,7 +100,7 @@ export function later(fn: () => void): void { pending.push(fn); }
 // ------------------------------------------------------------------ screens
 export function openScreen(name: ScreenName | null): void {
   app.screen = name;
-  app.openedFrame = frame().frame;
+  app.openedFrame = app.screenFrame = frame().frame;
   ui.setFocus(null);
   render.setActive(name === null);
   if (name === "results") app.toasts = []; // run-end toasts are listed on the results screen itself
@@ -113,7 +115,7 @@ export function quickPlay(): void {
   const lm = platform.save().progress.lastMode || "journey";
   if (lm === "learn") startLearn(nextLessonIndex());
   else if (lm === "daily") startDaily();
-  else if (lm === "challenge" || lm === "practice") { openModes(); app.setup = lm; }
+  else if (lm === "challenge" || lm === "practice") { openModes(); selectMode(lm); }
   else startJourney(nextJourneyIndex());
 }
 export function nextJourneyIndex(): number {
@@ -131,7 +133,12 @@ export function selectMode(id: string): void {
   else if (id === "journey") startJourney(nextJourneyIndex());
   else if (id === "daily") startDaily();
   else if (id === "score") openScores();
-  else { app.setup = id; app.openedFrame = frame().frame; }
+  else {
+    // the setup panel opens below the cards (ui.js scrollIntoView): focusing its first control scrolls it in
+    app.setup = id;
+    app.openedFrame = frame().frame;
+    app.focusNext = id === "practice" ? "practice-filter" : `challenge-${Content.CHALLENGE_LEVELS[0]!.id}`;
+  }
 }
 
 // ------------------------------------------------------------------ start flows
@@ -574,11 +581,12 @@ onPointerButton((e) => {
 });
 onPointerMove((x, y) => { if (now() - lastTouch >= 0.6) hover = { x, y }; });
 /** ui.js: pointerdown picks (bodies as 0.5-radius spheres, else the floor); pointermove moves the cursor in the build phase. */
-function pointerInput(): void {
+function pointerInput(wasPlaying: boolean): void {
   const list = presses.splice(0);
   const h = hover;
   hover = null;
-  if (!playing() || app.resultsAt !== null) return;
+  // a press that closed a panel or left a screen this frame belongs to that widget, not the chamber
+  if (!wasPlaying || !playing() || app.resultsAt !== null) return;
   const s = app.session!;
   if (h && s.state.phase === "build" && inView(h.x, h.y) && !onHud(h.x, h.y)) {
     const w = render.screenToWorld(h.x, h.y);
@@ -662,9 +670,10 @@ onUpdate((dt) => {
 });
 onRender((interp) => {
   hudRects.length = 0;
+  const wasPlaying = playing();
   drawScreens();
   for (const fn of pending.splice(0)) fn();
-  pointerInput();
+  pointerInput(wasPlaying);
   const s = app.session;
   if (s) {
     render.setSnapshot(s.state, s.state.phase === "run" && !s.paused ? interp : 1);

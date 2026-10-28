@@ -62,7 +62,11 @@ function button(b: Btn): void {
   if (b.disabled) opts.disabled = true;
   if (b.selected !== undefined) opts.selected = b.selected;
   if (b.content) opts.content = b.content;
-  else if (b.name && b.name !== b.text) opts.content = () => { ui.label(b.text); };
+  else if (b.width != null && buttonWidth(b.text, style) > b.width) {
+    // a label wider than its button wraps (labels don't)
+    const inner = b.width - 34;
+    opts.content = () => { ui.style("wrap").paragraph(b.text, Math.max(20, inner)); };
+  } else if (b.name && b.name !== b.text) opts.content = () => { ui.label(b.text); };
   const s: ui.Style = {};
   if (b.width != null) s.width = b.width;
   if (b.height != null) s.height = b.height;
@@ -188,8 +192,9 @@ function playScreen(L: Layout): void {
     const statusH = (lastSize.get("rail-status-in")?.height ?? 120 * L.sc) / L.sc + 20;
     const trayH = (lastSize.get("rail-tray-in")?.height ?? 260 * L.sc) / L.sc + 20;
     const room = L.lh - top - pad - 2 * gap;
-    // the chamber keeps at least 40 % of the height; the rails scroll past that
-    const sh = Math.min(statusH, room * 0.22), th = Math.min(trayH, room - sh - Math.max(160, room * 0.4));
+    const sh = Math.min(statusH, room * (app.mode === "learn" ? 0.34 : 0.22));
+    // the chamber keeps its full-width height (20 × 12 plus the margin) when the room allows, at least 160 px
+    const th = Math.min(trayH, room - sh - Math.max(160, Math.min(room * 0.4, 0.6 * w + 12)));
     cv = { x: pad, y: top + sh + gap, w, h: room - sh - th };
     pagePaint(cv);
     railBox("rail-status", pad, top, w, sh, (iw) => statusRail(iw, true, L));
@@ -243,6 +248,8 @@ function statusRail(w: number, compact: boolean, L: Layout): void {
     { id: "btn-hud-help", text: T("Help"), style: "btn-secondary", act: () => openHelp("play"), disabled: app.resultsAt !== null },
   ];
   if (compact) {
+    // compact layouts carry the lesson box here, so the tray stays in view below the chamber
+    if (app.mode === "learn" && level.steps) lessonBox(w, level);
     // .pf-rail-left at ≤ 1023 px: one wrapping row
     const items = lines.map(([t]) => t);
     para(items.join("  ·  "), w, "hud-line", "hud-lines");
@@ -258,7 +265,7 @@ function statusRail(w: number, compact: boolean, L: Layout): void {
 /** .pf-rail-right: the lesson box and the action tray. */
 function trayRail(w: number, L: Layout): void {
   const s = app.session!, level = app.level!;
-  if (app.mode === "learn" && level.steps) lessonBox(w, level);
+  if (app.mode === "learn" && level.steps && (L.wide || L.land)) lessonBox(w, level);
   const legal: Record<string, { ok: boolean; reason?: string }> = {};
   for (const a of s.legal()) legal[`${a.type}:${a.material ?? a.joint ?? ""}`] = a;
   const build = building() && app.resultsAt === null;
@@ -336,7 +343,10 @@ function bodyTargets(): void {
 function toasts(L: Layout): void {
   if (!app.toasts.length) return;
   const w = Math.min(L.lw - 32, 420);
-  ui.place("toast-stack", { anchor: "bottom", y: 16 }, () => {
+  // .pf-toasts sat at the bottom; on compact layouts that is the tray, so they show under the header there
+  const where = L.wide || app.screen ? { anchor: "bottom" as const, y: 16 }
+    : { anchor: "top" as const, y: Math.max(HEADER + 8, (view.y - frame().safeArea.top) / L.sc + 8) };
+  ui.place("toast-stack", where, () => {
     ui.column("toast-col", () => {
       app.toasts.forEach((t, i) => ui.column(`toast-${i}`, () => para(t.text, w - 34, "toast-text", `toast-${i}-text`), { style: t.ok ? "toast-ok" : "toast" }));
     }, { spacing: 6, align: "center" });
@@ -440,7 +450,7 @@ function fullScreen(L: Layout): void {
   const key = `screen-${app.screen}`;
   const prev = lastSize.get(key);
   const scroll = !!prev && prev.height / L.sc > bodyH;
-  const opening = f.frame - app.openedFrame <= 6;
+  const opening = f.frame - app.screenFrame <= 6;
   ui.place("screen", { anchor: "top-start", x: 0, y: HEADER }, () => {
     const body = (): void => {
       const r = ui.column(`${key}-body`, () => {

@@ -1,33 +1,28 @@
-// Every player-facing key used in code (ui.js, bootstrap.js) and content
+// Every player-facing key used by the engine client (native/*.ts) and content
 // (level names, intros, lesson steps, achievements, materials, joints) exists
 // in all nine locales, with the same {placeholders} as the en-US text.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { STRINGS } from "../src/strings.js";
 import { EN, LOCALES, t, setLocale, getLocale, onLocaleChange, levelName, reasonText } from "../src/i18n.js";
 import { LEARN_LESSONS, JOURNEY_LEVELS, CHALLENGE_LEVELS, ACHIEVEMENTS, dailyLevel } from "../src/content.js";
 import { MATERIALS, JOINT_TYPES } from "../src/rules.js";
 
-const src = (f) => readFileSync(new URL("../src/" + f, import.meta.url), "utf8");
+const NATIVE = new URL("../native/", import.meta.url);
 
+/** Every key the engine client translates (T / N in native/*.ts) plus the content's names and texts. */
 function usedKeys() {
   const keys = new Set();
-  for (const f of ["ui.js", "bootstrap.js"]) {
-    const s = src(f);
-    for (const m of s.matchAll(/\bt\("((?:[^"\\]|\\.)*)"/g)) keys.add(m[1]);
-    for (const m of s.matchAll(/i18n(?:Aria)?: "((?:[^"\\]|\\.)*)"/g)) keys.add(m[1]);
-    // t(cond ? "a" : "b", …)
-    for (const m of s.matchAll(/\bt\([^()"]*\?\s*"([^"]*)"\s*:\s*"([^"]*)"/g)) { keys.add(m[1]); keys.add(m[2]); }
-    for (const m of s.matchAll(/(?<![.\w])(?:toggle|slider)\("([^"]+)"/g)) keys.add(m[1]);
-    for (const m of s.matchAll(/slider\("([^"]+)"/g)) keys.add(m[1] + " volume");
+  for (const f of readdirSync(NATIVE).filter((n) => n.endsWith(".ts"))) {
+    const s = readFileSync(new URL(f, NATIVE), "utf8");
+    for (const m of s.matchAll(/\b[TN]\("((?:[^"\\]|\\.)*)"/g)) keys.add(m[1]);
+    // T(cond ? "a" : "b", …)
+    for (const m of s.matchAll(/\bT\([^()"]*\?\s*"([^"]*)"\s*:\s*"([^"]*)"/g)) { keys.add(m[1]); keys.add(m[2]); }
   }
-  const ui = src("ui.js");
-  for (const m of ui.matchAll(/name: "([^"]+)", desc: "([^"]+)", duration: "([^"]+)"/g)) { keys.add(m[1]); keys.add(m[2]); keys.add(m[3]); }
-  for (const m of ui.slice(ui.indexOf("TERMINAL_TEXT"), ui.indexOf("MODE_DEFS")).matchAll(/: "([^"]+)"/g)) keys.add(m[1]);
-  for (const m of ui.matchAll(/\["([^"]+)", c\./g)) keys.add(m[1]);
+  const main = readFileSync(new URL("main.ts", NATIVE), "utf8");
+  for (const m of main.slice(main.indexOf("TERMINAL_TEXT"), main.indexOf("export function terminalText")).matchAll(/: "([^"]+)"/g)) keys.add(m[1]);
   // keys built by concatenation are covered by EN (sync./phase./action./screen./reason.)
-  for (const k of [...keys]) if (/^(sync|phase|action|screen|reason)\.$/.test(k)) keys.delete(k);
   for (const k of Object.keys(EN)) keys.add(k);
   keys.add("Daily Cast {date}");
   for (const l of [...LEARN_LESSONS, ...JOURNEY_LEVELS, ...CHALLENGE_LEVELS, dailyLevel("2026-01-01")]) {
@@ -50,7 +45,7 @@ test("nine locales ship", () => {
 
 test("every used key exists in every translated locale with matching placeholders", () => {
   const keys = usedKeys();
-  assert.ok(keys.size > 300, "key scan found " + keys.size);
+  assert.ok(keys.size > 250, "key scan found " + keys.size);
   const missing = [];
   for (const loc of LOCALES) {
     if (loc.startsWith("en-")) continue;
@@ -66,7 +61,6 @@ test("every used key exists in every translated locale with matching placeholder
 test("en-GB only overrides real keys", () => {
   const keys = usedKeys();
   for (const k of Object.keys(STRINGS["en-GB"])) {
-    if (k === "Color grade") continue; // gfx-i18n term kept for parity
     assert.ok(keys.has(k), "en-GB override for unknown key " + k);
   }
 });

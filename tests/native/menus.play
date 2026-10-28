@@ -1,0 +1,79 @@
+# The menus on a desktop (1280 x 800): how to play, leaderboards, the modes with the Practice and
+# Challenge setups, progression, then Journey chamber 1 from the progression list with its pause,
+# settings and help panels, by clicks and keys (Escape backs out).
+# viewport 1280x800@1
+until 600 Daily challenge
+frames 10
+save title
+click =How to play
+until 120 Move the spawn cursor
+frames 10
+save help
+key Escape 1
+until 120 Industrial physics sandbox
+frames 10
+click =Leaderboards
+until 120 Local bests (Journey)
+frames 10
+save scores
+click =Back
+until 120 Industrial physics sandbox
+frames 10
+click =All modes
+until 120 Choose a mode
+frames 10
+click =Practice
+until 60 Practice setup
+frames 10
+save practice-setup
+expect First Drop
+click =Challenge
+until 60 Challenge setup
+expect Heavy Water
+frames 10
+click =Back
+until 120 Industrial physics sandbox
+frames 10
+click =Journey
+until 120 Progression
+frames 10
+save progression
+click =1. First Drop
+until 300 Spawns left
+frames 30
+key Escape 1
+until 60 Restart chamber
+frames 10
+save pause
+click =Settings
+until 60 Camera default
+frames 10
+save settings
+click =Left-handed action tray
+frames 5
+click =Done
+until 60 Restart chamber
+frames 10
+click =Resume
+frames 20
+save left-handed
+key Escape 1
+until 60 Restart chamber
+frames 10
+click =Help #2
+until 120 Move the spawn cursor
+frames 10
+click =Back
+until 60 Restart chamber
+frames 10
+click =Leave chamber
+until 120 Industrial physics sandbox
+frames 10
+click =Profile & settings
+until 60 Camera default
+frames 10
+click =Left-handed action tray
+frames 5
+key Escape 1
+until 60 Industrial physics sandbox
+frames 5
