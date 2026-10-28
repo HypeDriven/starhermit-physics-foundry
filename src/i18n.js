@@ -1,9 +1,9 @@
-// Physics Foundry UI language. One source for every string module (this file,
-// gfx-i18n.js and platform-i18n.js read getLocale()): sh-language.js resolves
-// the Language setting — explicit game choice (ui.language) → for Automatic the
-// StarHermit account's preferred language → navigator.languages → en-US.
-// Strings are keyed by their en-US text; EN holds the few symbolic keys.
-// A language change fires onLocaleChange listeners; ui.js re-renders in place.
+// Physics Foundry UI language: every player-facing string (strings.js) keyed
+// by its en-US text; EN holds the few symbolic keys. The engine client
+// (native/i18n.ts) sets the locale from the runtime's interface language
+// (Options › Language, else the account's preferred language or the
+// device's); every string is drawn through t() each frame, so a change shows
+// on the next frame without restarting anything.
 
 import { STRINGS } from "./strings.js";
 
@@ -57,7 +57,6 @@ export function setLocale(next) {
   const changed = resolved !== locale;
   locale = resolved;
   table = STRINGS[locale] || STRINGS["en-US"];
-  if (typeof document !== "undefined") document.documentElement.lang = locale;
   if (changed) for (const fn of listeners) { try { fn(locale); } catch (e) { console.error(e); } }
 }
 
@@ -72,10 +71,3 @@ export function reasonText(code) {
   const key = "reason." + code;
   return EN[key] ? t(key) : String(code || "");
 }
-
-// sh-language.js (loaded before the bundle) owns resolution, storage and the
-// Settings → Language selector; it calls apply() now and on every change.
-export const language = (typeof window !== "undefined" && window.StarHermitLanguage)
-  ? window.StarHermitLanguage.create({ game: "physics-foundry", supported: LOCALES, apply: setLocale })
-  : null;
-if (!language) setLocale("en-US");

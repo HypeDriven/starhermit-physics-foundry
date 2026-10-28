@@ -1,24 +1,21 @@
 {
   "name": "physics-foundry",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "node --test tests/*.test.mjs",
-    "test:e2e": "node tests/e2e.mjs",
-    "start": "node server.js",
-    "build": "node build.mjs"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "SEE LICENSE IN LICENSE.md",
+  "description": "Physics Foundry — spawn materials, rig joints and run the chamber to deliver every payload. An industrial physics puzzle on the StarHermit engine.",
   "type": "module",
-  "dependencies": {
-    "esbuild": "^0.28.1",
-    "three": "^0.161.0"
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE.md",
+  "scripts": {
+    "test": "npm run test:unit && npm run test:native",
+    "test:unit": "node --test tests/rules.test.mjs tests/server.test.mjs tests/progress.test.mjs tests/i18n.test.mjs",
+    "test:native": "node tests/native.mjs",
+    "test:browser": "node tools/browser-play.mjs .",
+    "start": "node server.js",
+    "package": "node tools/package-web.mjs",
+    "css": "node tools/css.mjs",
+    "plays": "node tools/gen-plays.mjs"
   },
   "devDependencies": {
-    "playwright-core": "^1.62.1",
-    "puppeteer-core": "^25.9.0"
+    "playwright-core": "^1.62.1"
   }
 }

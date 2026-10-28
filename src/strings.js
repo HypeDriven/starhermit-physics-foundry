@@ -346,6 +346,15 @@ const DE = {
   "Complete every Journey mastery stage.": "Schließe jede Meisterprüfung der Reise ab.",
   "Marathon Builder": "Marathon-Baumeister",
   "Spawn 500 bodies over your lifetime.": "Platziere insgesamt 500 Körper.",
+  // engine client
+  "Progress restored from your StarHermit cloud save.": "Fortschritt aus deinem StarHermit-Cloud-Spielstand wiederhergestellt.",
+  "{material} payload {n}": "{material}-Fracht {n}",
+  "{material} ball {n}": "{material}-Kugel {n}",
+  ", selected": ", ausgewählt",
+  "Sound, graphics, language, larger text, high contrast and reduced motion are in the StarHermit Options.": "Ton, Grafik, Sprache, größere Schrift, hoher Kontrast und reduzierte Bewegung findest du in den StarHermit-Optionen.",
+  "Open Options": "Optionen öffnen",
+  "Key bindings": "Tastenbelegung",
+  "Loading…": "Wird geladen …",
 };
 
 const ES = {
@@ -688,6 +697,15 @@ const ES = {
   "Complete every Journey mastery stage.": "Completa todas las pruebas de maestría de la travesía.",
   "Marathon Builder": "Constructor maratoniano",
   "Spawn 500 bodies over your lifetime.": "Coloca 500 cuerpos en total.",
+  // engine client
+  "Progress restored from your StarHermit cloud save.": "Progreso restaurado desde tu partida guardada en la nube de StarHermit.",
+  "{material} payload {n}": "Carga de {material} {n}",
+  "{material} ball {n}": "Bola de {material} {n}",
+  ", selected": ", seleccionada",
+  "Sound, graphics, language, larger text, high contrast and reduced motion are in the StarHermit Options.": "El sonido, los gráficos, el idioma, el texto más grande, el alto contraste y el movimiento reducido están en las Opciones de StarHermit.",
+  "Open Options": "Abrir Opciones",
+  "Key bindings": "Asignación de teclas",
+  "Loading…": "Cargando…",
 };
 
 // Spain: vosotros-free neutral text already; a few regional words differ.
@@ -1050,6 +1068,15 @@ const FR = {
   "Complete every Journey mastery stage.": "Terminez toutes les épreuves de maîtrise du parcours.",
   "Marathon Builder": "Bâtisseur marathonien",
   "Spawn 500 bodies over your lifetime.": "Placez 500 corps au total.",
+  // engine client
+  "Progress restored from your StarHermit cloud save.": "Progression restaurée depuis ta sauvegarde cloud StarHermit.",
+  "{material} payload {n}": "Charge {material} {n}",
+  "{material} ball {n}": "Bille {material} {n}",
+  ", selected": ", sélectionnée",
+  "Sound, graphics, language, larger text, high contrast and reduced motion are in the StarHermit Options.": "Le son, les graphismes, la langue, le texte agrandi, le contraste élevé et les animations réduites se trouvent dans les Options StarHermit.",
+  "Open Options": "Ouvrir les Options",
+  "Key bindings": "Touches",
+  "Loading…": "Chargement…",
 };
 
 const FR_CA = {
@@ -1407,6 +1434,15 @@ const PT = {
   "Complete every Journey mastery stage.": "Conclua todas as provas de maestria da jornada.",
   "Marathon Builder": "Construtor maratonista",
   "Spawn 500 bodies over your lifetime.": "Coloque 500 corpos no total.",
+  // engine client
+  "Progress restored from your StarHermit cloud save.": "Progresso restaurado do seu salvamento na nuvem do StarHermit.",
+  "{material} payload {n}": "Carga de {material} {n}",
+  "{material} ball {n}": "Bola de {material} {n}",
+  ", selected": ", selecionada",
+  "Sound, graphics, language, larger text, high contrast and reduced motion are in the StarHermit Options.": "Som, gráficos, idioma, texto maior, alto contraste e movimento reduzido ficam nas Opções do StarHermit.",
+  "Open Options": "Abrir Opções",
+  "Key bindings": "Atalhos de teclado",
+  "Loading…": "Carregando…",
 };
 
 const IT = {
@@ -1749,6 +1785,15 @@ const IT = {
   "Complete every Journey mastery stage.": "Completa tutte le prove di maestria del percorso.",
   "Marathon Builder": "Costruttore maratoneta",
   "Spawn 500 bodies over your lifetime.": "Posiziona 500 corpi in totale.",
+  // engine client
+  "Progress restored from your StarHermit cloud save.": "Progressi ripristinati dal salvataggio cloud di StarHermit.",
+  "{material} payload {n}": "Carico di {material} {n}",
+  "{material} ball {n}": "Sfera di {material} {n}",
+  ", selected": ", selezionata",
+  "Sound, graphics, language, larger text, high contrast and reduced motion are in the StarHermit Options.": "Audio, grafica, lingua, testo più grande, alto contrasto e movimento ridotto si trovano nelle Opzioni di StarHermit.",
+  "Open Options": "Apri Opzioni",
+  "Key bindings": "Tasti",
+  "Loading…": "Caricamento…",
 };
 
 // en-GB: British spelling where it differs; everything else is the en-US key.

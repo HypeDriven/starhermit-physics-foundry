@@ -1,0 +1,159 @@
+/* Physics Foundry — the browser build's src/style.css rewritten class-based
+   for the engine's UI (`npm run css` converts it into assets/ui-style.json).
+   Element selectors (h2, h3, dt, table cells), body classes (pf-hc, pf-lg,
+   pf-lh, pf-rm) and @media do not convert: every widget names its classes,
+   the breakpoints are layouts picked in native/screens.ts, high contrast is
+   a token set native/style.ts applies, and larger text, reduced motion and
+   the left-handed tray are the runtime's options and the game's option.
+   The material buttons' coloured left edge is one class per material. */
+
+:root {
+  --bg: #14161c;
+  --panel: #1e222c;
+  --panel-2: #262b38;
+  --text: #e8ecf4;
+  --muted: #9aa2b8;
+  --accent: #ff8a3d;
+  --accent-2: #ffb066;
+  --ok: #4be38a;
+  --err: #e34b4b;
+  --focus: #7fd8ff;
+  --line: #3a4158;
+}
+
+* { box-sizing: border-box; }
+
+/* ------------------------------------------------------------- text */
+.text { color: var(--text); font-size: 16px; }
+.muted { color: var(--muted); font-size: 16px; }
+.muted-small { color: var(--muted); font-size: 14.4px; }
+.strong { color: var(--text); font-size: 16px; font-weight: 700; }
+.logo { color: var(--text); font-size: 17.6px; font-weight: 700; }
+.net { color: var(--muted); font-size: 12.8px; }
+.h2 { color: var(--text); font-size: 24px; font-weight: 700; }
+.title-h2 { color: var(--text); font-size: 25.6px; font-weight: 700; }
+.h3 { color: var(--accent-2); font-size: 18.7px; font-weight: 700; }
+.objective { color: var(--accent-2); font-size: 16px; font-weight: 700; }
+.hud-line { color: var(--text); font-size: 16px; }
+.hud-time { color: var(--accent-2); font-size: 16px; font-weight: 700; }
+.hud-phase { color: var(--muted); font-size: 16px; }
+.error { color: var(--err); font-size: 16px; }
+.card-title { color: var(--text); font-size: 16px; font-weight: 700; }
+.card-text { color: var(--muted); font-size: 14.4px; }
+.dt { color: var(--muted); font-size: 16px; }
+.dd { color: var(--text); font-size: 16px; }
+.th { color: var(--text); font-size: 16px; font-weight: 700; }
+.td { color: var(--text); font-size: 16px; text-align: end; }
+.td-start { color: var(--text); font-size: 16px; }
+.total { color: var(--accent-2); font-size: 16px; font-weight: 700; }
+.total-num { color: var(--accent-2); font-size: 16px; font-weight: 700; text-align: end; }
+.caption { color: var(--text); font-size: 16px; text-align: center; }
+.ach-on { color: var(--accent-2); font-size: 16px; }
+.ach-off { color: var(--muted); font-size: 16px; }
+.toast-text { color: var(--text); font-size: 16px; }
+.fps { color: var(--text); font-size: 12px; }
+
+/* ------------------------------------------------------------- surfaces */
+.page { background: var(--bg); border-radius: 0; }
+.canvas-bg { background: #0c0e13; border-radius: 0; }
+.topbar { background: var(--panel); border-bottom: 1px solid #000000; border-radius: 0; padding: 8px 16px; }
+.rail { background: var(--panel); border-radius: 10px; padding: 12px; }
+.setup { background: var(--panel); border-radius: 10px; padding: 16px; }
+.lesson { background: var(--panel-2); border: 1px solid var(--accent); border-radius: 8px; padding: 10px; }
+.panel { background: var(--panel); border-radius: 12px; padding: 20px; }
+.toast { background: var(--panel-2); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 16px; }
+.toast-ok { background: var(--panel-2); border: 1px solid var(--ok); border-radius: 8px; padding: 8px 16px; }
+.score-row { border-bottom: 1px solid var(--line); border-radius: 0; padding: 6px 10px; }
+.info-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.scrim { background: #05060abf; border-radius: 0; }
+.fps-box { background: #14161cbf; border-radius: 4px; padding: 2px 6px; }
+
+/* ------------------------------------------------------------- buttons */
+.btn {
+  min-height: 44px; min-width: 44px; padding: 9px 16px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font-size: 16px; text-align: center;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; }
+.btn.active { outline: 2px solid var(--accent-2); }
+.btn-primary {
+  min-height: 44px; min-width: 44px; padding: 9px 16px;
+  background: var(--accent); border: 1px solid var(--accent); border-radius: 8px;
+  color: #1a0d08; font-size: 16px; font-weight: 700; text-align: center;
+}
+.btn-primary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn-primary:disabled { opacity: 0.45; }
+.btn-go {
+  min-height: 44px; min-width: 44px; padding: 9px 16px;
+  background: var(--ok); border: 1px solid var(--ok); border-radius: 8px;
+  color: #0c1a10; font-size: 16px; font-weight: 700; text-align: center;
+}
+.btn-go:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn-go:disabled { opacity: 0.45; }
+.btn-secondary {
+  min-height: 44px; min-width: 44px; padding: 9px 16px;
+  background: #00000000; border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font-size: 16px; text-align: center;
+}
+.btn-secondary:hover { border-color: var(--accent); }
+.btn-secondary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn-secondary:disabled { opacity: 0.45; }
+.btn-big {
+  min-height: 56px; padding: 14px 38px;
+  background: var(--accent); border: 1px solid var(--accent); border-radius: 8px;
+  color: #1a0d08; font-size: 20.8px; font-weight: 700; text-align: center;
+}
+.btn-big:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn-mat {
+  min-height: 44px; min-width: 44px; padding: 9px 16px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font-size: 16px; text-align: center;
+}
+.btn-mat:hover { border-color: var(--accent); }
+.btn-mat:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn-mat.active { outline: 2px solid var(--accent-2); }
+.mat-steel { background: #c9d4e8; border-radius: 0; }
+.mat-wood { background: #b5722f; border-radius: 0; }
+.mat-glass { background: #6fd3ff; border-radius: 0; }
+.mat-rubber { background: #d14b4b; border-radius: 0; }
+.card {
+  min-height: 44px; padding: 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  color: var(--text); font-size: 16px; text-align: start;
+}
+.card:hover { border-color: var(--accent); }
+.card:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.card.active { border-color: var(--accent); }
+.chip {
+  min-height: 44px; padding: 6px 14px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px;
+  color: var(--text); font-size: 16px; text-align: center;
+}
+.chip:hover { border-color: var(--accent); }
+.chip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.chip:disabled { opacity: 0.4; }
+.chip-done {
+  min-height: 44px; padding: 6px 14px;
+  background: var(--panel-2); border: 1px solid var(--ok); border-radius: 999px;
+  color: var(--text); font-size: 16px; text-align: center;
+}
+.chip-done:hover { border-color: var(--accent); }
+.chip-done:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.chip-mastery {
+  min-height: 44px; padding: 6px 14px;
+  background: var(--panel-2); border: 2px solid var(--line); border-radius: 999px;
+  color: var(--text); font-size: 16px; text-align: center;
+}
+.chip-mastery:hover { border-color: var(--accent); }
+.chip-mastery:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.chip-mastery:disabled { opacity: 0.4; }
+.chip-mastery-done {
+  min-height: 44px; padding: 6px 14px;
+  background: var(--panel-2); border: 2px solid var(--ok); border-radius: 999px;
+  color: var(--text); font-size: 16px; text-align: center;
+}
+.chip-mastery-done:hover { border-color: var(--accent); }
+.chip-mastery-done:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.on-accent { color: #1a0d08; font-size: 16px; font-weight: 700; text-align: center; }
