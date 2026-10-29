@@ -207,14 +207,30 @@ const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
 camera.position.set(0, 0, 20);
 camera.lookAt(0, 0, 0);
 
-// One dominant key + soft hemisphere fill + ambient base (r161 intensities ÷ π).
-const ambient = new AmbientLight(0xffffff, 0.45 / Math.PI);
-const key = new DirectionalLight(0xfff2df, 1.4 / Math.PI);
+// One dominant key + soft hemisphere fill + ambient base (render.js's r161 intensities; engine.minor 28).
+const ambient = new AmbientLight(0xffffff, 0.45);
+const key = new DirectionalLight(0xfff2df, 1.4);
 key.position.set(6, 10, 14);
 key.shadow.bias = -0.0004;
-key.shadow.normalBias = 1; // three's 0.02 world units; the engine's normal bias is in texels
-key.shadow.distance = 40;
-const fill = new HemisphereLight(0x9db4d8, 0x2a2018, 0.5 / Math.PI);
+key.shadow.normalBias = 0.02;
+const fill = new HemisphereLight(0x9db4d8, 0x2a2018, 0.5);
+// render.js fitted the key light's shadow frustum tightly around the chamber shell (back wall to the front of
+// the play plane) in light space; the light looks from its position at the origin.
+{
+  const f = new Vector3().sub(key.position).normalize();
+  const r = new Vector3().crossVectors(f, new Vector3(0, 1, 0)).normalize();
+  const u = new Vector3().crossVectors(r, f);
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  const hw = (CH_W + 4) / 2, hh = (CH_H + 4) / 2, p = new Vector3();
+  for (const x of [-hw, hw]) for (const y of [-hh, hh]) for (const z of [-1.4, 1.2]) {
+    p.set(x, y, z).sub(key.position);
+    const v = [p.dot(r), p.dot(u), -p.dot(f)];
+    for (let i = 0; i < 3; i++) { lo[i] = Math.min(lo[i], v[i]); hi[i] = Math.max(hi[i], v[i]); }
+  }
+  const sc = key.shadow.camera as OrthographicCamera;
+  Object.assign(sc, { left: lo[0] - 0.25, right: hi[0] + 0.25, bottom: lo[1] - 0.25, top: hi[1] + 0.25, near: Math.max(0.1, -hi[2] - 1), far: -lo[2] + 1 });
+  sc.updateProjectionMatrix();
+}
 scene.add(ambient, key, key.target, fill);
 
 const envGroup = new Group();     // chamber shell, walls, decor
@@ -699,8 +715,8 @@ export function applyLook(next: Look): void {
     }
   }
   applyEnvMaps();
-  ambient.intensity = (next.reflections ? 0.18 : 0.45) / Math.PI;
-  fill.intensity = (next.reflections ? 0.4 : 0.5) / Math.PI;
+  ambient.intensity = next.reflections ? 0.18 : 0.45;
+  fill.intensity = next.reflections ? 0.4 : 0.5;
   // UnrealBloomPass(0.6, 0.5, 0.88): only lamps, glowing rings, hazards and sparks bloom.
   renderer.bloom = next.bloom ? { strength: 0.6, radius: 0.5, threshold: 0.88, resolution: b.bloomRes } : null;
   // GTAOPass: radius 0.9, distance exponent 1.4, thickness 1.5; 16 / 8 samples and the denoise per tier; blend 0.7.
