@@ -1,6 +1,6 @@
 # Physics Foundry — Product and Game Specification
 
-**Document status:** running specification of the shipped game (StarHermit engine 1.24.0 script game, host API minor 20).  
+**Document status:** running specification of the shipped game (StarHermit engine 1.27.0 script game, host API 1.29).  
 **Game index:** 68  
 **Genre:** Physics sandbox  
 **Players:** 1 player; optional asynchronous score comparison  
@@ -206,7 +206,7 @@ Changing level swaps the assets live (materials, canvas textures, sphere geometr
 ## 6. StarHermit integration
 
 ### Packaging and launch
-- `starhermit.txt`: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.24.0`, `engine.minor=20`, capabilities platform, storage, clipboard; `control.*` and `engine.gamepad.*` for every action; server=score-script.js.
+- `starhermit.txt`: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.27.0`, `engine.minor=29`, capabilities platform, storage, clipboard; `control.*` and `engine.gamepad.*` for every action; server=score-script.js.
 - `npm run package` writes the web loader `index.html` and `starhermit-files.json` (`starhermit package --web .`); `.starhermitignore` leaves out tests/, tools/, server.js, docs and data/. Re-run after every change.
 
 ### Identity, saves, preferences, controls

@@ -187,19 +187,6 @@ function makeLightPool(): CanvasTexture {
   return canvasTexture(c);
 }
 
-/** three's ACESFilmicToneMapping on one linear colour (the old composer tone-mapped the clear colour too). */
-function aces(c: Color, exposure: number): Color {
-  const k = exposure / 0.6;
-  const v = [c.r * k, c.g * k, c.b * k];
-  const inM = [[0.59719, 0.07600, 0.02840], [0.35458, 0.90834, 0.13383], [0.04823, 0.01566, 0.83777]];
-  const outM = [[1.60475, -0.10208, -0.00327], [-0.53108, 1.10813, -0.07276], [-0.07367, -0.00605, 1.07602]];
-  const mul = (m: number[][], x: number[]): number[] => [0, 1, 2].map((r) => m[0]![r]! * x[0]! + m[1]![r]! * x[1]! + m[2]![r]! * x[2]!);
-  const fit = (x: number): number => (x * (x + 0.0245786) - 0.000090537) / (x * (0.983729 * x + 0.4329510) + 0.238081);
-  const o = mul(outM, mul(inM, v).map(fit)).map((x) => Math.max(0, Math.min(1, x)));
-  const out = new Color();
-  out.r = o[0]!; out.g = o[1]!; out.b = o[2]!;
-  return out;
-}
 
 // ---------------------------------------------------------------- the scene
 const EXPOSURE = 1.05;
@@ -625,11 +612,11 @@ function applyEmissiveBoost(): void {
   for (const lm of lampMats) lm.emissiveIntensity = bloom ? 2.6 : 1.2;
   particleBoost = look?.particles === "high" ? (bloom ? 2.2 : 1.3) : 1;
 }
-/** The old post chain tone-mapped the clear colour (lifted 2.4× so it survived); direct rendering did not. */
+/** The post chain tone-maps the clear colour as the old composer did (lifted 2.4× so it survived); direct rendering does not. */
 function applyBackground(): void {
   const c = new Color(palette.background);
   const post = !!look && (look.ao !== "off" || look.bloom || look.grade || look.antialias === "fxaa" || look.antialias === "smaa");
-  scene.background = post ? aces(c.multiplyScalar(2.4), EXPOSURE) : c;
+  scene.background = post ? c.multiplyScalar(2.4) : c;
 }
 function setMap(mat: MeshStandardMaterial, map: Texture | null, bump: Texture | null = null, bumpScale = 1): void {
   if (mat.map === map && mat.bumpMap === bump) return;
@@ -718,7 +705,8 @@ export function applyLook(next: Look): void {
   ambient.intensity = next.reflections ? 0.18 : 0.45;
   fill.intensity = next.reflections ? 0.4 : 0.5;
   // UnrealBloomPass(0.6, 0.5, 0.88): only lamps, glowing rings, hazards and sparks bloom.
-  renderer.bloom = next.bloom ? { strength: 0.6, radius: 0.5, threshold: 0.88, resolution: b.bloomRes } : null;
+  // three r161 page: UnrealBloomPass 0.6 squared (0.36) for the engine's r185 bloom (engine.minor 29).
+  renderer.bloom = next.bloom ? { strength: 0.36, radius: 0.5, threshold: 0.88, resolution: b.bloomRes } : null;
   // GTAOPass: radius 0.9, distance exponent 1.4, thickness 1.5; 16 / 8 samples and the denoise per tier; blend 0.7.
   renderer.ao = next.ao === "off" ? null : {
     blendIntensity: 0.7, radius: 0.9, distanceExponent: 1.4, thickness: 1.5, scale: 1,
@@ -728,7 +716,7 @@ export function applyLook(next: Look): void {
   // GradeShader on the linear buffer before the tone mapping: an 0.18 S-curve, saturation 1.1, cool shadows /
   // warm highlights by a smoothstep of luma from 0.15 to 0.7, a 0.2 vignette from 0.3 to 0.8 (y scaled 0.8).
   renderer.grade = next.grade ? {
-    space: "linear", contrast: 0.18, saturation: 1.1, split: [0.15, 0.7], shadows: [0.95, 0.98, 1.06], highlights: [1.05, 1.0, 0.95],
+    space: "linear", overRange: "keep", contrast: 0.18, saturation: 1.1, split: [0.15, 0.7], shadows: [0.95, 0.98, 1.06], highlights: [1.05, 1.0, 0.95],
     vignette: { amount: 0.2, inner: 0.3, outer: 0.8, scale: [1, 0.8] },
   } : null;
   renderer.antialias = next.antialias;
