@@ -705,8 +705,8 @@ export function applyLook(next: Look): void {
   ambient.intensity = next.reflections ? 0.18 : 0.45;
   fill.intensity = next.reflections ? 0.4 : 0.5;
   // UnrealBloomPass(0.6, 0.5, 0.88): only lamps, glowing rings, hazards and sparks bloom.
-  // three r161 page: UnrealBloomPass 0.6 squared (0.36) for the engine's r185 bloom (engine.minor 29).
-  renderer.bloom = next.bloom ? { strength: 0.36, radius: 0.5, threshold: 0.88, resolution: b.bloomRes } : null;
+  // three r161 page: bloom model "r160" with the page's strength 0.6 (engine.minor 30).
+  renderer.bloom = next.bloom ? { model: "r160", strength: 0.6, radius: 0.5, threshold: 0.88, resolution: b.bloomRes } : null;
   // GTAOPass: radius 0.9, distance exponent 1.4, thickness 1.5; 16 / 8 samples and the denoise per tier; blend 0.7.
   renderer.ao = next.ao === "off" ? null : {
     blendIntensity: 0.7, radius: 0.9, distanceExponent: 1.4, thickness: 1.5, scale: 1,
