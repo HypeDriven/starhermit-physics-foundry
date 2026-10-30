@@ -698,7 +698,7 @@ export function applyLook(next: Look): void {
   // reflections: the room environment replaces most of the flat fill
   if (next.reflections) {
     if (!envTex) {
-      try { envTex = new PMREMGenerator(renderer).fromScene(new RoomEnvironment(renderer), 0.04).texture; } catch (e) { console.warn(`environment: ${String(e)}`); }
+      try { const pageRoom = new RoomEnvironment(renderer); pageRoom.position.y = 0; /* the page's three r161 (pre-r183) builds the room at the origin */ envTex = new PMREMGenerator(renderer).fromScene(pageRoom, 0.04).texture; } catch (e) { console.warn(`environment: ${String(e)}`); }
     }
   }
   applyEnvMaps();
