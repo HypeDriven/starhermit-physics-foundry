@@ -151,14 +151,11 @@ Follow the skill pack's acceptance gate: deterministic seeds, debug views for co
 
 The chamber is lit by one warm key light (PCF shadows), a hemisphere fill and a small ambient base (three r161 intensities ÷ π for the engine's light units), rendered with ACES filmic tone mapping at exposure 1.05. With reflections on, a `RoomEnvironment` image (PMREM) lights the physically based surfaces; each material carries it as its own environment map so r161's per-material intensities (0.35 shell, 0.6 obstacles, bodies 0.4–1.4) still apply at engine minor 20. Bodies are clear-coated Physical on High/Ultra, Standard on Balanced, Lambert on Low; with surface detail they are true spheres with procedural surface maps (wood grain, brushed steel, rubber tread), the back wall gets brushed-steel panels with soot and stencilled bay numbers (bump-mapped), the slabs tread plate, the lamps soft light pools, plus the gauge and target glows. Payloads carry an accent ring. Effects: bloom (0.6 / 0.5 / threshold 0.88: lamps, rings, hazards, sparks), a linear colour grade with vignette, GTAO, FXAA / SMAA / MSAA, additive sparks, and background motion (dust, lamp shimmer, the gauge needle), frozen when paused or under reduced motion. With post effects the backdrop colour is the old composer's tone-mapped clear colour (palette × 2.4 through ACES).
 
-**Quality.** The runtime's Options own the graphics level (Auto from the device, ten levels in four tiers), render scale, pixel-ratio cap, adaptive resolution, frame-rate limit and readout. `native/quality.ts` maps the tier to the old presets and budgets and scales sparks and dust within the tier by the level (≤ 2×):
+**Quality.** The runtime's Options own the graphics level (Auto from the device, ten levels in four tiers), render scale, pixel-ratio cap, adaptive resolution, frame-rate limit and readout. The engine's level (`levelSettings()`) sets the shadow map, ambient occlusion, bloom, grade and anti-aliasing (Low has none). `native/quality.ts` maps the tier to the old art presets and budgets, holds the textures to the level's maximum and scales sparks and dust by the level's particle budget (≤ 2×):
 
 | Budget | Low | Balanced | High | Ultra |
 |---|---|---|---|---|
 | Body shading | Lambert | Standard | clear-coated Physical | clear-coated Physical |
-| Shadows | off | 1024² | 2048² | 4096² |
-| Ambient occlusion / bloom / grade | – / – / – | – / on / on | on / on / on | high / on / on |
-| Anti-aliasing | MSAA | FXAA | SMAA | MSAA |
 | Reflections, particles high, background animated, surface detail | off | on | on | on |
 | Back-wall panel texture (height ⅔) | 256 px | 512 px | 1024 px | 2048 px |
 | Body surface maps (height ½) | 64 px | 128 px | 256 px | 512 px |

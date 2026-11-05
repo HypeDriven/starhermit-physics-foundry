@@ -11,8 +11,9 @@
 // their ratio. The oscillator fallbacks it played while a sample decoded
 // are not ported (a live synthesis graph makes clip loads fail on the web
 // runtime): a clip still loading is silent. The runtime's Options own the
-// volumes, the mute and the voice limit. Clips load once the mixer runs
-// (natively at once, in a browser after the first press), one at a time.
+// volumes, the mute and the voice limit. Clips all load at once in onStart;
+// the hum and the stems wait for the mixer (natively at once, in a browser
+// after the first press).
 import { context, createClip, loadClip, play as playClip, type AudioClip, type Sound } from "starhermit:audio";
 import { Rules } from "./game.ts";
 
@@ -20,19 +21,22 @@ const SFX = ["ui-select", "ui-back", "ui-error", "spawn", "joint", "delete", "un
   "win", "lose", "tick", "pause", "achievement"] as const;
 export type Sfx = (typeof SFX)[number];
 const clips = new Map<string, AudioClip>();
-const queue: string[] = [];
-let loading = false;
-let wantClips = false;
 let suspended = false;
 
-/** Asks for the clips; they load once the mixer runs (see update). */
-export function loadSfx(): void { wantClips = true; }
+/** Loads every clip at once (onStart); a cue whose clip is still loading is skipped. */
+export function loadSfx(): void {
+  for (const name of SFX) {
+    loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); }, (e: unknown) => {
+      console.warn(`sfx ${name}: ${e instanceof Error ? e.message : String(e)}`);
+    });
+  }
+}
 
 export function play(name: Sfx): void {
   if (suspended) return;
   const clip = clips.get(name);
   if (!clip) return;
-  try { playClip(clip, { bus: "effects" }); } catch { clips.delete(name); if (!queue.includes(name)) queue.push(name); }
+  try { playClip(clip, { bus: "effects" }); } catch { /* the mixer is full this frame: skip it */ }
 }
 
 // -- the hum and the music ------------------------------------------------------------------------
@@ -108,25 +112,9 @@ export function setSuspended(on: boolean): void {
   } catch { /* gone */ }
 }
 
-/** Each frame: the clips once the mixer runs (one at a time), then the hum and the stems. */
+/** Each frame, once the mixer runs: the hum and the stems. */
 export function update(): void {
   if (context.state !== "running") return;
-  if (wantClips) {
-    wantClips = false;
-    for (const n of SFX) if (!queue.includes(n)) queue.push(n);
-  }
-  if (!loading && queue.length) {
-    const name = queue.shift()!;
-    if (!clips.has(name)) {
-      loading = true;
-      loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); loading = false; }, (e: unknown) => {
-        console.warn(`sfx ${name}: ${e instanceof Error ? e.message : String(e)}`);
-        loading = false;
-      });
-    }
-    return;
-  }
-  if (loading) return;
   if (!ambClip) {
     if (!renderAmbience(8000)) return;
     try { ambClip = createClip([amb], RATE); } catch (e) { console.warn(`audio: ${String(e)}`); ambPos = 0; }

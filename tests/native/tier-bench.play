@@ -1,0 +1,9 @@
+# Bench scene: Journey chamber 1 "First Drop" (fixed) in the build phase. The run itself is on real time and ends within a few seconds at bench frame rates, so it is not measured. Written for tools/engine-tier-bench.mjs.
+until 600 Daily challenge
+frames 10
+click =Play
+until 300 Spawns left
+frames 120
+measure start
+frames 600
+measure stop

@@ -615,7 +615,7 @@ function applyEmissiveBoost(): void {
 /** The post chain tone-maps the clear colour as the old composer did (lifted 2.4× so it survived); direct rendering does not. */
 function applyBackground(): void {
   const c = new Color(palette.background);
-  const post = !!look && (look.ao !== "off" || look.bloom || look.grade || look.antialias === "fxaa" || look.antialias === "smaa");
+  const post = !!look && (look.ao !== null || look.bloom !== null || look.grade || look.antialias === "fxaa" || look.antialias === "smaa");
   scene.background = post ? c.multiplyScalar(2.4) : c;
 }
 function setMap(mat: MeshStandardMaterial, map: Texture | null, bump: Texture | null = null, bumpScale = 1): void {
@@ -693,7 +693,7 @@ export function applyLook(next: Look): void {
   renderer.toneMappingExposure = EXPOSURE;
   renderer.shadowMap.enabled = next.shadows > 0;
   key.castShadow = next.shadows > 0;
-  if (next.shadows > 0) key.shadow.mapSize = next.shadows;
+  if (next.shadows > 0) key.shadow.mapSize = next.shadows; // the level's size: the engine doesn't hold mapSize to it
   for (const v of bodyViews.values()) v.mesh.castShadow = next.shadows > 0;
   // reflections: the room environment replaces most of the flat fill
   if (next.reflections) {
@@ -706,12 +706,13 @@ export function applyLook(next: Look): void {
   fill.intensity = next.reflections ? 0.4 : 0.5;
   // UnrealBloomPass(0.6, 0.5, 0.88): only lamps, glowing rings, hazards and sparks bloom.
   // three r161 page: bloom model "r160" with the page's strength 0.6 (engine.minor 30).
-  renderer.bloom = next.bloom ? { model: "r160", strength: 0.6, radius: 0.5, threshold: 0.88, resolution: b.bloomRes } : null;
+  renderer.bloom = next.bloom === null ? null : { model: "r160", strength: 0.6, radius: 0.5, threshold: 0.88, resolution: next.bloom };
   // GTAOPass: radius 0.9, distance exponent 1.4, thickness 1.5; 16 / 8 samples and the denoise per tier; blend 0.7.
-  renderer.ao = next.ao === "off" ? null : {
+  const ao = next.ao, hi = !!ao && ao.resolution >= 1; // the engine's AO "high" is full resolution
+  renderer.ao = ao && {
     blendIntensity: 0.7, radius: 0.9, distanceExponent: 1.4, thickness: 1.5, scale: 1,
-    samples: next.ao === "high" ? 16 : 8, resolution: b.aoRes,
-    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
+    samples: ao.samples, resolution: ao.resolution,
+    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: hi ? 6 : 4, rings: 2, samples: ao.denoiseSamples, radiusExponent: 2 },
   };
   // GradeShader on the linear buffer before the tone mapping: an 0.18 S-curve, saturation 1.1, cool shadows /
   // warm highlights by a smoothstep of luma from 0.15 to 0.7, a 0.2 vignette from 0.3 to 0.8 (y scaled 0.8).
