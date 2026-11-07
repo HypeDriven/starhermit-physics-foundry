@@ -182,7 +182,7 @@ Changing level swaps the assets live (materials, canvas textures, sphere geometr
 - `native/render.ts`: the chamber on `starhermit:scene` (procedural canvases on `starhermit:canvas`), framing into the view rectangle, picking, interpolation between fixed steps.
 - `native/audio.ts`: the sfx clips on the effects bus; the furnace hum and the two music stems rendered to clips on the music bus.
 - `native/platform.ts`: save, cloud merge and migration, the game's options, player, invite link, server clock, score posting, board reads. `native/i18n.ts`: the interface language. `native/quality.ts`: looks per tier. `native/game.ts`: typed facade over the pure modules.
-- Pure modules shared with node tests: `src/rules.js` (deterministic physics, legality, scoring, replay verification), `src/content.js` (themes, 6 lessons, 44 journey chambers, 4 challenges, the Daily generator, achievements, validators), `src/session.js` (validated commands, undo, replay log), `src/progress.js` (save model, merge, run bookkeeping, options), `src/i18n.js` + `src/strings.js` and `src/platform-i18n.js` (strings in nine locales).
+- Pure modules shared with node tests: `src/rules.js` (deterministic physics, legality, scoring, replay verification), `src/content.js` (themes, 6 lessons, 44 journey chambers, 4 challenges, the Daily generator, achievements, validators), `src/session.js` (validated commands, undo, replay log), `src/progress.js` (save model, merge, run bookkeeping, options), `assets/strings.json` (strings in nine locales).
 - `server.js`: the local dev server with replay validation (not packaged); `score-script.js`: the platform script (server=).
 
 ### Determinism, replay, and security
@@ -252,7 +252,7 @@ Success targets for the first public test: median first-play time under 20 secon
 
 ### Language
 
-- Every player-facing string ships in en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT (`src/strings.js`, account strings in `src/platform-i18n.js`); the game name is never translated.
+- Every player-facing string ships in en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT (`assets/strings.json`, account strings are the engine's); the game name is never translated.
 - The language is the runtime's interface language (Options › Language, else the account's or device's), mapped to the nearest shipped locale; a change shows on the next frame without restarting the chamber or its clock.
 
 ### Graphics and performance

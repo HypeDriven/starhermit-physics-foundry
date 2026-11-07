@@ -4,12 +4,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { STRINGS } from "../src/strings.js";
-import { EN, LOCALES, t, setLocale, getLocale, onLocaleChange, levelName, reasonText } from "../src/i18n.js";
 import { LEARN_LESSONS, JOURNEY_LEVELS, CHALLENGE_LEVELS, ACHIEVEMENTS, dailyLevel } from "../src/content.js";
 import { MATERIALS, JOINT_TYPES } from "../src/rules.js";
 
 const NATIVE = new URL("../native/", import.meta.url);
+const STRINGS = JSON.parse(readFileSync(new URL("../assets/strings.json", import.meta.url), "utf8"));
+const LOCALES = Object.keys(STRINGS);
+/** The symbolic keys (their en-US text differs from the key). */
+const EN = Object.fromEntries(Object.entries(STRINGS["en-US"]).filter(([k, v]) => k !== v));
 
 /** Every key the engine client translates (T / N in native/*.ts) plus the content's names and texts. */
 function usedKeys() {
@@ -65,17 +67,8 @@ test("en-GB only overrides real keys", () => {
   }
 });
 
-test("t() fills placeholders and switches live", () => {
-  const seen = [];
-  const off = onLocaleChange((l) => seen.push(l));
-  setLocale("de-DE");
-  assert.equal(getLocale(), "de-DE");
-  assert.equal(t("Delivered: {done} / {total}", { done: 1, total: 2 }), "Geliefert: 1 / 2");
-  assert.equal(levelName({ name: "Daily Cast 2026-10-17" }), "Tagesguss 2026-10-17");
-  assert.equal(reasonText("budget-exhausted"), "keine Platzierungen mehr übrig");
-  setLocale("xx-YY");
-  assert.equal(getLocale(), "en-US");
-  assert.equal(t("Phase: {phase}", { phase: t("phase.build") }), "Phase: build");
-  off();
-  assert.deepEqual(seen, ["de-DE", "en-US"]);
+test("the tables keep their translations and symbolic keys", () => {
+  assert.equal(STRINGS["de-DE"]["Daily Cast {date}"], "Tagesguss {date}");
+  assert.equal(STRINGS["de-DE"]["reason.budget-exhausted"], "keine Platzierungen mehr übrig");
+  assert.equal(STRINGS["en-US"]["phase.build"], "build");
 });

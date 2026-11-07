@@ -547,7 +547,9 @@ function burst(x: number, y: number, color: string, count: number, speed = 4): v
     pool.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v + 1.5, life: 0, ttl: 0.5 + spawnRng.next() * 0.5, r: c.r, g: c.g, b: c.b });
   }
 }
+let sparksDrawn = 0;
 function updateParticles(dt: number): void {
+  if (!pool.length && !sparksDrawn) return;
   for (let i = pool.length - 1; i >= 0; i--) {
     const p = pool[i]!;
     p.life += dt;
@@ -564,6 +566,7 @@ function updateParticles(dt: number): void {
     pCol[n * 3] = p.r * fade; pCol[n * 3 + 1] = p.g * fade; pCol[n * 3 + 2] = p.b * fade;
     n++;
   }
+  sparksDrawn = n;
   pGeo.setDrawRange(0, n);
   pGeo.attributes.position!.needsUpdate = true;
   pGeo.attributes.color!.needsUpdate = true;
