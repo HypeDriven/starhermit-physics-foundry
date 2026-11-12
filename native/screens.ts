@@ -1,3 +1,7 @@
+import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
+import { localizedDrawOptions as __l10nDrawOptions } from "./l10n/font.ts";
+// localization-runtime:attached
+import { openLocalizedOptions as __l10nOptions } from "./l10n/menu.ts";
 // The browser build's DOM shell (src/ui.js + src/style.css) as starhermit:ui,
 // built every frame over the chamber: the header (logo, player and sync
 // status), the chamber screen (the objective rail with the HUD lines, the
@@ -13,7 +17,22 @@
 // compact (the status above the chamber and the tray below; phones in
 // portrait put the cursor pad in one row). The chamber view's rectangle
 // goes to main.ts (view → render.ts), and the page is painted around it.
-import { frame, openMenu } from "starhermit:engine";
+// The browser build's DOM shell (src/ui.js + src/style.css) as starhermit:ui,
+// built every frame over the chamber: the header (logo, player and sync
+// status), the chamber screen (the objective rail with the HUD lines, the
+// error line, Pause and Help; the chamber view; the lesson box and the
+// action tray — materials, Spawn at cursor, joints, Delete, Undo, Run and the
+// cursor pad — mirrored for the left-handed tray), named targets for the
+// bodies (the old picking's DOM equivalent: screen readers and play scripts
+// find them), the toasts, the pause and settings panels, and every
+// full-page screen (title, modes with their setup panels, progression, how
+// to play, leaderboards, results). The old media queries are layouts picked
+// by the window's logical size: wide (≥ 1024 px: three columns), short
+// landscape (≤ 900 px wide, landscape: narrow rails either side) and
+// compact (the status above the chamber and the tray below; phones in
+// portrait put the cursor pad in one row). The chamber view's rectangle
+// goes to main.ts (view → render.ts), and the page is painted around it.
+import { frame } from "starhermit:engine";
 import { bindings, requestRebind } from "starhermit:input";
 import * as draw from "starhermit:draw";
 import * as ui from "starhermit:ui";
@@ -44,7 +63,7 @@ function textWidth(text: string, style: string, kind?: "button" | "heading"): nu
 /** Text up to `width` wide: one label when it fits, else a paragraph. */
 function para(text: string, width: number, cls = "text", id?: string): void {
   if (!text) return;
-  let u = ui.style(cls);
+  let u = ui.style(__l10nStyle(cls));
   if (id) u = u.id(id);
   if (textWidth(text, cls) <= width) u.label(text);
   else u.paragraph(text, Math.max(20, width));
@@ -63,12 +82,12 @@ function button(b: Btn): void {
   else if (b.width != null && buttonWidth(b.text, style) > b.width) {
     // a label wider than its button wraps (labels don't)
     const inner = b.width - 34;
-    opts.content = () => { ui.style("wrap").paragraph(b.text, Math.max(20, inner)); };
+    opts.content = () => { ui.style(__l10nStyle("wrap")).paragraph(b.text, Math.max(20, inner)); };
   } else if (b.name && b.name !== b.text) opts.content = () => { ui.label(b.text); };
   const s: ui.Style = {};
   if (b.width != null) s.width = b.width;
   if (b.height != null) s.height = b.height;
-  if (ui.style(style, s).id(b.id).button(b.name ?? b.text, opts) && fresh()) later(b.act);
+  if (ui.style(__l10nStyle(style), __l10nStyle(s)).id(b.id).button(b.name ?? b.text, opts) && fresh()) later(b.act);
 }
 /** Buttons at their own widths in rows that wrap at `width`; `stretch`ed rows fill the width, so they keep the packer (the engine's wrap row doesn't stretch its lines). */
 function flow(label: string, list: Btn[], width: number, gap = 8, stretch = false, justify: "start" | "center" = "start"): void {
@@ -155,7 +174,7 @@ const HEADER = 40;
 function header(L: Layout): void {
   const bar = ui.place("topbar", { anchor: "top-start", x: 0, y: 0 }, () => {
     ui.row("topbar-row", () => {
-      ui.style("logo").label("Physics Foundry");
+      ui.style(__l10nStyle("logo")).label("Physics Foundry");
       ui.spacer();
       const bits: string[] = [];
       if (platform.signedIn()) bits.push(platform.displayName() || T("Player"));
@@ -164,7 +183,7 @@ function header(L: Layout): void {
         const st = platform.syncState();
         bits.push(T(st === "synced" ? "sync.synced" : st === "saving" ? "sync.saving" : "sync.offline"));
       }
-      ui.style("net").id("net-status").label(bits.join(" · "));
+      ui.style(__l10nStyle("net")).id("net-status").label(bits.join(" · "));
     }, { style: "topbar", width: L.lw, height: HEADER, align: "center" });
   });
   rect(bar);
@@ -395,7 +414,7 @@ function toggleRow(id: string, label: string, on: boolean, w: number, set: (v: b
         const s = st.scale, box = 22 * s, bx = r.x + (r.width - box) / 2, by = r.y + (r.height - box) / 2;
         draw.roundRect(bx, by, box, box, 4, on ? token("accent") : token("panel-2"));
         draw.strokeRoundRect(bx, by, box, box, 4, token("muted"), 2);
-        if (on) draw.text("✓", bx + box / 2, by + 1 * s, { size: 17 * s, color: "#1a0d08", align: "center", weight: "bold" });
+        if (on) draw.text("✓", bx + box / 2, by + 1 * s, __l10nDrawOptions({ size: 17 * s, color: "#1a0d08", align: "center", weight: "bold" }));
       },
     });
     para(T(label), w - 56, "text", `${id}-label`);
@@ -418,7 +437,7 @@ function settingsPanel(L: Layout): void {
           para(profileNote(), iw, "muted", "profile-note");
           para(T("Sound, graphics, language, larger text, high contrast and reduced motion are in the StarHermit Options."), iw, "muted", "options-note");
           flow("settings-runtime", [
-            { id: "btn-options", text: T("Open Options"), act: () => openMenu() },
+            { id: "btn-options", text: T("Open Options"), act: () => __l10nOptions() },
             { id: "btn-rebind", text: T("Key bindings"), act: () => requestRebind() },
           ], iw, 8);
           para(T("Display"), iw, "h3");
@@ -529,7 +548,7 @@ function modesScreen(w: number): void {
       facts.forEach(([k, v], i) => {
         if (inner < 380) { para(k, inner, "dt"); para(v, inner, "dd", `setup-fact-${i}`); return; }
         ui.row(`setup-fact-${i}`, () => {
-          ui.column(`setup-fact-${i}-k`, () => ui.style("dt").label(k), { width: kw });
+          ui.column(`setup-fact-${i}-k`, () => ui.style(__l10nStyle("dt")).label(k), { width: kw });
           ui.column(`setup-fact-${i}-v`, () => para(v, inner - kw - 8, "dd"), { width: inner - kw - 8 });
         }, { width: inner, spacing: 8 });
       });
@@ -682,11 +701,11 @@ function resultsScreen(w: number): void {
     ];
     rows.forEach(([k, v], i) => ui.row(`score-${i}`, () => {
       ui.column(`score-${i}-k`, () => para(k, tw - 110, "th"), { width: tw - 100 });
-      ui.column(`score-${i}-v`, () => ui.style("td").id(`score-${i}-n`).label(String(v)), { width: 80, align: "end" });
+      ui.column(`score-${i}-v`, () => ui.style(__l10nStyle("td")).id(`score-${i}-n`).label(String(v)), { width: 80, align: "end" });
     }, { style: "score-row", width: tw, spacing: 0, align: "center" }));
     ui.row("score-total", () => {
       ui.column("score-total-k", () => para(T("Total"), tw - 110, "total"), { width: tw - 100 });
-      ui.column("score-total-v", () => ui.style("total-num").id("score-total").label(String(r.score.total)), { width: 80, align: "end" });
+      ui.column("score-total-v", () => ui.style(__l10nStyle("total-num")).id("score-total").label(String(r.score.total)), { width: 80, align: "end" });
     }, { style: "score-row", width: tw, spacing: 0, align: "center" });
   }, { width: tw, spacing: 0 });
   para(r.newBest ? T("New local best! (previous {n})", { n: r.prevBest }) : T("Local best: {n}", { n: Math.max(r.prevBest, r.score.total) }), w, "muted", "results-best");

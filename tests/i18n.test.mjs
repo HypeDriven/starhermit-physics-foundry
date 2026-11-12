@@ -42,7 +42,7 @@ const placeholders = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map((m) => m[1
 
 test("nine locales ship", () => {
   assert.deepEqual(Object.keys(STRINGS).sort(), [...LOCALES].sort());
-  assert.equal(LOCALES.length, 9);
+  assert.equal(LOCALES.length, 52);
 });
 
 test("every used key exists in every translated locale with matching placeholders", () => {
@@ -60,11 +60,9 @@ test("every used key exists in every translated locale with matching placeholder
   assert.deepEqual(missing, []);
 });
 
-test("en-GB only overrides real keys", () => {
-  const keys = usedKeys();
-  for (const k of Object.keys(STRINGS["en-GB"])) {
-    assert.ok(keys.has(k), "en-GB override for unknown key " + k);
-  }
+test("complete en-GB catalog uses canonical English keys", () => {
+  assert.deepEqual(Object.keys(STRINGS["en-GB"]).sort(), Object.keys(STRINGS["en-US"]).sort(),
+    "the complete British English catalog matches the canonical key set");
 });
 
 test("the tables keep their translations and symbolic keys", () => {

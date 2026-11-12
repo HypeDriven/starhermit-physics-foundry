@@ -1,3 +1,5 @@
+// localization-runtime:attached
+import { localizedCanvasFont as __l10nCanvasFont } from "./l10n/font.ts";
 // The industrial test chamber on starhermit:scene, as the browser build's
 // src/render.js drew it with three.js r161: the orthographic camera looking
 // straight at the 20 × 12 chamber (gameplay in the XY plane), the panelled
@@ -104,7 +106,7 @@ function makePanelTexture(size: number): CanvasTexture {
     g.fillStyle = `rgba(8,6,4,${0.04 + rnd() * 0.06})`;
     g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
   }
-  g.font = "bold 34px monospace";
+  g.font = __l10nCanvasFont("bold 34px monospace");
   g.textBaseline = "top";
   g.fillStyle = "rgba(255,170,90,0.22)";
   g.fillText("BAY 07", pw * 0 + 18, 16);
