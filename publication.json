@@ -1,0 +1,98 @@
+{
+  "game": {
+    "id": "b8adce2c-e09e-4316-bde2-c4f567f34d13",
+    "displayName": "Physics Foundry",
+    "hosting": {
+      "hostingEnabled": true,
+      "hostedUrl": "https://b8adce2c-e09e-4316-bde2-c4f567f34d13.starhermit.com/index.html",
+      "deployStatus": "live",
+      "pinnedCommitSha": null,
+      "deployedCommitSha": null,
+      "deployError": null,
+      "deployedAt": "2026-11-12T08:16:29.166808+00:00",
+      "externalLaunchUrl": null,
+      "engineVersion": "1.38.0",
+      "deployWarning": null
+    }
+  },
+  "publishedAt": "2026-11-12T08:16:34.558Z",
+  "sourceCommit": "58d557d0f10299841c140b371179bf0ff71e9e40",
+  "bytesReceived": 1816567,
+  "archiveSha256": "caf6dd2111d3c59f7fd4d53d73239fdb8aad2be26de908fb2bac71bc8791484b",
+  "indexSha256": "0d5ca53fc11af31b594dd8267de29dbe3c532755d926423ab3bdf993ae3c6354",
+  "result": {
+    "clientPublished": true,
+    "serverImageLoaded": false,
+    "imageDigest": null,
+    "bytesReceived": 1816567,
+    "mode": "replace",
+    "filesRemoved": 0,
+    "engineVersion": "1.38.0",
+    "deployWarning": null
+  },
+  "liveVerification": {
+    "at": "2026-11-12T08:16:34.558Z",
+    "files": [
+      {
+        "file": "starhermit-files.json",
+        "sha256": "0d5ca53fc11af31b594dd8267de29dbe3c532755d926423ab3bdf993ae3c6354",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Japanese.otf",
+        "sha256": "776ce4f7527f44fd8527f45d322d7b74dac15b2e9b16b41967e2cf16b61196ab",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Khmer.ttf",
+        "sha256": "a06b26ba69c307e3ed9a85daa434aae44065fd3e2a8677c4a7a4fbb770239892",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/SimplifiedChinese.otf",
+        "sha256": "84021376db1ef588c843a2e8ff7d43d4aefd799177331ac5f7be0e92d336a20c",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Tamil.ttf",
+        "sha256": "13a03e437210be9cb8bcb15db4dd3efbae6fbccf0415a849e52cfc17084f4f83",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/TraditionalChinese.otf",
+        "sha256": "2b74a887a25642ce08a12e9d6c279f24dcc18bf6919b3208128ee0c5b99133b4",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/common.json",
+        "sha256": "166fda7cbc2dd174100814e7543524a3af39bb6c1e63d6ed9ca9616308c09622",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/fonts.json",
+        "sha256": "37beaea0dba54c9f2c45995cbf9fd19fad21719d701718c41d7e58dd7748ca13",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/locales.json",
+        "sha256": "be76475a0f2c8249916b2154531b5cb3c8694769a34c1a19f222fc170a0cdd86",
+        "status": 200
+      },
+      {
+        "file": "assets/strings.json",
+        "sha256": "a1220c869ab61dca59899b516ac13f9c702f05ad1fc9f371c68cae56dfdb0fb9",
+        "status": 200
+      },
+      {
+        "file": "index.html",
+        "sha256": "9f19c581ada0dced6a2da9b1f312295518b7405a9b6f0675a0d24602accd1050",
+        "status": 200
+      },
+      {
+        "file": "starhermit.txt",
+        "sha256": "6ddecdd89ac7085eb0d1b28f3be260fc688c6da4b8194050a43770c65ef9c8fb",
+        "status": 200
+      }
+    ]
+  }
+}
