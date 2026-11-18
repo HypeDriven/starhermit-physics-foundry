@@ -30,6 +30,7 @@ import {
   RepeatWrapping, RingGeometry, RoomEnvironment, SRGBColorSpace, SphereGeometry, TorusGeometry, Vector3, renderer, scene,
   type Material, type Object3D, type Texture,
 } from "starhermit:scene";
+import { GPUParticleEmitter } from "starhermit:particles";
 import { OffscreenCanvas, type OffscreenCanvasRenderingContext2D } from "starhermit:canvas";
 import { Rules, type GameEvent, type Level, type State, type Theme } from "./game.ts";
 import { SPARK_MAX, DUST_MAX, sparkCap, type Look } from "./quality.ts";
@@ -227,6 +228,8 @@ const levelGroup = new Group();   // obstacles, hazards, targets, crates and pip
 const bodyGroup = new Group();
 const jointGroup = new Group();
 const overlayGroup = new Group(); // ghost, selection, cursor
+envGroup.movable = false;
+levelGroup.movable = bodyGroup.movable = jointGroup.movable = overlayGroup.movable = true;
 scene.add(envGroup, levelGroup, bodyGroup, jointGroup, overlayGroup);
 
 const palette = { ...DEFAULT_PALETTE };
@@ -372,6 +375,7 @@ let needle: Mesh;
   const needleGeo = new PlaneGeometry(0.04, 0.34);
   needleGeo.translate(0, 0.14, 0);
   needle = new Mesh(needleGeo, new MeshBasicMaterial({ color: 0xc0392b }));
+  needle.movable = true;
   needle.position.set(dial.position.x, dial.position.y, -0.88);
   needle.rotation.z = -0.9;
   detailGroup.add(dial, bezel, needle);
@@ -524,54 +528,19 @@ cursorGroup.add(new Mesh(new PlaneGeometry(0.7, 0.05), mats.cursor), new Mesh(ne
 cursorGroup.position.z = 0.5;
 overlayGroup.add(cursorGroup);
 
-// -------------------------------------------------------------- particles (pooled sparks) and dust
-const pGeo = new BufferGeometry();
-const pPos = new Float32Array(SPARK_MAX * 3);
-const pCol = new Float32Array(SPARK_MAX * 3);
-pGeo.setAttribute("position", new BufferAttribute(pPos, 3));
-pGeo.setAttribute("color", new BufferAttribute(pCol, 3));
-pGeo.setDrawRange(0, 0);
-const pMat = new PointsMaterial({ size: 0.14, vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false });
-const points = new Points(pGeo, pMat);
-points.frustumCulled = false;
-scene.add(points);
-interface Spark { x: number; y: number; vx: number; vy: number; life: number; ttl: number; r: number; g: number; b: number }
-const pool: Spark[] = [];
+// -------------------------------------------------------------- native particles and dust
+const pMat = new PointsMaterial({ size: 0.14, transparent: true, opacity: 0.9, depthWrite: false });
+const sparks = new GPUParticleEmitter({
+  capacity: SPARK_MAX, material: pMat, space: "world", life: [0.5, 1],
+  velocity: [0, 1.5, 0], gravity: [0, -6, 0], opacity: [0.9, 0],
+});
+sparks.frustumCulled = false;
+scene.add(sparks);
 let particleCap = 300;
-let particleBoost = 1;
 const spawnRng = Rules.makeRng(1234);
 function burst(x: number, y: number, color: string, count: number, speed = 4): void {
-  const c = new Color(color);
-  for (let i = 0; i < count; i++) {
-    if (pool.length >= particleCap) pool.shift();
-    const a = spawnRng.next() * Math.PI * 2;
-    const v = (0.3 + spawnRng.next() * 0.7) * speed;
-    pool.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v + 1.5, life: 0, ttl: 0.5 + spawnRng.next() * 0.5, r: c.r, g: c.g, b: c.b });
-  }
-}
-let sparksDrawn = 0;
-function updateParticles(dt: number): void {
-  if (!pool.length && !sparksDrawn) return;
-  for (let i = pool.length - 1; i >= 0; i--) {
-    const p = pool[i]!;
-    p.life += dt;
-    if (p.life >= p.ttl) { pool.splice(i, 1); continue; }
-    p.vy -= 6 * dt;
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
-  }
-  let n = 0;
-  for (const p of pool) {
-    if (n >= particleCap) break;
-    pPos[n * 3] = p.x; pPos[n * 3 + 1] = p.y; pPos[n * 3 + 2] = 0.7;
-    const fade = (1 - p.life / p.ttl) * particleBoost;
-    pCol[n * 3] = p.r * fade; pCol[n * 3 + 1] = p.g * fade; pCol[n * 3 + 2] = p.b * fade;
-    n++;
-  }
-  sparksDrawn = n;
-  pGeo.setDrawRange(0, n);
-  pGeo.attributes.position!.needsUpdate = true;
-  pGeo.attributes.color!.needsUpdate = true;
+  sparks.set({ velocitySpread: [speed, speed, 0] });
+  sparks.burst(Math.min(count, particleCap), [x, y, 0.7], { color: new Color(color) });
 }
 const dGeo = new BufferGeometry();
 const dPos = new Float32Array(DUST_MAX * 3);
@@ -615,7 +584,7 @@ function applyEmissiveBoost(): void {
   mats.payloadRing.color.set(palette.accent).multiplyScalar(bloom ? 1.6 : 1);
   mats.targetGlow.color.set(palette.accent);
   for (const lm of lampMats) lm.emissiveIntensity = bloom ? 2.6 : 1.2;
-  particleBoost = look?.particles === "high" ? (bloom ? 2.2 : 1.3) : 1;
+  sparks.set({ opacity: [0.9 * (look?.particles === "high" ? (bloom ? 2.2 : 1.3) : 1), 0] });
 }
 /** The post chain tone-maps the clear colour as the old composer did (lifted 2.4× so it survived); direct rendering does not. */
 function applyBackground(): void {
@@ -727,7 +696,6 @@ export function applyLook(next: Look): void {
   } : null;
   renderer.antialias = next.antialias;
   particleCap = sparkCap(next);
-  if (pool.length > particleCap) pool.splice(0, pool.length - particleCap);
   if (next.particles === "high") { pMat.map = softSprite; pMat.size = 0.2; pMat.blending = AdditiveBlending; }
   else { pMat.map = null; pMat.size = 0.14; pMat.blending = NormalBlending; }
   dust.visible = next.animated;
@@ -758,7 +726,7 @@ export function setSnapshot(state: State, interpAlpha = 1): void {
 export function resetChamber(): void {
   clearViews();
   prevSnap = curSnap = null;
-  pool.length = 0;
+  sparks.clear();
   selection = null;
   shakeAmp = 0;
 }
@@ -962,7 +930,7 @@ export function update(dt: number, w: number, h: number, rect: Rect): void {
     poolMats.forEach((pm, i) => { pm.opacity = 0.16 * (0.92 + Math.sin(elapsed * (1.3 + i * 0.4) + i) * 0.08); });
     needle.rotation.z = -0.9 + Math.sin(elapsed * 0.9) * 0.08 + Math.sin(elapsed * 7.1) * 0.015;
   }
-  updateParticles(paused ? 0 : dt);
+  sparks.paused = paused || reducedMotion;
   // camera shake (decaying, never affects picking)
   if (shakeAmp > 0.001 && !reducedMotion) {
     shakeOffset.set((spawnRng.next() - 0.5) * shakeAmp, (spawnRng.next() - 0.5) * shakeAmp, 0);

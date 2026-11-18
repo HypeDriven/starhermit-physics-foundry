@@ -67,7 +67,6 @@ export const app = {
   results: null as Results | null,
   resultsAt: null as number | null,
   error: null as { text: string; until: number } | null,
-  toasts: [] as { text: string; until: number; ok: boolean }[],
   helpReturn: "title" as "title" | "play" | "pause",
   helpPaused: false,
   /** Board views on the leaderboards screen. */
@@ -84,8 +83,8 @@ export function announce(text: string, assertive = false): void {
   if (text) ui.announce(text.slice(0, 500), { politeness: assertive ? "assertive" : "polite" });
 }
 export function toast(text: string, ok = false): void {
-  app.toasts.push({ text, until: now() + 4.5, ok });
-  if (app.toasts.length > 4) app.toasts.shift();
+  const compact = ui.viewport!().width < 1024 && !app.screen;
+  ui.toast!(text, { kind: ok ? "success" : "info", duration: 4.5, position: compact ? "top" : "bottom", offset: compact ? 48 : 16, style: [ok ? "toast-ok" : "toast", "toast-text"] });
 }
 function vibrateMs(ms: number): void { if (platform.options.haptics) { try { vibrate(ms); } catch { /* no motor */ } } }
 function flashError(msg: string): void {
@@ -104,7 +103,7 @@ export function openScreen(name: ScreenName | null): void {
   app.openedFrame = app.screenFrame = frame().frame;
   ui.setFocus(null);
   render.setActive(name === null);
-  if (name === "results") app.toasts = []; // run-end toasts are listed on the results screen itself
+  if (name === "results") ui.clearToasts!(); // run-end toasts are listed on the results screen itself
 }
 export function goTitle(): void { teardownPlay(); openScreen("title"); app.focusNext = "btn-play"; }
 export function openModes(): void { app.setup = null; openScreen("modes"); }
@@ -667,7 +666,6 @@ onUpdate((dt) => {
   audio.update();
   const t = now();
   if (app.error && app.error.until < t) app.error = null;
-  app.toasts = app.toasts.filter((x) => x.until >= t);
 });
 onRender(__l10nRender((interp) => {
   hudRects.length = 0;

@@ -1,6 +1,6 @@
 # Physics Foundry — Product and Game Specification
 
-**Document status:** running specification of the shipped game (StarHermit engine 1.39.0 script game, host API 1.39).
+**Document status:** running specification of the shipped game (StarHermit engine 1.44.1 script game, host API 1.44).
 **Game index:** 68  
 **Genre:** Physics sandbox  
 **Players:** 1 player; optional asynchronous score comparison  
@@ -179,7 +179,8 @@ Changing level swaps the assets live (materials, canvas textures, sphere geometr
 
 - `native/main.ts` (engine.entry): app state and screen flow, starting every mode, the session's events (sounds, sparks, announcements, lesson steps, achievements), keys / pads / pointer / touch, one rules tick per fixed step, results and score posting, lifecycle.
 - `native/screens.ts`: every screen, rail, tray and panel on `starhermit:ui`; `native/style.ts` registers `assets/ui-style.json` (from `tools/ui-style.css` by `npm run css`) and the high-contrast tokens.
-- `native/render.ts`: the chamber on `starhermit:scene` (procedural canvases on `starhermit:canvas`), framing into the view rectangle, picking, interpolation between fixed steps.
+- `native/render.ts`: the chamber on `starhermit:scene` (procedural canvases on `starhermit:canvas`), framing into the view rectangle, picking, interpolation between fixed steps. Cosmetic sparks use a bounded native GPU particle emitter with automatic CPU fallback, and static chamber scenery carries mobility hints for the shadow cache.
+- `native/screens.ts` retains the static help page through `ui.retain`; toasts use the engine's native layout, styling, accessibility and lifetime management.
 - `native/audio.ts`: the sfx clips on the effects bus; the furnace hum and the two music stems rendered to clips on the music bus.
 - `native/platform.ts`: save, cloud merge and migration, the game's options, player, invite link, server clock, score posting, board reads. `native/i18n.ts`: the interface language. `native/quality.ts`: looks per tier. `native/game.ts`: typed facade over the pure modules.
 - Pure modules shared with node tests: `src/rules.js` (deterministic physics, legality, scoring, replay verification), `src/content.js` (themes, 6 lessons, 44 journey chambers, 4 challenges, the Daily generator, achievements, validators), `src/session.js` (validated commands, undo, replay log), `src/progress.js` (save model, merge, run bookkeeping, options), `assets/strings.json` (strings in nine locales).
@@ -187,7 +188,7 @@ Changing level swaps the assets live (materials, canvas textures, sphere geometr
 
 ### Determinism, replay, and security
 
-- Fixed simulation step where physics exists; quantize authoritative inputs and define stable collision/order rules.
+- Fixed simulation step where physics exists; quantize authoritative inputs and define stable collision/order rules. Authoritative physics stays in the shared JavaScript rules because the platform's server-side sandbox cannot import client-only `starhermit:physics`; this preserves replay and score validation. Native GPU particles affect presentation only.
 - Use separate seeded random streams for rules, content decoration, and audiovisual variants. Cosmetic randomness never changes rules.
 - Replay envelope: schema version, build/content version, seed, initial hash, timestamp offset, ordered commands, periodic state hashes, terminal result.
 - Validate all network input for identity, session membership, turn/tick, bounds, rate, payload size, and legal action. Reject duplicates idempotently by command ID.
@@ -197,13 +198,13 @@ Changing level swaps the assets live (materials, canvas textures, sphere geometr
 
 - Show useful progress by asset group; load core rules/UI first and scenic assets lazily. Provide procedural low-detail substitutes if optional assets fail.
 - Cache immutable hashed assets and the last safe local snapshot. Updates activate between rounds, never during one.
-- Recover WebGL context by rebuilding GPU resources from retained CPU descriptors. If 3D is unavailable, present a clear compatibility message and preserve account/session state.
+- Recover the graphics device by rebuilding GPU resources from retained CPU descriptors. If WebGPU is unavailable in a browser, present a clear compatibility message and preserve account/session state.
 - Background tabs reduce rendering to zero or a low heartbeat while preserving required network lifecycle.
 
 ## 6. StarHermit integration
 
 ### Packaging and launch
-- `starhermit.txt`: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.39.0`, `engine.minor=39`, capabilities platform, storage, clipboard; `control.*` and `engine.gamepad.*` for every action; server=score-script.js.
+- `starhermit.txt`: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.44.1`, `engine.minor=44`, capabilities platform, storage, clipboard; `control.*` and `engine.gamepad.*` for every action; server=score-script.js.
 - `npm run package` writes the web loader `index.html` and `starhermit-files.json` (`starhermit package --web .`); `.starhermitignore` leaves out tests/, tools/, server.js, docs and data/. Re-run after every change.
 
 ### Identity, saves, preferences, controls
@@ -292,3 +293,7 @@ This document does **not** authorize implementation, asset production, monetizat
 The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-SG`, `en-HK`, `en-BQ`, `es-CO`, `de-IT`, `fr-IT`, `es-CL`, `es-AR`, `es-EC`, `de-BR`. These reuse the corresponding existing translations in their language family. The runtime can resolve the exact regional tag. Language selection is available from the game’s Options panel or F2 and is saved per player in `ui.language`. Changes apply during play. Additional national, regional and indigenous language packs are only shipped once every English message has a translation with intact placeholders and markup. Complete additional language tables: `ja-JP`, `nl-BE`, `zh-SG`, `ms-SG`, `ta-SG`, `zh-HK`, `yue-HK`, `nl-NL`, `fi-FI`, `sv-FI`, `et-EE`, `id-ID`, `vi-VN`, `ru-FI`, `ru-EE`, `da-DE`, `lb-BE`, `co-FR`, `eu-FR`, `ca-FR`, `oc-FR`, `sl-IT`, `fur-IT`, `ca-IT`, `oc-IT`, `ca-ES`, `eu-ES`, `gl-ES`, `su-ID`, `bew-ID`, `km-VN`.
 
 <!-- regional-localization:end -->
+
+## Engine 1.44.1
+
+Browser play uses the WebGPU-only StarHermit 1.44.1 web runtime. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.

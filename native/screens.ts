@@ -163,7 +163,6 @@ export function drawScreens(): void {
   header(L);
   if (app.overlay === "pause") pausePanel(L);
   else if (app.overlay === "settings") settingsPanel(L);
-  toasts(L);
   if (app.focusNext) {
     const age = f.frame - app.openedFrame;
     if (age >= 1) ui.setFocus(app.focusNext);
@@ -358,20 +357,6 @@ function bodyTargets(): void {
   }
 }
 
-// ------------------------------------------------------------------ toasts
-function toasts(L: Layout): void {
-  if (!app.toasts.length) return;
-  const w = Math.min(L.lw - 32, 420);
-  // .pf-toasts sat at the bottom; on compact layouts that is the tray, so they show under the header there
-  const where = L.wide || app.screen ? { anchor: "bottom" as const, y: 16 }
-    : { anchor: "top" as const, y: Math.max(HEADER + 8, (view.y - frame().safeArea.top) / L.sc + 8) };
-  ui.place("toast-stack", where, () => {
-    ui.column("toast-col", () => {
-      app.toasts.forEach((t, i) => ui.column(`toast-${i}`, () => para(t.text, w - 34, "toast-text", `toast-${i}-text`), { style: t.ok ? "toast-ok" : "toast" }));
-    }, { spacing: 6, align: "center" });
-  });
-}
-
 // ------------------------------------------------------------------ the pause and settings panels (.pf-overlay)
 function pausePanel(L: Layout): void {
   const w = Math.min(300, L.lw - 32), inner = w - 40;
@@ -486,7 +471,12 @@ function buildScreen(w: number, L: Layout): void {
     case "title": titleScreen(w); break;
     case "modes": modesScreen(w); break;
     case "progression": progressionScreen(w); break;
-    case "help": helpScreen(w); break;
+    case "help": {
+      const actions = ["cursor_up", "cursor_left", "cursor_down", "cursor_right", "spawn", "material_1", "material_2", "material_3", "material_4", "joint", "delete", "run", "undo", "reframe", "pause"];
+      const version = JSON.stringify([w, platform.options.jointMode, actions.map((action) => keysFor(action))]);
+      ui.retain!("help-screen", version, () => helpScreen(w));
+      break;
+    }
     case "scores": scoresScreen(w); break;
     case "results": resultsScreen(w); break;
   }
