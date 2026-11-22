@@ -695,6 +695,7 @@ export function applyLook(next: Look): void {
     vignette: { amount: 0.2, inner: 0.3, outer: 0.8, scale: [1, 0.8] },
   } : null;
   renderer.antialias = next.antialias;
+  renderer.motionBlur = next.bloom !== null ? { intensity: 0.25, samples: 8, maxPixels: 16, targetFps: 60, camera: false } : null;
   particleCap = sparkCap(next);
   if (next.particles === "high") { pMat.map = softSprite; pMat.size = 0.2; pMat.blending = AdditiveBlending; }
   else { pMat.map = null; pMat.size = 0.14; pMat.blending = NormalBlending; }

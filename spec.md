@@ -1,6 +1,6 @@
 # Physics Foundry — Product and Game Specification
 
-**Document status:** running specification of the shipped game (StarHermit engine 1.44.1 script game, host API 1.44).
+**Document status:** running specification of the shipped game (StarHermit engine 1.47.0 script game, host API 1.47).
 **Game index:** 68  
 **Genre:** Physics sandbox  
 **Players:** 1 player; optional asynchronous score comparison  
@@ -204,7 +204,7 @@ Changing level swaps the assets live (materials, canvas textures, sphere geometr
 ## 6. StarHermit integration
 
 ### Packaging and launch
-- `starhermit.txt`: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.44.1`, `engine.minor=44`, capabilities platform, storage, clipboard; `control.*` and `engine.gamepad.*` for every action; server=score-script.js.
+- `starhermit.txt`: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.47.0`, `engine.minor=47`, capabilities platform, storage, clipboard; `control.*` and `engine.gamepad.*` for every action; server=score-script.js.
 - `npm run package` writes the web loader `index.html` and `starhermit-files.json` (`starhermit package --web .`); `.starhermitignore` leaves out tests/, tools/, server.js, docs and data/. Re-run after every change.
 
 ### Identity, saves, preferences, controls
@@ -294,6 +294,10 @@ The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-S
 
 <!-- regional-localization:end -->
 
-## Engine 1.44.1
+## Engine 1.47.0
 
-Browser play uses the WebGPU-only StarHermit 1.44.1 web runtime. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
+Browser play uses the WebGPU-only StarHermit 1.47.0 web runtime. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
+
+Browser rendering uses the engine's asynchronous pipeline creation so newly encountered materials do not stall the page. Native play retains the engine's synchronous pipeline behavior.
+
+Higher graphics tiers use native per-object motion blur for moving pieces and effects. Camera motion stays sharp, lower tiers omit the effect, and the runtime's Motion blur and Reduce motion preferences remain authoritative.
