@@ -12,7 +12,7 @@
     "metadataSource": "starhermit.txt",
     "createdAt": "2026-09-01T07:01:05.656455+00:00",
     "coverArtSource": "manifest",
-    "coverArtUpdatedAt": "2026-11-23T17:02:23.632896+00:00",
+    "coverArtUpdatedAt": "2026-11-26T13:12:04.148751+00:00",
     "submittedByUserId": "2712e04e-461b-4d23-81ae-e40b429128a8",
     "submittedByUsername": "starhermit",
     "hosting": {
@@ -22,9 +22,9 @@
       "pinnedCommitSha": null,
       "deployedCommitSha": null,
       "deployError": null,
-      "deployedAt": "2026-11-23T17:02:23.607482+00:00",
+      "deployedAt": "2026-11-26T13:12:04.117018+00:00",
       "externalLaunchUrl": null,
-      "engineVersion": "1.47.0",
+      "engineVersion": "1.50.0",
       "deployWarning": null
     },
     "description": "Experiment with materials, joints, tools, and characters in an interactive physics sandbox.",
@@ -36,19 +36,19 @@
     "links": [],
     "isDisabled": false
   },
-  "publishedAt": "2026-11-23T17:02:23.782Z",
-  "sourceCommit": "6b0fd4cad769c37bc0181d86a1074babd77f2659",
-  "bytesReceived": 1850087,
-  "archiveSha256": "046c13b4bf547c4889807e8987e3eb03b9f7269b02b45af18fca84134f4ea4c5",
+  "publishedAt": "2026-11-26T13:12:04.257Z",
+  "sourceCommit": "63775b8ef3f4dfb7d440a3deae01560612b0dd6a",
+  "bytesReceived": 1850083,
+  "archiveSha256": "425ea4e310146aa17e9b7467cba9a3088c9a3d7bf87a45450afb4521b8f78a54",
   "indexSha256": "6e54320b3ffe1b9e70b21fee7879e581dbd6af9ffc7282a15d8d27443b76c87b",
   "result": {
     "clientPublished": true,
     "serverImageLoaded": false,
     "imageDigest": null,
-    "bytesReceived": 1850087,
+    "bytesReceived": 1850083,
     "mode": "replace",
     "filesRemoved": 0,
-    "engineVersion": "1.47.0",
+    "engineVersion": "1.50.0",
     "deployWarning": null
   },
   "liveVerification": {
